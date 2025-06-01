@@ -11,6 +11,7 @@ import pandas as pd
 import pickle
 import threading
 import hashlib
+import shutil
 
 # Constants
 IMAGE_FOLDER = r"C:\spotbillfiles\backup\image"
@@ -341,27 +342,77 @@ def print_image():
         os.startfile(temp_file, "print")
 
 def save_image():
-    if img:
-        filetypes = [("PNG files", "*.png"), ("JPEG files", "*.jpg;*.jpeg"), ("All files", "*.*")]
-        save_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=filetypes)
-        if save_path:
-            try:
-                img.save(save_path)
-                messagebox.showinfo("Success", f"Image saved to:\n{save_path}")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to save image: {e}")
+    """
+    Save the currently displayed image in a folder named after the consumer ID,
+    with the filename as the date, inside the user's Downloads directory.
+    """
+    if img_original:
+        consumer_id = entry_consumer_id.get().strip()
+        selected_date_index = listbox_dates.curselection()
+        if not consumer_id or not selected_date_index:
+            messagebox.showwarning("Warning", "Please select a consumer and a date.")
+            return
+        selected_date = listbox_dates.get(selected_date_index)
+        # Format date for filename
+        date_str = selected_date.replace("-", "")
+        # Downloads path
+        downloads_dir = os.path.join(os.path.expanduser("~"), "Downloads")
+        consumer_dir = os.path.join(downloads_dir, consumer_id)
+        os.makedirs(consumer_dir, exist_ok=True)
+        save_path = os.path.join(consumer_dir, f"{date_str}.png")
+        try:
+            img_original.save(save_path)
+            messagebox.showinfo("Success", f"Image saved to:\n{save_path}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save image: {e}")
+
+def save_multiple_images():
+    """
+    Save all images for the current consumer ID in the Downloads/consumer_id folder,
+    with filenames as their dates.
+    """
+    consumer_id = entry_consumer_id.get().strip()
+    if not consumer_id or consumer_id not in image_index:
+        messagebox.showwarning("Warning", "Please search and select a valid Consumer ID first.")
+        return
+    images_data = image_index[consumer_id]["images"]
+    downloads_dir = os.path.join(os.path.expanduser("~"), "Downloads")
+    consumer_dir = os.path.join(downloads_dir, consumer_id)
+    os.makedirs(consumer_dir, exist_ok=True)
+    saved = 0
+    for date, paths in images_data.items():
+        # Prefer default folder image if present
+        default_img = None
+        for path in paths:
+            if path.startswith(os.path.abspath(IMAGE_FOLDER)):
+                default_img = path
+                break
+        image_path = default_img if default_img else paths[0]
+        ext = os.path.splitext(image_path)[1].lower()
+        save_path = os.path.join(consumer_dir, f"{date}{ext if ext else '.png'}")
+        try:
+            shutil.copy(image_path, save_path)
+            saved += 1
+        except Exception:
+            continue
+    if saved:
+        messagebox.showinfo("Success", f"{saved} images saved to:\n{consumer_dir}")
+    else:
+        messagebox.showwarning("Warning", "No images were saved.")
 
 def show_buttons():
     btn_zoom_out.pack(side=LEFT, padx=5)
     btn_zoom_in.pack(side=LEFT, padx=5)
     btn_print.pack(side=LEFT, padx=5)
     btn_save.pack(side=LEFT, padx=5)
+    btn_save_multiple.pack(side=LEFT, padx=5)
 
 def hide_buttons():
     btn_zoom_in.pack_forget()
     btn_zoom_out.pack_forget()
     btn_print.pack_forget()
     btn_save.pack_forget()
+    btn_save_multiple.pack_forget()
 
 def load_searched_lists():
     if os.path.exists(SEARCHED_LISTS_FILE):
@@ -769,6 +820,8 @@ btn_zoom_out = tb.Button(button_frame, text="-", command=zoom_out, bootstyle="se
 btn_zoom_in = tb.Button(button_frame, text="+", command=zoom_in, bootstyle="secondary-outline")
 btn_print = tb.Button(button_frame, text="Print", command=print_image, bootstyle="info-outline")
 btn_save = tb.Button(button_frame, text="Save", command=save_image, bootstyle="success-outline")
+btn_save_multiple = tb.Button(button_frame, text="Save All", command=save_multiple_images, bootstyle="success-outline")
+
 
 hide_buttons()
 
