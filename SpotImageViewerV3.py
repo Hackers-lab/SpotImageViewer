@@ -6,29 +6,49 @@ from datetime import datetime
 import subprocess
 import json
 import pandas as pd
+import pickle
 
 # Constants
 IMAGE_FOLDER = r"C:\spotbillfiles\backup\image"
 TXT_FILE = r"C:\spotbillfiles\backup\images.txt"
 JSON_FILE = r"C:\spotbillfiles\backup\meter_mapping.json"
 SEARCHED_LISTS_FILE = r"C:\spotbillfiles\backup\searched_lists.json"
+PICKLE_FILE = r"C:\spotbillfiles\backup\image_index.pkl"
 
 # Global Variables
 image_index = {}  # Stores the image index
 meter_mapping = {}  # Stores the meter mapping (con_id -> meter_no)
 img_tk = None  # Stores the displayed image
 img = None  # Stores the original image
+img_original = None  # Stores the original image for zooming
+
+# Zoom scale
+zoom_scale = 1.0  # Track zoom level
 
 
-# Function to generate images.txt using the batch command
+# Function to generate images.txt using the batch command and update pickle
 def generate_images_txt():
     try:
         command = f'dir "{IMAGE_FOLDER}" /b > "{TXT_FILE}"'
         subprocess.run(command, shell=True, check=True)
         messagebox.showinfo("Success", "Images loaded successfully!")
-        reload_image_index()
+        reload_image_index(save_pickle=True)
     except subprocess.CalledProcessError as e:
         messagebox.showerror("Error", f"Failed to load images: {e}")
+
+
+# Save image index to pickle
+def save_image_index_pickle(index):
+    with open(PICKLE_FILE, "wb") as f:
+        pickle.dump(index, f)
+
+
+# Load image index from pickle
+def load_image_index_pickle():
+    if os.path.exists(PICKLE_FILE):
+        with open(PICKLE_FILE, "rb") as f:
+            return pickle.load(f)
+    return None
 
 
 # Load image index from the text file
@@ -59,10 +79,18 @@ def load_image_index():
     return image_index
 
 
-# Reload the image index and update the GUI
-def reload_image_index():
+# Reload the image index and update the GUI, using pickle if available
+def reload_image_index(save_pickle=False):
     global image_index
+    if not save_pickle:
+        index = load_image_index_pickle()
+        if index is not None:
+            image_index = index
+            update_image_count()
+            return
     image_index = load_image_index()
+    if save_pickle:
+        save_image_index_pickle(image_index)
     update_image_count()
 
 
@@ -241,6 +269,7 @@ def show_about():
     )
     messagebox.showinfo("About", about_text)
 
+
 # Add this function to open the PDF file using os.startfile
 def open_documentation():
     pdf_path = os.path.join(os.path.dirname(TXT_FILE), "help.pdf")  # Path to the PDF file
@@ -252,6 +281,7 @@ def open_documentation():
             messagebox.showerror("Error", f"Failed to open the PDF file: {e}")
     else:
         messagebox.showerror("Error", "The help documentation file (help.pdf) was not found!")
+
 
 # Update the total image count label
 def update_image_count():
@@ -265,7 +295,7 @@ def update_image_count():
 
 # Function to display the selected image
 def display_image(event):
-    global img_tk, img
+    global img_tk, img, img_original
     selected_date_index = listbox_dates.curselection()
     if not selected_date_index:
         return
@@ -279,7 +309,8 @@ def display_image(event):
             if format_date(date) == selected_date:
                 image_path = images_data[date][0]
                 try:
-                    img = Image.open(image_path)
+                    img_original = Image.open(image_path)  # Store original
+                    img = img_original.copy()
                     img.thumbnail((canvas.winfo_width(), canvas.winfo_height()), Image.Resampling.LANCZOS)
                     img_tk = ImageTk.PhotoImage(img)
 
@@ -294,11 +325,11 @@ def display_image(event):
 
 # Zoom In functionality
 def zoom_in():
-    global img_tk, img
-    if img:
-        width, height = img.size
-        new_size = (int(width * 1.2), int(height * 1.2))  # Increase size by 20%
-        img = img.resize(new_size, Image.Resampling.LANCZOS)
+    global img_tk, img, zoom_scale, img_original
+    if img_original:
+        zoom_scale *= 1.2
+        new_size = (int(img_original.width * zoom_scale), int(img_original.height * zoom_scale))
+        img = img_original.resize(new_size, Image.Resampling.LANCZOS)
         img_tk = ImageTk.PhotoImage(img)
         canvas.delete("all")
         canvas.create_image(canvas.winfo_width() // 2, canvas.winfo_height() // 2, anchor=tk.CENTER, image=img_tk)
@@ -306,11 +337,11 @@ def zoom_in():
 
 # Zoom Out functionality
 def zoom_out():
-    global img_tk, img
-    if img:
-        width, height = img.size
-        new_size = (int(width * 0.8), int(height * 0.8))  # Decrease size by 20%
-        img = img.resize(new_size, Image.Resampling.LANCZOS)
+    global img_tk, img, zoom_scale, img_original
+    if img_original:
+        zoom_scale *= 0.8
+        new_size = (int(img_original.width * zoom_scale), int(img_original.height * zoom_scale))
+        img = img_original.resize(new_size, Image.Resampling.LANCZOS)
         img_tk = ImageTk.PhotoImage(img)
         canvas.delete("all")
         canvas.create_image(canvas.winfo_width() // 2, canvas.winfo_height() // 2, anchor=tk.CENTER, image=img_tk)
@@ -324,11 +355,25 @@ def print_image():
         os.startfile(temp_file, "print")  # Open the image in the default viewer and print
 
 
+# Save functionality
+def save_image():
+    if img:
+        filetypes = [("PNG files", "*.png"), ("JPEG files", "*.jpg;*.jpeg"), ("All files", "*.*")]
+        save_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=filetypes)
+        if save_path:
+            try:
+                img.save(save_path)
+                messagebox.showinfo("Success", f"Image saved to:\n{save_path}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save image: {e}")
+
+
 # Show buttons when an image is displayed
 def show_buttons():
     btn_zoom_out.pack(side=tk.LEFT, padx=5)
     btn_zoom_in.pack(side=tk.LEFT, padx=5)
     btn_print.pack(side=tk.LEFT, padx=5)
+    btn_save.pack(side=tk.LEFT, padx=5)  # <-- Add this line
 
 
 # Hide buttons when no image is displayed
@@ -336,6 +381,7 @@ def hide_buttons():
     btn_zoom_in.pack_forget()
     btn_zoom_out.pack_forget()
     btn_print.pack_forget()
+    btn_save.pack_forget()  # <-- Add this line
 
 
 # Load searched lists from file
@@ -484,13 +530,14 @@ frame_right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
 canvas = tk.Canvas(frame_right, bg="white")
 canvas.pack(fill=tk.BOTH, expand=True)
 
-# Add buttons for zoom in, zoom out, and print
+# Add buttons for zoom in, zoom out, print, and save
 button_frame = ttk.Frame(frame_right)
 button_frame.pack(pady=10)
 
 btn_zoom_out = ttk.Button(button_frame, text="-", command=zoom_out)
 btn_zoom_in = ttk.Button(button_frame, text="+", command=zoom_in)
 btn_print = ttk.Button(button_frame, text="Print", command=print_image)
+btn_save = ttk.Button(button_frame, text="Save", command=save_image)  # <-- Add this line
 
 # Hide buttons initially
 hide_buttons()
