@@ -9,6 +9,7 @@ import subprocess
 import json
 import pandas as pd
 import pickle
+import threading
 
 # Constants
 IMAGE_FOLDER = r"C:\spotbillfiles\backup\image"
@@ -16,6 +17,7 @@ TXT_FILE = r"C:\spotbillfiles\backup\images.txt"
 JSON_FILE = r"C:\spotbillfiles\backup\meter_mapping.json"
 SEARCHED_LISTS_FILE = r"C:\spotbillfiles\backup\searched_lists.json"
 PICKLE_FILE = r"C:\spotbillfiles\backup\image_index.pkl"
+ADDITIONAL_FOLDERS_FILE = r"C:\spotbillfiles\backup\additional_folders.json"
 
 # Global Variables
 image_index = {}
@@ -24,6 +26,7 @@ img_tk = None
 img = None
 img_original = None
 zoom_scale = 1.0
+additional_folders = []
 
 def generate_images_txt():
     try:
@@ -414,6 +417,53 @@ def open_preview_image(consumer_id, date):
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to load image: {e}")
 
+def load_additional_folders():
+    global additional_folders
+    if os.path.exists(ADDITIONAL_FOLDERS_FILE):
+        with open(ADDITIONAL_FOLDERS_FILE, "r") as f:
+            additional_folders = json.load(f)
+    else:
+        additional_folders = []
+
+def save_additional_folders():
+    with open(ADDITIONAL_FOLDERS_FILE, "w") as f:
+        json.dump(additional_folders, f, indent=4)
+
+def add_folder():
+    folder = filedialog.askdirectory(title="Select Additional Image Folder")
+    if folder and folder not in additional_folders:
+        additional_folders.append(folder)
+        save_additional_folders()
+        update_folder_list()
+
+def remove_folder():
+    selected = folder_listbox.curselection()
+    if selected:
+        idx = selected[0]
+        del additional_folders[idx]
+        save_additional_folders()
+        update_folder_list()
+
+def check_folder_status(folder):
+    return os.path.exists(folder)
+
+def update_folder_list():
+    folder_listbox.delete(0, tk.END)
+    for folder in additional_folders:
+        status = check_folder_status(folder)
+        color = "green" if status else "red"
+        folder_listbox.insert(tk.END, folder)
+        folder_listbox.itemconfig(tk.END, foreground=color)
+
+def refresh_folder_status():
+    # Refresh status colors in the listbox
+    for idx, folder in enumerate(additional_folders):
+        status = check_folder_status(folder)
+        color = "green" if status else "red"
+        folder_listbox.itemconfig(idx, foreground=color)
+    # Schedule next check
+    folder_status_pane.after(3000, refresh_folder_status)
+
 # --- GUI SECTION ---
 
 root = tb.Window(themename="minty")
@@ -488,6 +538,7 @@ help_menu.add_command(label="About", command=show_about)
 main_frame = tb.Frame(root)
 main_frame.pack(fill=BOTH, expand=True)
 
+# Left pane (dates)
 frame_left = tb.Frame(main_frame, width=200, padding=10, relief="ridge", borderwidth=2)
 frame_left.pack(side=LEFT, fill=Y, padx=10, pady=10)
 
@@ -510,8 +561,9 @@ listbox_dates = tk.Listbox(frame_left, font=("Arial", 12), height=20)
 listbox_dates.pack(fill=BOTH, expand=True)
 listbox_dates.bind("<<ListboxSelect>>", display_image)
 
+# Right pane (image display)
 frame_right = tb.Frame(main_frame, padding=10, relief="ridge", borderwidth=2)
-frame_right.pack(side=RIGHT, fill=BOTH, expand=True, padx=10, pady=10)
+frame_right.pack(side=LEFT, fill=BOTH, expand=True, padx=10, pady=10)
 
 canvas = tk.Canvas(frame_right, bg="#f8f9fa")
 canvas.pack(fill=BOTH, expand=True)
@@ -538,6 +590,45 @@ btn_print = tb.Button(button_frame, text="Print", command=print_image, bootstyle
 btn_save = tb.Button(button_frame, text="Save", command=save_image, bootstyle="success-outline")
 
 hide_buttons()
+
+# New: Far right pane for folder management
+folder_status_pane = tb.Frame(main_frame, width=250, padding=10, relief="ridge", borderwidth=2)
+folder_status_pane.pack(side=RIGHT, fill=Y, padx=10, pady=10)
+
+folder_title = tb.Label(folder_status_pane, text="Network Folders", font=("Arial", 13, "bold"), bootstyle="info")
+folder_title.pack(pady=(0, 10))
+
+folder_listbox = tk.Listbox(folder_status_pane, font=("Arial", 12), height=20, width=32)
+folder_listbox.pack(pady=5, fill=X)
+
+btn_add_folder = tb.Button(folder_status_pane, text="Add", command=add_folder, bootstyle="success")
+btn_add_folder.pack(side=LEFT, padx=5, pady=10, anchor="s")
+
+btn_remove_folder = tb.Button(
+    folder_status_pane,
+    text="Remove",
+    command=remove_folder,
+    bootstyle="danger"
+)
+btn_remove_folder.pack(side=LEFT, padx=5, pady=10, anchor="s")
+
+# Enable selection with mouse click for folder_listbox
+def on_folder_select(event):
+    # This function can be expanded if you want to show folder details on selection
+    pass
+
+folder_listbox.bind("<<ListboxSelect>>", on_folder_select)
+
+# Optionally, allow pressing Delete key to remove selected folder
+def on_folder_delete(event):
+    remove_folder()
+
+folder_listbox.bind("<Delete>", on_folder_delete)
+
+# Load and show folders at startup
+load_additional_folders()
+update_folder_list()
+refresh_folder_status()
 
 reload_image_index()
 
