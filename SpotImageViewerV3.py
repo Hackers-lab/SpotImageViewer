@@ -108,8 +108,9 @@ def search_consumer():
     listbox_dates.delete(0, tk.END)
     label_consumer_details.config(text="")
     label_total_images.config(text="")
-    canvas.delete("all")
-    hide_buttons()  # Hide buttons when no image is displayed
+    #canvas.delete("all")
+    #hide_buttons()  # Hide buttons when no image is displayed
+    show_latest_previews(consumer_id)
 
     if not consumer_id.isdigit() or len(consumer_id) != 9:
         messagebox.showwarning("Invalid Input", "Consumer ID must be a 9-digit number.")
@@ -250,6 +251,9 @@ def refresh_search():
     label_total_images.config(text="")
     canvas.delete("all")
     hide_buttons()  # Hide buttons when no image is displayed
+    # Hide preview images
+    for frame in preview_frames:
+        frame.pack_forget()
 
 
 # Show About information
@@ -295,6 +299,9 @@ def update_image_count():
 
 # Function to display the selected image
 def display_image(event):
+    # Hide previews
+    for frame in preview_frames:
+        frame.pack_forget()
     global img_tk, img, img_original
     selected_date_index = listbox_dates.curselection()
     if not selected_date_index:
@@ -437,6 +444,72 @@ def show_progress(message):
     progress_window.update()  # Update the window to show the message
     return progress_window
 
+def show_latest_previews(consumer_id):
+    # Hide main image and buttons
+    canvas.delete("all")
+    hide_buttons()
+    # Remove any previous previews
+    for frame in preview_frames:
+        frame.pack_forget()
+    # If not found, do nothing
+    if consumer_id not in image_index:
+        return
+    images_data = image_index[consumer_id]["images"]
+    all_images = []
+    for date, paths in images_data.items():
+        for path in paths:
+            all_images.append((date, path))
+    all_images.sort(key=lambda x: datetime.strptime(x[0], "%d%m%Y"), reverse=True)
+    # Store the date for each preview so we can use it in the click handler
+    preview_dates = []
+    for i, (date, path) in enumerate(all_images[:5]):
+        try:
+            img = Image.open(path)
+            img.thumbnail((200, 200), Image.Resampling.LANCZOS)
+            img_tk = ImageTk.PhotoImage(img)
+            preview_canvases[i].delete("all")
+            preview_canvases[i].create_image(110, 110, anchor=tk.CENTER, image=img_tk)
+            preview_canvases[i].image = img_tk  # Keep reference
+            preview_labels[i].config(text=format_date(date))
+            preview_frames[i].pack(side=tk.LEFT, padx=10, pady=10, in_=frame_right)
+            preview_dates.append(date)
+            # Remove previous bindings to avoid stacking
+            preview_canvases[i].unbind("<Button-1>")
+            # Bind click event to open the image as if selected from date pane
+            def make_onclick(idx):
+                return lambda event: open_preview_image(consumer_id, preview_dates[idx])
+            preview_canvases[i].bind("<Button-1>", make_onclick(i))
+        except Exception as e:
+            preview_labels[i].config(text="Error")
+            preview_canvases[i].delete("all")
+            preview_frames[i].pack(side=tk.LEFT, padx=10, pady=10, in_=frame_right)
+            preview_canvases[i].unbind("<Button-1>")
+    # Hide unused previews
+    for j in range(len(all_images), 5):
+        preview_frames[j].pack_forget()
+        preview_canvases[j].unbind("<Button-1>")
+
+def open_preview_image(consumer_id, date):
+    # Hide previews
+    for frame in preview_frames:
+        frame.pack_forget()
+    global img_tk, img, img_original, zoom_scale
+    zoom_scale = 1.0
+    if consumer_id in image_index:
+        images_data = image_index[consumer_id]["images"]
+        if date in images_data:
+            image_path = images_data[date][0]
+            try:
+                img_original = Image.open(image_path)  # Store original
+                img = img_original.copy()
+                img.thumbnail((canvas.winfo_width(), canvas.winfo_height()), Image.Resampling.LANCZOS)
+                img_tk = ImageTk.PhotoImage(img)
+                canvas.delete("all")
+                canvas.image = img_tk  # Keep a reference to avoid garbage collection
+                canvas.create_image(canvas.winfo_width() // 2, canvas.winfo_height() // 2, anchor=tk.CENTER, image=img_tk)
+                show_buttons()  # Show buttons when an image is displayed
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to load image: {e}")
 
 # Initialize the GUI
 root = tk.Tk()
@@ -530,6 +603,20 @@ frame_right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
 canvas = tk.Canvas(frame_right, bg="white")
 canvas.pack(fill=tk.BOTH, expand=True)
 
+# Preview canvases and labels for 5 latest images
+preview_frames = []
+preview_canvases = []
+preview_labels = []
+for i in range(5):  # Change 3 to 5
+    frame = ttk.Frame(frame_right)
+    canvas_preview = tk.Canvas(frame, width=220, height=220, bg="white", highlightthickness=1, highlightbackground="gray")
+    label = ttk.Label(frame, text="", font=("Arial", 10))
+    canvas_preview.pack()
+    label.pack()
+    preview_frames.append(frame)
+    preview_canvases.append(canvas_preview)
+    preview_labels.append(label)
+
 # Add buttons for zoom in, zoom out, print, and save
 button_frame = ttk.Frame(frame_right)
 button_frame.pack(pady=10)
@@ -560,3 +647,4 @@ entry_meter_number.bind("<space>", lambda e: show_searched_lists(e, entry_meter_
 
 # Start the application
 root.mainloop()
+
