@@ -10,6 +10,7 @@ import json
 import pandas as pd
 import pickle
 import threading
+import hashlib
 
 # Constants
 IMAGE_FOLDER = r"C:\spotbillfiles\backup\image"
@@ -27,15 +28,37 @@ img = None
 img_original = None
 zoom_scale = 1.0
 additional_folders = []
+last_online_folders = set()
 
 def generate_images_txt():
-    try:
-        command = f'dir "{IMAGE_FOLDER}" /b > "{TXT_FILE}"'
-        subprocess.run(command, shell=True, check=True)
-        messagebox.showinfo("Success", "Images loaded successfully!")
-        reload_image_index(save_pickle=True)
-    except subprocess.CalledProcessError as e:
-        messagebox.showerror("Error", f"Failed to load images: {e}")
+    """
+    Generate images.txt for all online folders (default + additional).
+    Each folder gets its own TXT file with a unique name.
+    """
+    # Always include the default folder first
+    folders = [IMAGE_FOLDER] + [f for f in additional_folders if check_folder_status(f)]
+    txt_files = []
+
+    for folder in folders:
+        # Create a unique filename for each folder's txt file
+        folder_hash = hashlib.md5(folder.encode()).hexdigest()[:8]
+        txt_file = os.path.join(os.path.dirname(TXT_FILE), f"images_{folder_hash}.txt")
+        txt_files.append(txt_file)
+        try:
+            command = f'dir "{folder}" /b > "{txt_file}"'
+            subprocess.run(command, shell=True, check=True)
+        except subprocess.CalledProcessError as e:
+            messagebox.showerror("Error", f"Failed to load images from {folder}: {e}")
+
+    # Merge all txt files into the main TXT_FILE (default folder first, then others)
+    with open(TXT_FILE, "w") as outfile:
+        for folder, txt_file in zip(folders, txt_files):
+            with open(txt_file, "r") as infile:
+                for line in infile:
+                    outfile.write(f"{os.path.abspath(folder)}|{line.strip()}\n")
+
+    messagebox.showinfo("Success", "Images loaded successfully from all online folders!")
+    reload_image_index(save_pickle=True)
 
 def save_image_index_pickle(index):
     with open(PICKLE_FILE, "wb") as f:
@@ -48,22 +71,40 @@ def load_image_index_pickle():
     return None
 
 def load_image_index():
+    """
+    Load image index from TXT_FILE, supporting multiple folders.
+    Only images from online folders are included.
+    """
     global image_index
     image_index = {}
     try:
         with open(TXT_FILE, "r") as file:
             for line in file:
-                filename = line.strip()
+                line = line.strip()
+                if "|" in line:
+                    folder_path, filename = line.split("|", 1)
+                else:
+                    # For backward compatibility, assume default folder
+                    folder_path, filename = IMAGE_FOLDER, line
+
+                # Only process if folder is online
+                if not check_folder_status(folder_path):
+                    continue
+
                 if len(filename) < 23:
                     continue
                 date = filename[:8]
                 mru = filename[8:16]
                 consumer_id = filename[16:25]
+                full_path = os.path.join(folder_path, filename)
+                # Priority: default folder images overwrite others
                 if consumer_id not in image_index:
                     image_index[consumer_id] = {"MRU": mru, "images": {}}
                 if date not in image_index[consumer_id]["images"]:
                     image_index[consumer_id]["images"][date] = []
-                image_index[consumer_id]["images"][date].append(os.path.join(IMAGE_FOLDER, filename))
+                # Only add if not already present (avoid duplicates)
+                if full_path not in image_index[consumer_id]["images"][date]:
+                    image_index[consumer_id]["images"][date].append(full_path)
     except FileNotFoundError:
         messagebox.showinfo("Welcome", "Greetings!!\nAt first we will load existing images!!\nPress OK to continue...")
     except Exception as e:
@@ -71,16 +112,7 @@ def load_image_index():
     return image_index
 
 def reload_image_index(save_pickle=False):
-    global image_index
-    if not save_pickle:
-        index = load_image_index_pickle()
-        if index is not None:
-            image_index = index
-            update_image_count()
-            return
-    image_index = load_image_index()
-    if save_pickle:
-        save_image_index_pickle(image_index)
+    load_all_folder_indexes()
     update_image_count()
 
 def format_date(date_str):
@@ -213,12 +245,14 @@ def show_about():
         "Spot Image Viewer\n\n"
         "Features:\n"
         "• Search and preview consumer images by Consumer ID or Meter Number.\n"
-        "• Instantly preview the 5 latest images for a consumer after search.\n"
+        "• Instantly preview the 3 latest images for a consumer after search.\n"
         "• Click any preview to view it in full size.\n"
         "• View all available image dates and select any to display the image.\n"
-        "• Zoom in/out and print or save the displayed image.\n"
+        "• Zoom in/out, print, or save the displayed image.\n"
+        "• Save all images for a consumer to your Downloads folder with one click.\n"
+        "• Add or remove network folders; images from online folders are merged and counted live.\n"
         "• Update the meter list by importing an Excel file with Consumer IDs and Meter Numbers.\n"
-        "• Theme selector for instant appearance change (Settings menu).\n"
+        "• Theme selector for instant appearance change (Theme menu).\n"
         "• Maintain a history of searched Consumer IDs and Meter Numbers for quick access.\n\n"
         "Developed By: Pramod Verma\n"
         "ERP ID: 90018747\n"
@@ -237,12 +271,15 @@ def open_documentation():
         messagebox.showerror("Error", "The help documentation file (help.pdf) was not found!")
 
 def update_image_count():
-    total_images = sum(
-        len(images)
-        for consumer_data in image_index.values()
-        for images in consumer_data["images"].values()
-    )
-    label_image_count.config(text=f"Total Images in Database: {total_images}")
+    """
+    Update the total image count label using the same logic as debug_show_index_counts,
+    so the displayed count always matches the merged/app total.
+    """
+    merged_total = 0
+    for consumer_data in image_index.values():
+        for images in consumer_data["images"].values():
+            merged_total += len(images)
+    label_image_count.config(text=f"Total Images in Database: {merged_total}")
 
 def display_image(event):
     for frame in preview_frames:
@@ -257,7 +294,13 @@ def display_image(event):
         images_data = image_index[consumer_id]["images"]
         for date in images_data:
             if format_date(date) == selected_date:
-                image_path = images_data[date][0]
+                # Prefer default folder image if present
+                default_img = None
+                for img_path in images_data[date]:
+                    if img_path.startswith(os.path.abspath(IMAGE_FOLDER)):
+                        default_img = img_path
+                        break
+                image_path = default_img if default_img else images_data[date][0]
                 try:
                     img_original = Image.open(image_path)
                     img = img_original.copy()
@@ -368,11 +411,16 @@ def show_latest_previews(consumer_id):
     images_data = image_index[consumer_id]["images"]
     all_images = []
     for date, paths in images_data.items():
+        # Prefer default folder image if present
+        default_img = None
         for path in paths:
-            all_images.append((date, path))
+            if path.startswith(os.path.abspath(IMAGE_FOLDER)):
+                default_img = path
+                break
+        all_images.append((date, default_img if default_img else paths[0]))
     all_images.sort(key=lambda x: datetime.strptime(x[0], "%d%m%Y"), reverse=True)
     preview_dates = []
-    for i, (date, path) in enumerate(all_images[:5]):
+    for i, (date, path) in enumerate(all_images[:3]):
         try:
             img = Image.open(path)
             img.thumbnail((200, 200), Image.Resampling.LANCZOS)
@@ -392,7 +440,7 @@ def show_latest_previews(consumer_id):
             preview_canvases[i].delete("all")
             preview_frames[i].pack(side=LEFT, padx=10, pady=10, in_=frame_right)
             preview_canvases[i].unbind("<Button-1>")
-    for j in range(len(all_images), 5):
+    for j in range(len(all_images), 3):
         preview_frames[j].pack_forget()
         preview_canvases[j].unbind("<Button-1>")
 
@@ -404,7 +452,13 @@ def open_preview_image(consumer_id, date):
     if consumer_id in image_index:
         images_data = image_index[consumer_id]["images"]
         if date in images_data:
-            image_path = images_data[date][0]
+            # Prefer default folder image if present
+            default_img = None
+            for img_path in images_data[date]:
+                if img_path.startswith(os.path.abspath(IMAGE_FOLDER)):
+                    default_img = img_path
+                    break
+            image_path = default_img if default_img else images_data[date][0]
             try:
                 img_original = Image.open(image_path)
                 img = img_original.copy()
@@ -435,6 +489,10 @@ def add_folder():
         additional_folders.append(folder)
         save_additional_folders()
         update_folder_list()
+        def do_indexing():
+            generate_folder_index(folder)
+            root.after(0, reload_image_index)  # Ensure UI update on main thread
+        threading.Thread(target=do_indexing, daemon=True).start()
 
 def remove_folder():
     selected = folder_listbox.curselection()
@@ -456,13 +514,137 @@ def update_folder_list():
         folder_listbox.itemconfig(tk.END, foreground=color)
 
 def refresh_folder_status():
+    global last_online_folders
     # Refresh status colors in the listbox
     for idx, folder in enumerate(additional_folders):
         status = check_folder_status(folder)
         color = "green" if status else "red"
         folder_listbox.itemconfig(idx, foreground=color)
+    # Check if online folders have changed
+    current_online = set([IMAGE_FOLDER] + [f for f in additional_folders if check_folder_status(f)])
+    if current_online != last_online_folders:
+        last_online_folders = current_online
+        reload_image_index()  # This will also update image count
     # Schedule next check
     folder_status_pane.after(3000, refresh_folder_status)
+
+def generate_folder_index(folder):
+    """
+    Generate a pickle index for a single folder.
+    """
+    folder_hash = hashlib.md5(folder.encode()).hexdigest()[:8]
+    index_file = os.path.join(os.path.dirname(TXT_FILE), f"index_{folder_hash}.pkl")
+    index = {}
+    try:
+        for filename in os.listdir(folder):
+            if len(filename) < 23:
+                continue
+            date = filename[:8]
+            mru = filename[8:16]
+            consumer_id = filename[16:25]
+            full_path = os.path.join(folder, filename)
+            if consumer_id not in index:
+                index[consumer_id] = {"MRU": mru, "images": {}}
+            if date not in index[consumer_id]["images"]:
+                index[consumer_id]["images"][date] = []
+            index[consumer_id]["images"][date].append(full_path)
+        with open(index_file, "wb") as f:
+            pickle.dump(index, f)
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to index images in {folder}: {e}")
+
+def show_indexing_progress():
+    progress_window = Toplevel()
+    progress_window.title("Indexing Images")
+    label = tb.Label(progress_window, text="Indexing images, please wait...", font=("Arial", 14))
+    label.pack(padx=30, pady=30)
+    progress_window.update()
+    # Let the window be visible for at least a short time
+    root.after(500, progress_window.destroy)
+
+def generate_all_folder_indexes():
+    folders = [IMAGE_FOLDER] + [f for f in additional_folders if check_folder_status(f)]
+    for folder in folders:
+        generate_folder_index(folder)
+    messagebox.showinfo("Success", "New images updated!")
+    reload_image_index()
+
+def generate_all_folder_indexes_with_progress():
+    progress_window = Toplevel()
+    progress_window.title("Indexing Images")
+    label = tb.Label(progress_window, text="Indexing images, please wait...", font=("Arial", 14))
+    label.pack(padx=30, pady=30)
+    progress_window.update()
+
+    def do_indexing():
+        folders = [IMAGE_FOLDER] + [f for f in additional_folders if check_folder_status(f)]
+        for folder in folders:
+            generate_folder_index(folder)
+        # Schedule UI updates on the main thread
+        def finish():
+            progress_window.destroy()
+            messagebox.showinfo("Success", "Images updated for all online folders!")
+            reload_image_index()  # This will also update image count
+        root.after(0, finish)
+
+    threading.Thread(target=do_indexing, daemon=True).start()
+
+def load_all_folder_indexes():
+    """
+    Load and merge indexes from all online folders, giving priority to default folder.
+    """
+    global image_index
+    image_index = {}
+    folders = [IMAGE_FOLDER] + [f for f in additional_folders if check_folder_status(f)]
+    folder_indexes = []
+    for folder in folders:
+        folder_hash = hashlib.md5(folder.encode()).hexdigest()[:8]
+        index_file = os.path.join(os.path.dirname(TXT_FILE), f"index_{folder_hash}.pkl")
+        if os.path.exists(index_file):
+            with open(index_file, "rb") as f:
+                folder_indexes.append(pickle.load(f))
+    # Merge: default folder first, then others (others only add if not present)
+    for idx, folder_index in enumerate(folder_indexes):
+        for consumer_id, consumer_data in folder_index.items():
+            if consumer_id not in image_index:
+                image_index[consumer_id] = {"MRU": consumer_data["MRU"], "images": {}}
+            for date, images in consumer_data["images"].items():
+                if date not in image_index[consumer_id]["images"]:
+                    image_index[consumer_id]["images"][date] = []
+                # For default folder, insert at front; for others, append if not present
+                for img_path in images:
+                    if img_path not in image_index[consumer_id]["images"][date]:
+                        if idx == 0:  # default folder
+                            image_index[consumer_id]["images"][date].insert(0, img_path)
+                        else:
+                            image_index[consumer_id]["images"][date].append(img_path)
+
+def debug_show_index_counts():
+    """
+    Show a popup with the image count for each folder index and the merged total.
+    """
+    folders = [IMAGE_FOLDER] + [f for f in additional_folders if check_folder_status(f)]
+    msg_lines = []
+    total_per_folder = []
+    for folder in folders:
+        folder_hash = hashlib.md5(folder.encode()).hexdigest()[:8]
+        index_file = os.path.join(os.path.dirname(TXT_FILE), f"index_{folder_hash}.pkl")
+        count = 0
+        if os.path.exists(index_file):
+            with open(index_file, "rb") as f:
+                folder_index = pickle.load(f)
+                for consumer_data in folder_index.values():
+                    for images in consumer_data["images"].values():
+                        count += len(images)
+        msg_lines.append(f"{os.path.basename(folder)}: {count} images")
+        total_per_folder.append(count)
+    # Now show merged total from image_index
+    merged_total = 0
+    for consumer_data in image_index.values():
+        for images in consumer_data["images"].values():
+            merged_total += len(images)
+    msg_lines.append(f"\nMerged (app) total: {merged_total} images")
+    messagebox.showinfo("Image count info", "\n".join(msg_lines))
 
 # --- GUI SECTION ---
 
@@ -470,9 +652,6 @@ root = tb.Window(themename="minty")
 root.title("Spot Image Viewer")
 root.geometry("1200x800")
 root.state("zoomed")
-
-#title_label = tb.Label(root, text="Spot Image Viewer", font=("Arial", 24, "bold"), bootstyle="info")
-#title_label.pack(pady=10)
 
 frame_top = tb.Frame(root, padding=10)
 frame_top.pack(fill=X, padx=10, pady=10)
@@ -503,14 +682,17 @@ btn_refresh.pack(side=LEFT, padx=5)
 label_image_count = tb.Label(frame_top, text="Total Images: 0", font=("Arial", 12, "bold"), bootstyle="success")
 label_image_count.pack(side=LEFT, padx=5)
 
+# Menu Bar
 menu_bar = Menu(root)
 root.config(menu=menu_bar)
 file_menu = Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="File", menu=file_menu)
 file_menu.add_command(label="Update Consumer List", command=update_meter_list)
-file_menu.add_command(label="Reload Images", command=generate_images_txt)
+file_menu.add_command(label="Reload Images", command=generate_all_folder_indexes_with_progress)  # Use per-folder index!
+file_menu.add_command(label="Image Counts", command=debug_show_index_counts)
 file_menu.add_separator()
 file_menu.add_command(label="Exit", command=root.quit)
+
 
 # Theme selector menu (Settings)
 def change_theme(theme_name):
@@ -519,7 +701,6 @@ def change_theme(theme_name):
 settings_menu = Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="Theme", menu=settings_menu)
 
-# List of ttkbootstrap themes
 themes = [
     "cosmo", "flatly", "journal", "litera", "lumen", "minty", "pulse",
     "sandstone", "united", "yeti", "morph", "solar", "superhero", "cyborg", "darkly"
@@ -571,7 +752,7 @@ canvas.pack(fill=BOTH, expand=True)
 preview_frames = []
 preview_canvases = []
 preview_labels = []
-for i in range(5):
+for i in range(3):
     frame = tb.Frame(frame_right, padding=5, relief="groove", borderwidth=2)
     canvas_preview = tk.Canvas(frame, width=220, height=220, bg="#f8f9fa", highlightthickness=2, highlightbackground="#0d6efd")
     label = tb.Label(frame, text="", font=("Arial", 10, "bold"), bootstyle="secondary")
@@ -630,10 +811,8 @@ load_additional_folders()
 update_folder_list()
 refresh_folder_status()
 
+# Always load the index from per-folder pickles
 reload_image_index()
-
-if not os.path.exists(TXT_FILE):
-    generate_images_txt()
 
 if os.path.exists(JSON_FILE):
     entry_meter_number.config(state=tk.NORMAL)
@@ -641,6 +820,25 @@ if os.path.exists(JSON_FILE):
 
 entry_consumer_id.bind("<space>", lambda e: show_searched_lists(e, entry_consumer_id, "consumer_ids"))
 entry_meter_number.bind("<space>", lambda e: show_searched_lists(e, entry_meter_number, "meter_numbers"))
+
+def check_and_generate_indexes_on_startup():
+    # Check if any index exists
+    folders = [IMAGE_FOLDER] + additional_folders
+    index_exists = False
+    for folder in folders:
+        folder_hash = hashlib.md5(folder.encode()).hexdigest()[:8]
+        index_file = os.path.join(os.path.dirname(TXT_FILE), f"index_{folder_hash}.pkl")
+        if os.path.exists(index_file):
+            index_exists = True
+            break
+    if not index_exists:
+        messagebox.showinfo("Welcome", "Greetings!!\nNo image index found. The app will now index all images. This may take a while.")
+        generate_all_folder_indexes_with_progress()
+
+check_and_generate_indexes_on_startup()
+reload_image_index()
+
+
 
 root.mainloop()
 
