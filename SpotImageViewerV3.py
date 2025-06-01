@@ -4,7 +4,7 @@ from ttkbootstrap.constants import *
 import tkinter as tk
 from tkinter import messagebox, filedialog, Menu, Toplevel, Listbox
 from PIL import Image, ImageTk
-from datetime import datetime
+from datetime import datetime, timedelta
 import subprocess
 import json
 import pandas as pd
@@ -30,6 +30,22 @@ img_original = None
 zoom_scale = 1.0
 additional_folders = []
 last_online_folders = set()
+
+# Set your release/build date here
+RELEASE_DATE = datetime(2025, 6, 2)  # Change to your actual release date
+EXPIRY_DATE = RELEASE_DATE + timedelta(days=30)  # ~30 days
+
+if datetime.now() > EXPIRY_DATE:
+    import tkinter as tk
+    from tkinter import messagebox
+    root = tk.Tk()
+    root.withdraw()
+    messagebox.showerror(
+        "Version Expired!!",
+        "This version of Spot Image Viewer has expired.\n\nPlease install the new version\n\ncontact je.kushidaccc@gmail.com for an updated version.\n\nOr call 8092273459.\n\nThank you for using Spot Image Viewer!"
+    )
+    root.destroy()
+    exit()
 
 def generate_images_txt():
     """
