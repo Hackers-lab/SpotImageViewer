@@ -2,7 +2,7 @@ import os
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
 import tkinter as tk
-from tkinter import messagebox, filedialog, Menu, Toplevel, Listbox
+from tkinter import messagebox, filedialog, Menu, Toplevel, Listbox, ttk
 from PIL import Image, ImageTk
 from datetime import datetime, timedelta
 import subprocess
@@ -12,6 +12,7 @@ import pickle
 import threading
 import hashlib
 import shutil
+import time
 
 # Constants
 IMAGE_FOLDER = r"C:\spotbillfiles\backup\image"
@@ -31,21 +32,6 @@ zoom_scale = 1.0
 additional_folders = []
 last_online_folders = set()
 
-# Set your release/build date here
-RELEASE_DATE = datetime(2025, 6, 2)  # Change to your actual release date
-EXPIRY_DATE = RELEASE_DATE + timedelta(days=30)  # ~30 days
-
-if datetime.now() > EXPIRY_DATE:
-    import tkinter as tk
-    from tkinter import messagebox
-    root = tk.Tk()
-    root.withdraw()
-    messagebox.showerror(
-        "Version Expired!!",
-        "This version of Spot Image Viewer has expired.\n\nPlease install the new version\n\ncontact je.kushidaccc@gmail.com for an updated version.\n\nOr call 8092273459.\n\nThank you for using Spot Image Viewer!"
-    )
-    root.destroy()
-    exit()
 
 def generate_images_txt():
     """
@@ -130,7 +116,11 @@ def load_image_index():
 
 def reload_image_index(save_pickle=False):
     load_all_folder_indexes()
-    update_image_count()
+    #update_image_count()
+
+def reload_image_index_no_ui(save_pickle=False):
+    load_all_folder_indexes()
+    # Do NOT call update_image_count() here
 
 def format_date(date_str):
     try:
@@ -273,7 +263,7 @@ def show_about():
         "• Maintain a history of searched Consumer IDs and Meter Numbers for quick access.\n\n"
         "Developed By: Pramod Verma\n"
         "ERP ID: 90018747\n"
-        "Version: 3.1.0\n"
+        "Version: 4.1.0\n"
     )
     messagebox.showinfo("About", about_text)
 
@@ -286,6 +276,17 @@ def open_documentation():
             messagebox.showerror("Error", f"Failed to open the PDF file: {e}")
     else:
         messagebox.showerror("Error", "The help documentation file (help.pdf) was not found!")
+
+def background_reload_image_index():
+    """Run reload_image_index in a background thread and update UI when done."""
+    def worker():
+        t0 = time.time()
+        reload_image_index_no_ui()
+        t1 = time.time()
+        print(f"[Startup] reload_image_index (background): {t1-t0:.2f} seconds")
+        # Schedule UI update on main thread
+        root.after(0, update_image_count)
+    threading.Thread(target=worker, daemon=True).start()
 
 def update_image_count():
     """
@@ -452,12 +453,23 @@ def show_searched_lists(event, entry_widget, list_type):
     listbox.pack()
     for item in lists:
         listbox.insert(tk.END, item)
+
     def select_item(event):
-        selected_item = listbox.get(listbox.curselection())
+        # Get the index under the mouse pointer for single click
+        index = listbox.nearest(event.y)
+        if index < 0 or index >= listbox.size():
+            return
+        selected_item = listbox.get(index)
         entry_widget.delete(0, tk.END)
         entry_widget.insert(0, selected_item)
         dropdown.destroy()
-    listbox.bind("<Double-Button-1>", select_item)
+        # Trigger search and show image
+        if list_type == "consumer_ids":
+            search_consumer()
+        elif list_type == "meter_numbers":
+            search_meter()
+
+    listbox.bind("<Button-1>", select_item)
     listbox.bind("<Return>", select_item)
 
 def show_progress(message):
@@ -637,24 +649,54 @@ def generate_all_folder_indexes():
     reload_image_index()
 
 def generate_all_folder_indexes_with_progress():
-    progress_window = Toplevel()
-    progress_window.title("Indexing Images")
-    label = tb.Label(progress_window, text="Indexing images, please wait...", font=("Arial", 14))
-    label.pack(padx=30, pady=30)
-    progress_window.update()
+    folders = [IMAGE_FOLDER] + [f for f in additional_folders if check_folder_status(f)]
+    show_progress_bar()
+    progress_time_label.config(text="Loading images please wait...")
+    root.update()
 
     def do_indexing():
-        folders = [IMAGE_FOLDER] + [f for f in additional_folders if check_folder_status(f)]
+        total = sum([len(os.listdir(folder)) for folder in folders if os.path.exists(folder)])
+        if total == 0:
+            root.after(0, lambda: messagebox.showinfo("Info", "No images found in any folder."))
+            root.after(0, hide_progress_bar)
+            return
+        processed = 0
         for folder in folders:
-            generate_folder_index(folder)
-        # Schedule UI updates on the main thread
-        def finish():
-            progress_window.destroy()
-            messagebox.showinfo("Success", "Images updated for all online folders!")
-            reload_image_index()  # This will also update image count
+            folder_hash = hashlib.md5(folder.encode()).hexdigest()[:8]
+            index_file = os.path.join(os.path.dirname(TXT_FILE), f"index_{folder_hash}.pkl")
+            index = {}
+            try:
+                files = os.listdir(folder)
+                for filename in files:
+                    if len(filename) < 23:
+                        continue
+                    date = filename[:8]
+                    mru = filename[8:16]
+                    consumer_id = filename[16:25]
+                    full_path = os.path.join(folder, filename)
+                    if consumer_id not in index:
+                        index[consumer_id] = {"MRU": mru, "images": {}}
+                    if date not in index[consumer_id]["images"]:
+                        index[consumer_id]["images"][date] = []
+                    index[consumer_id]["images"][date].append(full_path)
+                    processed += 1
+                    if processed % 100 == 0 or processed == total:
+                        percent = (processed / total) * 100
+                        root.after(0, lambda p=percent: update_progress_bar(p))
+                with open(index_file, "wb") as f:
+                    pickle.dump(index, f)
+            except Exception as e:
+                root.after(0, lambda: messagebox.showerror("Error", f"Failed to index images in {folder}: {e}"))
+        root.after(0, lambda: update_progress_bar(100))
         root.after(0, finish)
 
-    threading.Thread(target=do_indexing, daemon=True).start()
+    def finish():
+        hide_progress_bar()
+        messagebox.showinfo("Success", "Images updated for all online folders!")
+        reload_image_index()
+        update_image_count()
+
+    root.after(100, lambda: threading.Thread(target=do_indexing, daemon=True).start())
 
 def load_all_folder_indexes():
     """
@@ -713,6 +755,10 @@ def debug_show_index_counts():
     msg_lines.append(f"\nMerged (app) total: {merged_total} images")
     messagebox.showinfo("Image count info", "\n".join(msg_lines))
 
+def update_progress_bar(percent):
+    progress_var.set(percent)
+    root.update_idletasks()
+
 # --- GUI SECTION ---
 
 root = tb.Window(themename="minty")
@@ -746,8 +792,33 @@ btn_search_meter.pack(side=LEFT, padx=5)
 btn_refresh = tb.Button(frame_top, text="Refresh", command=refresh_search, bootstyle="warning")
 btn_refresh.pack(side=LEFT, padx=5)
 
-label_image_count = tb.Label(frame_top, text="Total Images: 0", font=("Arial", 12, "bold"), bootstyle="success")
-label_image_count.pack(side=LEFT, padx=5)
+label_image_count_frame = tb.Frame(frame_top)
+label_image_count_frame.pack(side=LEFT, padx=5)
+
+label_image_count = tb.Label(label_image_count_frame, text="Total Images: 0", font=("Arial", 12, "bold"), bootstyle="success")
+label_image_count.pack()
+
+progress_var = tb.DoubleVar()
+progress_bar = ttk.Progressbar(
+    label_image_count_frame,
+    variable=progress_var,
+    length=250,
+    mode="indeterminate",
+    style="success.Horizontal.TProgressbar"  # You can use "info", "warning", etc.
+)
+progress_time_label = tb.Label(label_image_count_frame, text="", font=("Arial", 12, "italic"), bootstyle="secondary")
+
+def show_progress_bar():
+    label_image_count.pack_forget()
+    progress_bar.pack()
+    progress_time_label.pack()
+    progress_bar.start(10)
+
+def hide_progress_bar():
+    progress_bar.stop()
+    progress_bar.pack_forget()
+    progress_time_label.pack_forget()
+    label_image_count.pack()
 
 # Menu Bar
 menu_bar = Menu(root)
@@ -876,12 +947,12 @@ def on_folder_delete(event):
 folder_listbox.bind("<Delete>", on_folder_delete)
 
 # Load and show folders at startup
+
 load_additional_folders()
+
 update_folder_list()
 refresh_folder_status()
-
-# Always load the index from per-folder pickles
-reload_image_index()
+background_reload_image_index()
 
 if os.path.exists(JSON_FILE):
     entry_meter_number.config(state=tk.NORMAL)
@@ -891,7 +962,6 @@ entry_consumer_id.bind("<space>", lambda e: show_searched_lists(e, entry_consume
 entry_meter_number.bind("<space>", lambda e: show_searched_lists(e, entry_meter_number, "meter_numbers"))
 
 def check_and_generate_indexes_on_startup():
-    # Check if any index exists
     folders = [IMAGE_FOLDER] + additional_folders
     index_exists = False
     for folder in folders:
@@ -905,7 +975,6 @@ def check_and_generate_indexes_on_startup():
         generate_all_folder_indexes_with_progress()
 
 check_and_generate_indexes_on_startup()
-reload_image_index()
 
 
 
