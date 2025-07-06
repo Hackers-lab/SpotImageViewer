@@ -13,6 +13,7 @@ import threading
 import hashlib
 import shutil
 import time
+import sqlite3
 
 # Constants
 IMAGE_FOLDER = r"C:\spotbillfiles\backup\image"
@@ -758,6 +759,7 @@ def debug_show_index_counts():
 def update_progress_bar(percent):
     progress_var.set(percent)
     root.update_idletasks()
+
 
 # --- GUI SECTION ---
 

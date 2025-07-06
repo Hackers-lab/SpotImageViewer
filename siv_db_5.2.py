@@ -55,7 +55,6 @@ def initialize_database():
         folder_path TEXT,
         last_indexed TEXT
     )''')
-    # Notes table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS consumer_notes (
         consumer_id TEXT PRIMARY KEY,
@@ -69,10 +68,21 @@ def initialize_database():
 def get_note_options():
     notes_file = os.path.join(BACKUP_DIR, "note.txt")
     if not os.path.exists(notes_file):
-        # Default options if file doesn't exist
         return ["Inspection required", "regeneration required", "wrong meter reading"]
     with open(notes_file, "r", encoding="utf-8") as f:
         return [line.strip() for line in f if line.strip()]
+
+def get_note_color(note_text):
+    if not note_text:
+        return "secondary"
+    note_lower = note_text.lower()
+    if "inspection" in note_lower:
+        return "danger"
+    elif "regeneration" in note_lower:
+        return "danger"
+    elif "wrong" in note_lower:
+        return "danger"
+    return "secondary"
 
 def get_consumer_note(consumer_id):
     conn = sqlite3.connect(DATABASE_FILE)
@@ -82,18 +92,19 @@ def get_consumer_note(consumer_id):
     conn.close()
     if row:
         note_option, note_text = row
+        full_text = f"\nType: {note_option.title()}"
         if note_text:
-            return f"{note_option}\n{note_text}"
-        else:
-            return note_option
-    return ""
+            full_text += f"\n\nNote: {note_text.title()}"
+        color = get_note_color(full_text)
+        return full_text, color
+    return "", "secondary"
 
 def add_note_for_consumer():
     consumer_id = entry_consumer_id.get().strip()
     note_option = note_var.get()
-    note_text = note_text_var.get().strip()
+    note_text = note_entry.get("1.0", tk.END).strip()
     if not consumer_id or not note_option or note_option == "Select Note...":
-        messagebox.showwarning("Warning", "Please select a Consumer ID and a note option.")
+        messagebox.showwarning("Warning", "Please select a note option.")
         return
     conn = sqlite3.connect(DATABASE_FILE)
     cursor = conn.cursor()
@@ -104,8 +115,11 @@ def add_note_for_consumer():
     conn.commit()
     conn.close()
     messagebox.showinfo("Success", f"Note added for Consumer ID: {consumer_id}")
-    # Update notes pane immediately
-    label_notes_content.config(text=get_consumer_note(consumer_id))
+    note_display, note_color = get_consumer_note(consumer_id)
+    label_notes_content.config(
+        text=note_display if note_display else "No note for this consumer.",
+        bootstyle=note_color
+    )
 
 def export_notes_to_csv():
     conn = sqlite3.connect(DATABASE_FILE)
@@ -131,7 +145,6 @@ def export_notes_to_csv():
     messagebox.showinfo("Success", f"Notes exported to {export_path}")
 
 def save_folder_index_sqlite(folder_path, index):
-    """Save a single folder's index to SQLite database."""
     folder_hash = hashlib.md5(folder_path.encode()).hexdigest()[:8]
     conn = sqlite3.connect(DATABASE_FILE)
     cursor = conn.cursor()
@@ -152,19 +165,12 @@ def save_folder_index_sqlite(folder_path, index):
     conn.close()
 
 def sync_folder_index_sqlite(folder_path):
-    """
-    Incrementally update the database for a folder:
-    - Add new images found in the folder (and subfolders) but not in the DB.
-    - Delete images from the DB that no longer exist in the folder.
-    - Keep existing records if the file still exists.
-    """
     folder_hash = hashlib.md5(folder_path.encode()).hexdigest()[:8]
     conn = sqlite3.connect(DATABASE_FILE)
     cursor = conn.cursor()
-    # 1. Get all current image files in the folder and subfolders
     valid_exts = ('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.webp')
     current_files = set()
-    for root, dirs, files in os.walk(folder_path):
+    for folder_root, dirs, files in os.walk(folder_path):
         for filename in files:
             if not filename.lower().endswith(valid_exts):
                 continue
@@ -173,46 +179,34 @@ def sync_folder_index_sqlite(folder_path):
             date = filename[:8]
             mru = filename[8:16]
             consumer_id = filename[16:25]
-            full_path = os.path.join(root, filename)
+            full_path = os.path.join(folder_root, filename)
             current_files.add((consumer_id, mru, date, full_path, folder_hash))
-    # 2. Get all image records for this folder from the DB
     cursor.execute("SELECT consumer_id, mru, date, image_path, folder_hash FROM images WHERE folder_hash = ?", (folder_hash,))
     db_files = set(cursor.fetchall())
-    # 3. Find new files to add and old files to delete
     to_add = current_files - db_files
     to_delete = db_files - current_files
-    # 4. Insert new files
     if to_add:
         cursor.executemany(
             "INSERT OR IGNORE INTO images (consumer_id, mru, date, image_path, folder_hash) VALUES (?, ?, ?, ?, ?)",
             list(to_add)
         )
-    # 5. Delete missing files
     for record in to_delete:
         cursor.execute(
             "DELETE FROM images WHERE consumer_id=? AND mru=? AND date=? AND image_path=? AND folder_hash=?",
-            record
-        )
-    # 6. Update folder metadata
+            record)
     cursor.execute(
         "INSERT OR REPLACE INTO folder_indexes (folder_hash, folder_path, last_indexed) VALUES (?, ?, ?)",
-        (folder_hash, folder_path, datetime.now().isoformat())
-    )
+        (folder_hash, folder_path, datetime.now().isoformat()))
     conn.commit()
     conn.close()
 
 def load_all_folder_indexes_sqlite():
-    """
-    Load and merge indexes from all online folders from SQLite database,
-    giving priority to default folder.
-    """
     global image_index
     image_index = {}
     folders = [IMAGE_FOLDER] + [f for f in additional_folders if check_folder_status(f)]
     folder_hashes = [hashlib.md5(f.encode()).hexdigest()[:8] for f in folders]
     conn = sqlite3.connect(DATABASE_FILE)
     cursor = conn.cursor()
-    # Process default folder first
     default_hash = hashlib.md5(IMAGE_FOLDER.encode()).hexdigest()[:8]
     if default_hash in folder_hashes:
         cursor.execute("SELECT consumer_id, mru, date, image_path FROM images WHERE folder_hash = ?", (default_hash,))
@@ -223,7 +217,6 @@ def load_all_folder_indexes_sqlite():
                 image_index[consumer_id]["images"][date] = []
             if image_path not in image_index[consumer_id]["images"][date]:
                 image_index[consumer_id]["images"][date].append(image_path)
-    # Process other folders
     for folder in additional_folders:
         if not check_folder_status(folder):
             continue
@@ -245,7 +238,6 @@ def reload_image_index(save_pickle=False):
 
 def reload_image_index_no_ui(save_pickle=False):
     load_all_folder_indexes_sqlite()
-    # Do NOT call update_image_count() here
 
 def format_date(date_str):
     try:
@@ -259,9 +251,11 @@ def search_consumer():
     label_consumer_details.config(text="")
     label_total_images.config(text="")
     show_latest_previews(consumer_id)
-    # Show note for this consumer
-    note_display = get_consumer_note(consumer_id)
-    label_notes_content.config(text=note_display if note_display else "No note for this consumer.")
+    note_display, note_color = get_consumer_note(consumer_id)
+    label_notes_content.config(
+        text=note_display if note_display else "No note for this consumer.",
+        bootstyle=note_color
+    )
     if not consumer_id.isdigit() or len(consumer_id) != 9:
         messagebox.showwarning("Invalid Input", "Consumer ID must be a 9-digit number.")
         return
@@ -400,21 +394,15 @@ def open_documentation():
         messagebox.showerror("Error", "The help documentation file (help.pdf) was not found!")
 
 def background_reload_image_index():
-    """Run reload_image_index in a background thread and update UI when done."""
     def worker():
         t0 = time.time()
         reload_image_index_no_ui()
         t1 = time.time()
         print(f"[Startup] reload_image_index (background): {t1-t0:.2f} seconds")
-        # Schedule UI update on main thread
         root.after(0, update_image_count)
     threading.Thread(target=worker, daemon=True).start()
 
 def update_image_count():
-    """
-    Update the total image count label using the same logic as debug_show_index_counts,
-    so the displayed count always matches the merged/app total.
-    """
     merged_total = 0
     for consumer_data in image_index.values():
         for images in consumer_data["images"].values():
@@ -434,7 +422,6 @@ def display_image(event):
         images_data = image_index[consumer_id]["images"]
         for date in images_data:
             if format_date(date) == selected_date:
-                # Prefer default folder image if present
                 default_img = None
                 for img_path in images_data[date]:
                     if img_path.startswith(os.path.abspath(IMAGE_FOLDER)):
@@ -481,10 +468,6 @@ def print_image():
         os.startfile(temp_file, "print")
 
 def save_image():
-    """
-    Save the currently displayed image in a folder named after the consumer ID,
-    with the filename as the date, inside the user's Downloads directory.
-    """
     if img_original:
         consumer_id = entry_consumer_id.get().strip()
         selected_date_index = listbox_dates.curselection()
@@ -492,9 +475,7 @@ def save_image():
             messagebox.showwarning("Warning", "Please select a consumer and a date.")
             return
         selected_date = listbox_dates.get(selected_date_index)
-        # Format date for filename
         date_str = selected_date.replace("-", "")
-        # Downloads path
         downloads_dir = os.path.join(os.path.expanduser("~"), "Downloads")
         consumer_dir = os.path.join(downloads_dir, consumer_id)
         os.makedirs(consumer_dir, exist_ok=True)
@@ -506,10 +487,6 @@ def save_image():
             messagebox.showerror("Error", f"Failed to save image: {e}")
 
 def save_multiple_images():
-    """
-    Save all images for the current consumer ID in the Downloads/consumer_id folder,
-    with filenames as their dates.
-    """
     consumer_id = entry_consumer_id.get().strip()
     if not consumer_id or consumer_id not in image_index:
         messagebox.showwarning("Warning", "Please search and select a valid Consumer ID first.")
@@ -520,7 +497,6 @@ def save_multiple_images():
     os.makedirs(consumer_dir, exist_ok=True)
     saved = 0
     for date, paths in images_data.items():
-        # Prefer default folder image if present
         default_img = None
         for path in paths:
             if path.startswith(os.path.abspath(IMAGE_FOLDER)):
@@ -545,6 +521,8 @@ def show_buttons():
     btn_print.pack(side=LEFT, padx=5)
     btn_save.pack(side=LEFT, padx=5)
     btn_save_multiple.pack(side=LEFT, padx=5)
+    notes_pane.pack(side=RIGHT, fill=Y, padx=10, pady=10)
+
 
 def hide_buttons():
     btn_zoom_in.pack_forget()
@@ -552,7 +530,8 @@ def hide_buttons():
     btn_print.pack_forget()
     btn_save.pack_forget()
     btn_save_multiple.pack_forget()
-
+    notes_pane.pack_forget()
+    
 def load_searched_lists():
     if os.path.exists(SEARCHED_LISTS_FILE):
         with open(SEARCHED_LISTS_FILE, "r") as file:
@@ -577,7 +556,6 @@ def show_searched_lists(event, entry_widget, list_type):
         listbox.insert(tk.END, item)
 
     def select_item(event):
-        # Get the index under the mouse pointer for single click
         index = listbox.nearest(event.y)
         if index < 0 or index >= listbox.size():
             return
@@ -585,7 +563,6 @@ def show_searched_lists(event, entry_widget, list_type):
         entry_widget.delete(0, tk.END)
         entry_widget.insert(0, selected_item)
         dropdown.destroy()
-        # Trigger search and show image
         if list_type == "consumer_ids":
             search_consumer()
         elif list_type == "meter_numbers":
@@ -612,7 +589,6 @@ def show_latest_previews(consumer_id):
     images_data = image_index[consumer_id]["images"]
     all_images = []
     for date, paths in images_data.items():
-        # Prefer default folder image if present
         default_img = None
         for path in paths:
             if path.startswith(os.path.abspath(IMAGE_FOLDER)):
@@ -653,7 +629,6 @@ def open_preview_image(consumer_id, date):
     if consumer_id in image_index:
         images_data = image_index[consumer_id]["images"]
         if date in images_data:
-            # Prefer default folder image if present
             default_img = None
             for img_path in images_data[date]:
                 if img_path.startswith(os.path.abspath(IMAGE_FOLDER)):
@@ -692,8 +667,7 @@ def add_folder():
         update_folder_list()
         def do_indexing():
             generate_folder_index(folder)
-            root.after(0, reload_image_index)  # Ensure UI update on main thread
-            
+            root.after(0, reload_image_index)
         threading.Thread(target=do_indexing, daemon=True).start()
 
 def remove_folder():
@@ -709,35 +683,32 @@ def check_folder_status(folder):
 
 def update_folder_list():
     folder_listbox.delete(0, tk.END)
-    for folder in additional_folders:
+    for idx, folder in enumerate(additional_folders, start=1):
         status = check_folder_status(folder)
         color = "green" if status else "red"
-        folder_listbox.insert(tk.END, folder)
+        folder_name = os.path.basename(folder)
+        display_text = f"{idx}. {folder_name}\n [{folder}]"
+        # display_text = f"{idx}. {os.path.basename(folder)}\n\n    {folder}"
+        folder_listbox.insert(tk.END, display_text)
         folder_listbox.itemconfig(tk.END, foreground=color)
 
 def refresh_folder_status():
     global last_online_folders
-    # Refresh status colors in the listbox
     for idx, folder in enumerate(additional_folders):
         status = check_folder_status(folder)
         color = "green" if status else "red"
         folder_listbox.itemconfig(idx, foreground=color)
-    # Check if online folders have changed
     current_online = set([IMAGE_FOLDER] + [f for f in additional_folders if check_folder_status(f)])
     if current_online != last_online_folders:
         last_online_folders = current_online
-        reload_image_index()  # This will also update image count
-    # Schedule next check
+        reload_image_index()
     folder_status_pane.after(3000, refresh_folder_status)
 
 def generate_folder_index(folder):
-    """
-    Generate a SQLite index for a single folder (recursively).
-    """
     index = {}
     try:
         valid_exts = ('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.webp')
-        for root, dirs, files in os.walk(folder):
+        for folder_root, dirs, files in os.walk(folder):
             for filename in files:
                 if not filename.lower().endswith(valid_exts):
                     continue
@@ -746,7 +717,7 @@ def generate_folder_index(folder):
                 date = filename[:8]
                 mru = filename[8:16]
                 consumer_id = filename[16:25]
-                full_path = os.path.join(root, filename)
+                full_path = os.path.join(folder_root, filename)
                 if consumer_id not in index:
                     index[consumer_id] = {"MRU": mru, "images": {}}
                 if date not in index[consumer_id]["images"]:
@@ -762,7 +733,6 @@ def show_indexing_progress():
     label = tb.Label(progress_window, text="Indexing images, please wait...", font=("Arial", 14))
     label.pack(padx=30, pady=30)
     progress_window.update()
-    # Let the window be visible for at least a short time
     root.after(500, progress_window.destroy)
 
 def generate_all_folder_indexes():
@@ -778,11 +748,10 @@ def generate_all_folder_indexes_with_progress():
     progress_time_label.config(text="Loading images please wait...")
     root.update()
     def do_indexing():
-        # Count all images recursively
         valid_exts = ('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.webp')
         total = 0
         for folder in folders:
-            for root, dirs, files in os.walk(folder):
+            for folder_root, dirs, files in os.walk(folder):
                 total += sum(1 for filename in files if filename.lower().endswith(valid_exts) and len(filename) >= 23)
         if total == 0:
             root.after(0, lambda: messagebox.showinfo("Info", "No images found in any folder."))
@@ -824,9 +793,6 @@ def generate_all_folder_indexes_with_progress():
     root.after(100, lambda: threading.Thread(target=do_indexing, daemon=True).start())
 
 def debug_show_index_counts():
-    """
-    Show a popup with the image count for each folder index and the merged total.
-    """
     folders = [IMAGE_FOLDER] + [f for f in additional_folders if check_folder_status(f)]
     msg_lines = []
     total_per_folder = []
@@ -843,7 +809,6 @@ def debug_show_index_counts():
     
     conn.close()
     
-    # Now show merged total from image_index
     merged_total = 0
     for consumer_data in image_index.values():
         for images in consumer_data["images"].values():
@@ -854,7 +819,6 @@ def debug_show_index_counts():
 def update_progress_bar(percent):
     progress_var.set(percent)
     root.update_idletasks()
-
 
 # --- GUI SECTION ---
 
@@ -930,8 +894,6 @@ file_menu.add_command(label="Export Notes to CSV", command=export_notes_to_csv)
 file_menu.add_separator()
 file_menu.add_command(label="Exit", command=root.quit)
 
-
-# Theme selector menu (Settings)
 def change_theme(theme_name):
     root.style.theme_use(theme_name)
 
@@ -965,7 +927,7 @@ label_consumer_details = tb.Label(
     text="",
     wraplength=400,
     bootstyle="success",
-    font=("Arial", 11, "bold")  # Increased font size and bold
+    font=("Arial", 11, "bold")
 )
 label_consumer_details.pack(pady=5)
 
@@ -979,15 +941,46 @@ listbox_dates = tk.Listbox(frame_left, font=("Arial", 12), height=20)
 listbox_dates.pack(fill=BOTH, expand=True)
 listbox_dates.bind("<<ListboxSelect>>", display_image)
 
-# --- Reduce image pane width ---
+# Image display pane
 frame_right = tb.Frame(main_frame, width=500, padding=10, relief="ridge", borderwidth=2)
 frame_right.pack(side=LEFT, fill=BOTH, expand=True, padx=10, pady=10)
 
 canvas = tk.Canvas(frame_right, bg="#f8f9fa", width=500, height=500)
 canvas.pack(fill=BOTH, expand=True)
 
-# --- Notes pane: tall, rightmost, same height as folder pane, separate from image pane ---
-notes_pane = tb.Frame(main_frame, width=250, padding=10, relief="ridge", borderwidth=2)
+# Network folders pane (far right)
+folder_status_pane = tb.Frame(main_frame, width=250, padding=10, relief="ridge", borderwidth=2)
+folder_status_pane.pack(side=RIGHT, fill=Y, padx=10, pady=10)
+
+folder_title = tb.Label(folder_status_pane, text="Network Folders", font=("Arial", 13, "bold"), bootstyle="info")
+folder_title.pack(pady=(0, 10))
+
+folder_listbox = tk.Listbox(folder_status_pane, font=("Arial", 9), height=25, width=32)
+folder_listbox.pack(pady=5, fill=X)
+
+btn_add_folder = tb.Button(folder_status_pane, text="Add", command=add_folder, bootstyle="success")
+btn_add_folder.pack(side=LEFT, padx=5, pady=10, anchor="s")
+
+btn_remove_folder = tb.Button(
+    folder_status_pane,
+    text="Remove",
+    command=remove_folder,
+    bootstyle="danger"
+)
+btn_remove_folder.pack(side=LEFT, padx=5, pady=10, anchor="s")
+
+def on_folder_select(event):
+    pass
+
+folder_listbox.bind("<<ListboxSelect>>", on_folder_select)
+
+def on_folder_delete(event):
+    remove_folder()
+
+folder_listbox.bind("<Delete>", on_folder_delete)
+
+# Notes pane (middle)
+notes_pane = tb.Frame(main_frame, width=200, padding=10, relief="ridge", borderwidth=2)
 notes_pane.pack(side=RIGHT, fill=Y, padx=10, pady=10)
 
 label_notes_title = tb.Label(notes_pane, text="Add/View Note", font=("Arial", 12, "bold"), bootstyle="info")
@@ -995,23 +988,61 @@ label_notes_title.pack(anchor="w", pady=(0, 10))
 
 note_options = get_note_options()
 note_var = tk.StringVar()
-note_dropdown = ttk.Combobox(notes_pane, textvariable=note_var, values=note_options, state="readonly", width=25)
+note_dropdown = ttk.Combobox(notes_pane, textvariable=note_var, values=note_options, state="readonly", width=28)
 note_dropdown.set("Select Note...")
-note_dropdown.pack(anchor="w", pady=(0, 5))
+note_dropdown.pack(anchor="w", pady=(0, 5), fill=X)
+
+note_text_frame = tb.Frame(notes_pane)
+note_text_frame.pack(anchor="w", pady=(0, 5), fill=X)
 
 note_text_var = tk.StringVar()
-note_entry = tb.Entry(notes_pane, textvariable=note_text_var, width=30)
-note_entry.pack(anchor="w", pady=(0, 5))
+note_entry = tb.Text(note_text_frame, width=28, height=6, font=("Arial", 10))
+note_entry.pack(fill=X)
 
-btn_add_note = tb.Button(notes_pane, text="Add Note", command=add_note_for_consumer, bootstyle="warning")
-btn_add_note.pack(anchor="w", pady=(0, 10))
+note_buttons_frame = tb.Frame(notes_pane)
+note_buttons_frame.pack(anchor="w", pady=(0, 10), fill=X)
 
-label_prev_note_title = tb.Label(notes_pane, text="Previous Note:", font=("Arial", 11, "bold"), bootstyle="secondary")
+btn_add_note = tb.Button(note_buttons_frame, text="Add Note", command=add_note_for_consumer, bootstyle="success")
+btn_add_note.pack(side=LEFT, padx=(0, 5))
+
+def delete_note_for_consumer():
+    consumer_id = entry_consumer_id.get().strip()
+    if not consumer_id:
+        messagebox.showwarning("Warning", "Please select a Consumer ID first.")
+        return
+    
+    # Confirm deletion
+    if not messagebox.askyesno("Confirm", "Delete note for this consumer?"):
+        return
+    
+    conn = sqlite3.connect(DATABASE_FILE)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM consumer_notes WHERE consumer_id = ?", (consumer_id,))
+    conn.commit()
+    conn.close()
+    
+    messagebox.showinfo("Success", f"Note deleted for Consumer ID: {consumer_id}")
+    # Clear the note display
+    label_notes_content.config(text="No note for this consumer.", bootstyle="secondary")
+    # Clear the input fields
+    note_var.set("Select Note...")
+    note_entry.delete("1.0", tk.END)
+
+btn_delete_note = tb.Button(note_buttons_frame, text="Delete Note", command=delete_note_for_consumer, bootstyle="danger")
+btn_delete_note.pack(side=LEFT)
+
+label_prev_note_title = tb.Label(notes_pane, text="Previous Note:", font=("Arial", 11, "bold"), bootstyle="info")
 label_prev_note_title.pack(anchor="w", pady=(10, 0))
 
-label_notes_content = tb.Label(notes_pane, text="", font=("Arial", 11), wraplength=220, justify="left", bootstyle="secondary")
-label_notes_content.pack(anchor="w", pady=(5, 0))
-# --- End notes pane ---
+label_notes_content = tb.Label(
+    notes_pane, 
+    text="", 
+    font=("Arial", 12), 
+    wraplength=270, 
+    justify="left", 
+    bootstyle="danger"
+)
+label_notes_content.pack(anchor="w", pady=(5, 0), fill=X)
 
 preview_frames = []
 preview_canvases = []
@@ -1029,55 +1060,21 @@ for i in range(3):
 button_frame = tb.Frame(frame_right, padding=5)
 button_frame.pack(pady=10)
 
-btn_zoom_out = tb.Button(button_frame, text="-", command=zoom_out, bootstyle="secondary-outline")
-btn_zoom_in = tb.Button(button_frame, text="+", command=zoom_in, bootstyle="secondary-outline")
-btn_print = tb.Button(button_frame, text="Print", command=print_image, bootstyle="info-outline")
-btn_save = tb.Button(button_frame, text="Save", command=save_image, bootstyle="success-outline")
-btn_save_multiple = tb.Button(button_frame, text="Save All", command=save_multiple_images, bootstyle="success-outline")
-
+btn_zoom_out = tb.Button(button_frame, text="-", command=zoom_out, bootstyle="secondary")
+btn_zoom_in = tb.Button(button_frame, text="+", command=zoom_in, bootstyle="secondary")
+btn_print = tb.Button(button_frame, text="Print", command=print_image, bootstyle="info")
+btn_save = tb.Button(button_frame, text="Save", command=save_image, bootstyle="success")
+btn_save_multiple = tb.Button(button_frame, text="Save All", command=save_multiple_images, bootstyle="success")
 
 hide_buttons()
-
-# New: Far right pane for folder management
-folder_status_pane = tb.Frame(main_frame, width=250, padding=10, relief="ridge", borderwidth=2)
-folder_status_pane.pack(side=RIGHT, fill=Y, padx=10, pady=10)
-
-folder_title = tb.Label(folder_status_pane, text="Network Folders", font=("Arial", 13, "bold"), bootstyle="info")
-folder_title.pack(pady=(0, 10))
-
-folder_listbox = tk.Listbox(folder_status_pane, font=("Arial", 9), height=20, width=32)
-folder_listbox.pack(pady=5, fill=X)
-
-btn_add_folder = tb.Button(folder_status_pane, text="Add", command=add_folder, bootstyle="success")
-btn_add_folder.pack(side=LEFT, padx=5, pady=10, anchor="s")
-
-btn_remove_folder = tb.Button(
-    folder_status_pane,
-    text="Remove",
-    command=remove_folder,
-    bootstyle="danger"
-)
-btn_remove_folder.pack(side=LEFT, padx=5, pady=10, anchor="s")
-
-# Enable selection with mouse click for folder_listbox
-def on_folder_select(event):
-    # This function can be expanded if you want to show folder details on selection
-    pass
-
-folder_listbox.bind("<<ListboxSelect>>", on_folder_select)
-
-# Optionally, allow pressing Delete key to remove selected folder
-def on_folder_delete(event):
-    remove_folder()
-
-folder_listbox.bind("<Delete>", on_folder_delete)
 
 # Initialize database and load data
 initialize_database()
 load_additional_folders()
 update_folder_list()
 refresh_folder_status()
-background_reload_image_index()
+root.after(100, background_reload_image_index)
+
 
 if os.path.exists(JSON_FILE):
     entry_meter_number.config(state=tk.NORMAL)

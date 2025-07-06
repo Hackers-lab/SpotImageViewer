@@ -995,7 +995,7 @@ label_notes_title.pack(anchor="w", pady=(0, 10))
 
 note_options = get_note_options()
 note_var = tk.StringVar()
-note_dropdown = ttk.Combobox(notes_pane, textvariable=note_var, values=note_options, state="readonly", width=25)
+note_dropdown = ttk.Combobox(notes_pane, textvariable=note_var, values=note_options, state="readonly", width=22)
 note_dropdown.set("Select Note...")
 note_dropdown.pack(anchor="w", pady=(0, 5))
 
@@ -1013,39 +1013,14 @@ label_notes_content = tb.Label(notes_pane, text="", font=("Arial", 11), wrapleng
 label_notes_content.pack(anchor="w", pady=(5, 0))
 # --- End notes pane ---
 
-preview_frames = []
-preview_canvases = []
-preview_labels = []
-for i in range(3):
-    frame = tb.Frame(frame_right, padding=5, relief="groove", borderwidth=2)
-    canvas_preview = tk.Canvas(frame, width=220, height=220, bg="#f8f9fa", highlightthickness=2, highlightbackground="#0d6efd")
-    label = tb.Label(frame, text="", font=("Arial", 10, "bold"), bootstyle="secondary")
-    canvas_preview.pack()
-    label.pack()
-    preview_frames.append(frame)
-    preview_canvases.append(canvas_preview)
-    preview_labels.append(label)
-
-button_frame = tb.Frame(frame_right, padding=5)
-button_frame.pack(pady=10)
-
-btn_zoom_out = tb.Button(button_frame, text="-", command=zoom_out, bootstyle="secondary-outline")
-btn_zoom_in = tb.Button(button_frame, text="+", command=zoom_in, bootstyle="secondary-outline")
-btn_print = tb.Button(button_frame, text="Print", command=print_image, bootstyle="info-outline")
-btn_save = tb.Button(button_frame, text="Save", command=save_image, bootstyle="success-outline")
-btn_save_multiple = tb.Button(button_frame, text="Save All", command=save_multiple_images, bootstyle="success-outline")
-
-
-hide_buttons()
-
-# New: Far right pane for folder management
+# --- Network folder pane: rightmost, same as before ---
 folder_status_pane = tb.Frame(main_frame, width=250, padding=10, relief="ridge", borderwidth=2)
 folder_status_pane.pack(side=RIGHT, fill=Y, padx=10, pady=10)
 
 folder_title = tb.Label(folder_status_pane, text="Network Folders", font=("Arial", 13, "bold"), bootstyle="info")
 folder_title.pack(pady=(0, 10))
 
-folder_listbox = tk.Listbox(folder_status_pane, font=("Arial", 9), height=20, width=32)
+folder_listbox = tk.Listbox(folder_status_pane, font=("Arial", 12), height=20, width=32)
 folder_listbox.pack(pady=5, fill=X)
 
 btn_add_folder = tb.Button(folder_status_pane, text="Add", command=add_folder, bootstyle="success")

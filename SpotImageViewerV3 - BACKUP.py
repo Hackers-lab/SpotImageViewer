@@ -4,27 +4,23 @@ from ttkbootstrap.constants import *
 import tkinter as tk
 from tkinter import messagebox, filedialog, Menu, Toplevel, Listbox, ttk
 from PIL import Image, ImageTk
-from datetime import datetime
+from datetime import datetime, timedelta
+import subprocess
 import json
 import pandas as pd
+import pickle
 import threading
 import hashlib
 import shutil
 import time
-import sqlite3
-import csv
-
-# Ensure backup directory exists before using any files in it
-BACKUP_DIR = r"C:\spotbillfiles\backup"
-os.makedirs(BACKUP_DIR, exist_ok=True)
 
 # Constants
-IMAGE_FOLDER = os.path.join(BACKUP_DIR, "image")
-TXT_FILE = os.path.join(BACKUP_DIR, "images.txt")
-JSON_FILE = os.path.join(BACKUP_DIR, "meter_mapping.json")
-SEARCHED_LISTS_FILE = os.path.join(BACKUP_DIR, "searched_lists.json")
-DATABASE_FILE = os.path.join(BACKUP_DIR, "image_database.db")
-ADDITIONAL_FOLDERS_FILE = os.path.join(BACKUP_DIR, "additional_folders.json")
+IMAGE_FOLDER = r"C:\spotbillfiles\backup\image"
+TXT_FILE = r"C:\spotbillfiles\backup\images.txt"
+JSON_FILE = r"C:\spotbillfiles\backup\meter_mapping.json"
+SEARCHED_LISTS_FILE = r"C:\spotbillfiles\backup\searched_lists.json"
+PICKLE_FILE = r"C:\spotbillfiles\backup\image_index.pkl"
+ADDITIONAL_FOLDERS_FILE = r"C:\spotbillfiles\backup\additional_folders.json"
 
 # Global Variables
 image_index = {}
@@ -36,215 +32,94 @@ zoom_scale = 1.0
 additional_folders = []
 last_online_folders = set()
 
-def initialize_database():
-    """Initialize SQLite database with required tables."""
-    conn = sqlite3.connect(DATABASE_FILE)
-    cursor = conn.cursor()
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS images (
-        consumer_id TEXT,
-        mru TEXT,
-        date TEXT,
-        image_path TEXT,
-        folder_hash TEXT,
-        PRIMARY KEY (consumer_id, date, image_path)
-    )''')
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS folder_indexes (
-        folder_hash TEXT PRIMARY KEY,
-        folder_path TEXT,
-        last_indexed TEXT
-    )''')
-    # Notes table
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS consumer_notes (
-        consumer_id TEXT PRIMARY KEY,
-        note_option TEXT,
-        note_text TEXT
-    )
-    ''')
-    conn.commit()
-    conn.close()
 
-def get_note_options():
-    notes_file = os.path.join(BACKUP_DIR, "note.txt")
-    if not os.path.exists(notes_file):
-        # Default options if file doesn't exist
-        return ["Inspection required", "regeneration required", "wrong meter reading"]
-    with open(notes_file, "r", encoding="utf-8") as f:
-        return [line.strip() for line in f if line.strip()]
-
-def get_consumer_note(consumer_id):
-    conn = sqlite3.connect(DATABASE_FILE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT note_option, note_text FROM consumer_notes WHERE consumer_id = ?", (consumer_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        note_option, note_text = row
-        if note_text:
-            return f"{note_option}\n{note_text}"
-        else:
-            return note_option
-    return ""
-
-def add_note_for_consumer():
-    consumer_id = entry_consumer_id.get().strip()
-    note_option = note_var.get()
-    note_text = note_text_var.get().strip()
-    if not consumer_id or not note_option or note_option == "Select Note...":
-        messagebox.showwarning("Warning", "Please select a Consumer ID and a note option.")
-        return
-    conn = sqlite3.connect(DATABASE_FILE)
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT OR REPLACE INTO consumer_notes (consumer_id, note_option, note_text) VALUES (?, ?, ?)",
-        (consumer_id, note_option, note_text)
-    )
-    conn.commit()
-    conn.close()
-    messagebox.showinfo("Success", f"Note added for Consumer ID: {consumer_id}")
-    # Update notes pane immediately
-    label_notes_content.config(text=get_consumer_note(consumer_id))
-
-def export_notes_to_csv():
-    conn = sqlite3.connect(DATABASE_FILE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT consumer_id, note_option, note_text FROM consumer_notes")
-    rows = cursor.fetchall()
-    conn.close()
-    if not rows:
-        messagebox.showwarning("Warning", "No notes found to export.")
-        return
-    export_path = filedialog.asksaveasfilename(
-        defaultextension=".csv",
-        filetypes=[("CSV files", "*.csv")],
-        initialfile="consumer_notes.csv"
-    )
-    if not export_path:
-        return
-    with open(export_path, "w", newline='', encoding="utf-8") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["Consumer ID", "Note Option", "Note Text"])
-        for row in rows:
-            writer.writerow(row)
-    messagebox.showinfo("Success", f"Notes exported to {export_path}")
-
-def save_folder_index_sqlite(folder_path, index):
-    """Save a single folder's index to SQLite database."""
-    folder_hash = hashlib.md5(folder_path.encode()).hexdigest()[:8]
-    conn = sqlite3.connect(DATABASE_FILE)
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT OR REPLACE INTO folder_indexes (folder_hash, folder_path, last_indexed) VALUES (?, ?, ?)",
-        (folder_hash, folder_path, datetime.now().isoformat())
-    )
-    cursor.execute("DELETE FROM images WHERE folder_hash = ?", (folder_hash,))
-    for consumer_id, data in index.items():
-        mru = data["MRU"]
-        for date, paths in data["images"].items():
-            for path in paths:
-                cursor.execute(
-                    "INSERT OR IGNORE INTO images (consumer_id, mru, date, image_path, folder_hash) VALUES (?, ?, ?, ?, ?)",
-                    (consumer_id, mru, date, path, folder_hash)
-                )
-    conn.commit()
-    conn.close()
-
-def sync_folder_index_sqlite(folder_path):
+def generate_images_txt():
     """
-    Incrementally update the database for a folder:
-    - Add new images found in the folder (and subfolders) but not in the DB.
-    - Delete images from the DB that no longer exist in the folder.
-    - Keep existing records if the file still exists.
+    Generate images.txt for all online folders (default + additional).
+    Each folder gets its own TXT file with a unique name.
     """
-    folder_hash = hashlib.md5(folder_path.encode()).hexdigest()[:8]
-    conn = sqlite3.connect(DATABASE_FILE)
-    cursor = conn.cursor()
-    # 1. Get all current image files in the folder and subfolders
-    valid_exts = ('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.webp')
-    current_files = set()
-    for root, dirs, files in os.walk(folder_path):
-        for filename in files:
-            if not filename.lower().endswith(valid_exts):
-                continue
-            if len(filename) < 23:
-                continue
-            date = filename[:8]
-            mru = filename[8:16]
-            consumer_id = filename[16:25]
-            full_path = os.path.join(root, filename)
-            current_files.add((consumer_id, mru, date, full_path, folder_hash))
-    # 2. Get all image records for this folder from the DB
-    cursor.execute("SELECT consumer_id, mru, date, image_path, folder_hash FROM images WHERE folder_hash = ?", (folder_hash,))
-    db_files = set(cursor.fetchall())
-    # 3. Find new files to add and old files to delete
-    to_add = current_files - db_files
-    to_delete = db_files - current_files
-    # 4. Insert new files
-    if to_add:
-        cursor.executemany(
-            "INSERT OR IGNORE INTO images (consumer_id, mru, date, image_path, folder_hash) VALUES (?, ?, ?, ?, ?)",
-            list(to_add)
-        )
-    # 5. Delete missing files
-    for record in to_delete:
-        cursor.execute(
-            "DELETE FROM images WHERE consumer_id=? AND mru=? AND date=? AND image_path=? AND folder_hash=?",
-            record
-        )
-    # 6. Update folder metadata
-    cursor.execute(
-        "INSERT OR REPLACE INTO folder_indexes (folder_hash, folder_path, last_indexed) VALUES (?, ?, ?)",
-        (folder_hash, folder_path, datetime.now().isoformat())
-    )
-    conn.commit()
-    conn.close()
+    # Always include the default folder first
+    folders = [IMAGE_FOLDER] + [f for f in additional_folders if check_folder_status(f)]
+    txt_files = []
 
-def load_all_folder_indexes_sqlite():
+    for folder in folders:
+        # Create a unique filename for each folder's txt file
+        folder_hash = hashlib.md5(folder.encode()).hexdigest()[:8]
+        txt_file = os.path.join(os.path.dirname(TXT_FILE), f"images_{folder_hash}.txt")
+        txt_files.append(txt_file)
+        try:
+            command = f'dir "{folder}" /b > "{txt_file}"'
+            subprocess.run(command, shell=True, check=True)
+        except subprocess.CalledProcessError as e:
+            messagebox.showerror("Error", f"Failed to load images from {folder}: {e}")
+
+    # Merge all txt files into the main TXT_FILE (default folder first, then others)
+    with open(TXT_FILE, "w") as outfile:
+        for folder, txt_file in zip(folders, txt_files):
+            with open(txt_file, "r") as infile:
+                for line in infile:
+                    outfile.write(f"{os.path.abspath(folder)}|{line.strip()}\n")
+
+    messagebox.showinfo("Success", "Images loaded successfully from all online folders!")
+    reload_image_index(save_pickle=True)
+
+def save_image_index_pickle(index):
+    with open(PICKLE_FILE, "wb") as f:
+        pickle.dump(index, f)
+
+def load_image_index_pickle():
+    if os.path.exists(PICKLE_FILE):
+        with open(PICKLE_FILE, "rb") as f:
+            return pickle.load(f)
+    return None
+
+def load_image_index():
     """
-    Load and merge indexes from all online folders from SQLite database,
-    giving priority to default folder.
+    Load image index from TXT_FILE, supporting multiple folders.
+    Only images from online folders are included.
     """
     global image_index
     image_index = {}
-    folders = [IMAGE_FOLDER] + [f for f in additional_folders if check_folder_status(f)]
-    folder_hashes = [hashlib.md5(f.encode()).hexdigest()[:8] for f in folders]
-    conn = sqlite3.connect(DATABASE_FILE)
-    cursor = conn.cursor()
-    # Process default folder first
-    default_hash = hashlib.md5(IMAGE_FOLDER.encode()).hexdigest()[:8]
-    if default_hash in folder_hashes:
-        cursor.execute("SELECT consumer_id, mru, date, image_path FROM images WHERE folder_hash = ?", (default_hash,))
-        for consumer_id, mru, date, image_path in cursor.fetchall():
-            if consumer_id not in image_index:
-                image_index[consumer_id] = {"MRU": mru, "images": {}}
-            if date not in image_index[consumer_id]["images"]:
-                image_index[consumer_id]["images"][date] = []
-            if image_path not in image_index[consumer_id]["images"][date]:
-                image_index[consumer_id]["images"][date].append(image_path)
-    # Process other folders
-    for folder in additional_folders:
-        if not check_folder_status(folder):
-            continue
-        folder_hash = hashlib.md5(folder.encode()).hexdigest()[:8]
-        cursor.execute("SELECT consumer_id, mru, date, image_path FROM images WHERE folder_hash = ?", (folder_hash,))
-        for consumer_id, mru, date, image_path in cursor.fetchall():
-            if consumer_id not in image_index:
-                image_index[consumer_id] = {"MRU": mru, "images": {}}
-            if date not in image_index[consumer_id]["images"]:
-                image_index[consumer_id]["images"][date] = []
-            if image_path not in image_index[consumer_id]["images"][date]:
-                image_index[consumer_id]["images"][date].append(image_path)
-    conn.close()
+    try:
+        with open(TXT_FILE, "r") as file:
+            for line in file:
+                line = line.strip()
+                if "|" in line:
+                    folder_path, filename = line.split("|", 1)
+                else:
+                    # For backward compatibility, assume default folder
+                    folder_path, filename = IMAGE_FOLDER, line
+
+                # Only process if folder is online
+                if not check_folder_status(folder_path):
+                    continue
+
+                if len(filename) < 23:
+                    continue
+                date = filename[:8]
+                mru = filename[8:16]
+                consumer_id = filename[16:25]
+                full_path = os.path.join(folder_path, filename)
+                # Priority: default folder images overwrite others
+                if consumer_id not in image_index:
+                    image_index[consumer_id] = {"MRU": mru, "images": {}}
+                if date not in image_index[consumer_id]["images"]:
+                    image_index[consumer_id]["images"][date] = []
+                # Only add if not already present (avoid duplicates)
+                if full_path not in image_index[consumer_id]["images"][date]:
+                    image_index[consumer_id]["images"][date].append(full_path)
+    except FileNotFoundError:
+        messagebox.showinfo("Welcome", "Greetings!!\nAt first we will load existing images!!\nPress OK to continue...")
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred while loading the image index: {e}")
     return image_index
 
 def reload_image_index(save_pickle=False):
-    load_all_folder_indexes_sqlite()
-    update_image_count()
+    load_all_folder_indexes()
+    #update_image_count()
 
 def reload_image_index_no_ui(save_pickle=False):
-    load_all_folder_indexes_sqlite()
+    load_all_folder_indexes()
     # Do NOT call update_image_count() here
 
 def format_date(date_str):
@@ -259,31 +134,34 @@ def search_consumer():
     label_consumer_details.config(text="")
     label_total_images.config(text="")
     show_latest_previews(consumer_id)
-    # Show note for this consumer
-    note_display = get_consumer_note(consumer_id)
-    label_notes_content.config(text=note_display if note_display else "No note for this consumer.")
+
     if not consumer_id.isdigit() or len(consumer_id) != 9:
         messagebox.showwarning("Invalid Input", "Consumer ID must be a 9-digit number.")
         return
+
     if consumer_id in image_index:
         consumer_data = image_index[consumer_id]
         mru_code = consumer_data["MRU"]
         images_data = consumer_data["images"]
+
         if not images_data:
             label_consumer_details.config(text=f"Consumer ID: {consumer_id}\nMRU: {mru_code}")
             label_total_images.config(text="No images found for this Consumer ID!", foreground="red")
             return
+
         sorted_dates = sorted(images_data.keys(), key=lambda x: datetime.strptime(x, "%d%m%Y"), reverse=True)
         meter_number = get_meter_number(consumer_id)
         meter_text = f"\nMeter Number: {meter_number}" if meter_number else ""
         label_consumer_details.config(text=f"Consumer ID: {consumer_id}\nMRU: {mru_code}{meter_text}")
         label_total_images.config(text=f"Total Images Found: {sum(len(images) for images in images_data.values())}")
+
         for date in sorted_dates:
             readable_date = format_date(date)
             listbox_dates.insert(tk.END, readable_date)
     else:
         label_consumer_details.config(text="No images found for this Consumer ID!", foreground="red")
         label_total_images.config(text="")
+
     searched_lists = load_searched_lists()
     if consumer_id not in searched_lists["consumer_ids"]:
         searched_lists["consumer_ids"].append(consumer_id)
@@ -385,7 +263,7 @@ def show_about():
         "• Maintain a history of searched Consumer IDs and Meter Numbers for quick access.\n\n"
         "Developed By: Pramod Verma\n"
         "ERP ID: 90018747\n"
-        "Version: 5.2.0\n"
+        "Version: 4.1.0\n"
     )
     messagebox.showinfo("About", about_text)
 
@@ -693,7 +571,6 @@ def add_folder():
         def do_indexing():
             generate_folder_index(folder)
             root.after(0, reload_image_index)  # Ensure UI update on main thread
-            
         threading.Thread(target=do_indexing, daemon=True).start()
 
 def remove_folder():
@@ -732,27 +609,26 @@ def refresh_folder_status():
 
 def generate_folder_index(folder):
     """
-    Generate a SQLite index for a single folder (recursively).
+    Generate a pickle index for a single folder.
     """
+    folder_hash = hashlib.md5(folder.encode()).hexdigest()[:8]
+    index_file = os.path.join(os.path.dirname(TXT_FILE), f"index_{folder_hash}.pkl")
     index = {}
     try:
-        valid_exts = ('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.webp')
-        for root, dirs, files in os.walk(folder):
-            for filename in files:
-                if not filename.lower().endswith(valid_exts):
-                    continue
-                if len(filename) < 23:
-                    continue
-                date = filename[:8]
-                mru = filename[8:16]
-                consumer_id = filename[16:25]
-                full_path = os.path.join(root, filename)
-                if consumer_id not in index:
-                    index[consumer_id] = {"MRU": mru, "images": {}}
-                if date not in index[consumer_id]["images"]:
-                    index[consumer_id]["images"][date] = []
-                index[consumer_id]["images"][date].append(full_path)
-        sync_folder_index_sqlite(folder)
+        for filename in os.listdir(folder):
+            if len(filename) < 23:
+                continue
+            date = filename[:8]
+            mru = filename[8:16]
+            consumer_id = filename[16:25]
+            full_path = os.path.join(folder, filename)
+            if consumer_id not in index:
+                index[consumer_id] = {"MRU": mru, "images": {}}
+            if date not in index[consumer_id]["images"]:
+                index[consumer_id]["images"][date] = []
+            index[consumer_id]["images"][date].append(full_path)
+        with open(index_file, "wb") as f:
+            pickle.dump(index, f)
     except Exception as e:
         messagebox.showerror("Error", f"Failed to index images in {folder}: {e}")
 
@@ -777,51 +653,80 @@ def generate_all_folder_indexes_with_progress():
     show_progress_bar()
     progress_time_label.config(text="Loading images please wait...")
     root.update()
+
     def do_indexing():
-        # Count all images recursively
-        valid_exts = ('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.webp')
-        total = 0
-        for folder in folders:
-            for root, dirs, files in os.walk(folder):
-                total += sum(1 for filename in files if filename.lower().endswith(valid_exts) and len(filename) >= 23)
+        total = sum([len(os.listdir(folder)) for folder in folders if os.path.exists(folder)])
         if total == 0:
             root.after(0, lambda: messagebox.showinfo("Info", "No images found in any folder."))
             root.after(0, hide_progress_bar)
             return
         processed = 0
         for folder in folders:
+            folder_hash = hashlib.md5(folder.encode()).hexdigest()[:8]
+            index_file = os.path.join(os.path.dirname(TXT_FILE), f"index_{folder_hash}.pkl")
             index = {}
             try:
-                for rootdir, dirs, files in os.walk(folder):
-                    for filename in files:
-                        if not filename.lower().endswith(valid_exts):
-                            continue
-                        if len(filename) < 23:
-                            continue
-                        date = filename[:8]
-                        mru = filename[8:16]
-                        consumer_id = filename[16:25]
-                        full_path = os.path.join(rootdir, filename)
-                        if consumer_id not in index:
-                            index[consumer_id] = {"MRU": mru, "images": {}}
-                        if date not in index[consumer_id]["images"]:
-                            index[consumer_id]["images"][date] = []
-                        index[consumer_id]["images"][date].append(full_path)
-                        processed += 1
-                        if processed % 100 == 0 or processed == total:
-                            percent = (processed / total) * 100
-                            root.after(0, lambda p=percent: update_progress_bar(p))
-                sync_folder_index_sqlite(folder)
+                files = os.listdir(folder)
+                for filename in files:
+                    if len(filename) < 23:
+                        continue
+                    date = filename[:8]
+                    mru = filename[8:16]
+                    consumer_id = filename[16:25]
+                    full_path = os.path.join(folder, filename)
+                    if consumer_id not in index:
+                        index[consumer_id] = {"MRU": mru, "images": {}}
+                    if date not in index[consumer_id]["images"]:
+                        index[consumer_id]["images"][date] = []
+                    index[consumer_id]["images"][date].append(full_path)
+                    processed += 1
+                    if processed % 100 == 0 or processed == total:
+                        percent = (processed / total) * 100
+                        root.after(0, lambda p=percent: update_progress_bar(p))
+                with open(index_file, "wb") as f:
+                    pickle.dump(index, f)
             except Exception as e:
                 root.after(0, lambda: messagebox.showerror("Error", f"Failed to index images in {folder}: {e}"))
         root.after(0, lambda: update_progress_bar(100))
         root.after(0, finish)
+
     def finish():
         hide_progress_bar()
         messagebox.showinfo("Success", "Images updated for all online folders!")
         reload_image_index()
         update_image_count()
+
     root.after(100, lambda: threading.Thread(target=do_indexing, daemon=True).start())
+
+def load_all_folder_indexes():
+    """
+    Load and merge indexes from all online folders, giving priority to default folder.
+    """
+    global image_index
+    image_index = {}
+    folders = [IMAGE_FOLDER] + [f for f in additional_folders if check_folder_status(f)]
+    folder_indexes = []
+    for folder in folders:
+        folder_hash = hashlib.md5(folder.encode()).hexdigest()[:8]
+        index_file = os.path.join(os.path.dirname(TXT_FILE), f"index_{folder_hash}.pkl")
+        if os.path.exists(index_file):
+            with open(index_file, "rb") as f:
+                folder_indexes.append(pickle.load(f))
+    # Merge: default folder first, then others (others only add if not present)
+    for idx, folder_index in enumerate(folder_indexes):
+        for consumer_id, consumer_data in folder_index.items():
+            if consumer_id not in image_index:
+                image_index[consumer_id] = {"MRU": consumer_data["MRU"], "images": {}}
+            for date, images in consumer_data["images"].items():
+                if date not in image_index[consumer_id]["images"]:
+                    image_index[consumer_id]["images"][date] = []
+                # For default folder, insert at front; for others, append if not present
+                for img_path in images:
+                    if img_path not in image_index[consumer_id]["images"][date]:
+                        if idx == 0:  # default folder
+                            image_index[consumer_id]["images"][date].insert(0, img_path)
+                        else:
+                            image_index[consumer_id]["images"][date].append(img_path)
 
 def debug_show_index_counts():
     """
@@ -830,19 +735,18 @@ def debug_show_index_counts():
     folders = [IMAGE_FOLDER] + [f for f in additional_folders if check_folder_status(f)]
     msg_lines = []
     total_per_folder = []
-    
-    conn = sqlite3.connect(DATABASE_FILE)
-    cursor = conn.cursor()
-    
     for folder in folders:
         folder_hash = hashlib.md5(folder.encode()).hexdigest()[:8]
-        cursor.execute("SELECT COUNT(*) FROM images WHERE folder_hash = ?", (folder_hash,))
-        count = cursor.fetchone()[0]
+        index_file = os.path.join(os.path.dirname(TXT_FILE), f"index_{folder_hash}.pkl")
+        count = 0
+        if os.path.exists(index_file):
+            with open(index_file, "rb") as f:
+                folder_index = pickle.load(f)
+                for consumer_data in folder_index.values():
+                    for images in consumer_data["images"].values():
+                        count += len(images)
         msg_lines.append(f"{os.path.basename(folder)}: {count} images")
         total_per_folder.append(count)
-    
-    conn.close()
-    
     # Now show merged total from image_index
     merged_total = 0
     for consumer_data in image_index.values():
@@ -854,7 +758,6 @@ def debug_show_index_counts():
 def update_progress_bar(percent):
     progress_var.set(percent)
     root.update_idletasks()
-
 
 # --- GUI SECTION ---
 
@@ -893,7 +796,7 @@ label_image_count_frame = tb.Frame(frame_top)
 label_image_count_frame.pack(side=LEFT, padx=5)
 
 label_image_count = tb.Label(label_image_count_frame, text="Total Images: 0", font=("Arial", 12, "bold"), bootstyle="success")
-label_image_count.pack(side=LEFT)
+label_image_count.pack()
 
 progress_var = tb.DoubleVar()
 progress_bar = ttk.Progressbar(
@@ -901,7 +804,7 @@ progress_bar = ttk.Progressbar(
     variable=progress_var,
     length=250,
     mode="indeterminate",
-    style="success.Horizontal.TProgressbar"
+    style="success.Horizontal.TProgressbar"  # You can use "info", "warning", etc.
 )
 progress_time_label = tb.Label(label_image_count_frame, text="", font=("Arial", 12, "italic"), bootstyle="secondary")
 
@@ -923,10 +826,8 @@ root.config(menu=menu_bar)
 file_menu = Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="File", menu=file_menu)
 file_menu.add_command(label="Update Consumer List", command=update_meter_list)
-file_menu.add_command(label="Reload Images", command=generate_all_folder_indexes_with_progress)
+file_menu.add_command(label="Reload Images", command=generate_all_folder_indexes_with_progress)  # Use per-folder index!
 file_menu.add_command(label="Image Counts", command=debug_show_index_counts)
-file_menu.add_separator()
-file_menu.add_command(label="Export Notes to CSV", command=export_notes_to_csv)
 file_menu.add_separator()
 file_menu.add_command(label="Exit", command=root.quit)
 
@@ -979,39 +880,12 @@ listbox_dates = tk.Listbox(frame_left, font=("Arial", 12), height=20)
 listbox_dates.pack(fill=BOTH, expand=True)
 listbox_dates.bind("<<ListboxSelect>>", display_image)
 
-# --- Reduce image pane width ---
-frame_right = tb.Frame(main_frame, width=500, padding=10, relief="ridge", borderwidth=2)
+# Right pane (image display)
+frame_right = tb.Frame(main_frame, padding=10, relief="ridge", borderwidth=2)
 frame_right.pack(side=LEFT, fill=BOTH, expand=True, padx=10, pady=10)
 
-canvas = tk.Canvas(frame_right, bg="#f8f9fa", width=500, height=500)
+canvas = tk.Canvas(frame_right, bg="#f8f9fa")
 canvas.pack(fill=BOTH, expand=True)
-
-# --- Notes pane: tall, rightmost, same height as folder pane, separate from image pane ---
-notes_pane = tb.Frame(main_frame, width=250, padding=10, relief="ridge", borderwidth=2)
-notes_pane.pack(side=RIGHT, fill=Y, padx=10, pady=10)
-
-label_notes_title = tb.Label(notes_pane, text="Add/View Note", font=("Arial", 12, "bold"), bootstyle="info")
-label_notes_title.pack(anchor="w", pady=(0, 10))
-
-note_options = get_note_options()
-note_var = tk.StringVar()
-note_dropdown = ttk.Combobox(notes_pane, textvariable=note_var, values=note_options, state="readonly", width=25)
-note_dropdown.set("Select Note...")
-note_dropdown.pack(anchor="w", pady=(0, 5))
-
-note_text_var = tk.StringVar()
-note_entry = tb.Entry(notes_pane, textvariable=note_text_var, width=30)
-note_entry.pack(anchor="w", pady=(0, 5))
-
-btn_add_note = tb.Button(notes_pane, text="Add Note", command=add_note_for_consumer, bootstyle="warning")
-btn_add_note.pack(anchor="w", pady=(0, 10))
-
-label_prev_note_title = tb.Label(notes_pane, text="Previous Note:", font=("Arial", 11, "bold"), bootstyle="secondary")
-label_prev_note_title.pack(anchor="w", pady=(10, 0))
-
-label_notes_content = tb.Label(notes_pane, text="", font=("Arial", 11), wraplength=220, justify="left", bootstyle="secondary")
-label_notes_content.pack(anchor="w", pady=(5, 0))
-# --- End notes pane ---
 
 preview_frames = []
 preview_canvases = []
@@ -1045,7 +919,7 @@ folder_status_pane.pack(side=RIGHT, fill=Y, padx=10, pady=10)
 folder_title = tb.Label(folder_status_pane, text="Network Folders", font=("Arial", 13, "bold"), bootstyle="info")
 folder_title.pack(pady=(0, 10))
 
-folder_listbox = tk.Listbox(folder_status_pane, font=("Arial", 9), height=20, width=32)
+folder_listbox = tk.Listbox(folder_status_pane, font=("Arial", 12), height=20, width=32)
 folder_listbox.pack(pady=5, fill=X)
 
 btn_add_folder = tb.Button(folder_status_pane, text="Add", command=add_folder, bootstyle="success")
@@ -1072,9 +946,10 @@ def on_folder_delete(event):
 
 folder_listbox.bind("<Delete>", on_folder_delete)
 
-# Initialize database and load data
-initialize_database()
+# Load and show folders at startup
+
 load_additional_folders()
+
 update_folder_list()
 refresh_folder_status()
 background_reload_image_index()
@@ -1089,17 +964,19 @@ entry_meter_number.bind("<space>", lambda e: show_searched_lists(e, entry_meter_
 def check_and_generate_indexes_on_startup():
     folders = [IMAGE_FOLDER] + additional_folders
     index_exists = False
-    conn = sqlite3.connect(DATABASE_FILE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM images")
-    count = cursor.fetchone()[0]
-    conn.close()
-    if count > 0:
-        index_exists = True
+    for folder in folders:
+        folder_hash = hashlib.md5(folder.encode()).hexdigest()[:8]
+        index_file = os.path.join(os.path.dirname(TXT_FILE), f"index_{folder_hash}.pkl")
+        if os.path.exists(index_file):
+            index_exists = True
+            break
     if not index_exists:
         messagebox.showinfo("Welcome", "Greetings!!\nNo image index found. The app will now index all images. This may take a while.")
         generate_all_folder_indexes_with_progress()
 
 check_and_generate_indexes_on_startup()
 
+
+
 root.mainloop()
+
