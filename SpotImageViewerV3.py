@@ -13,6 +13,7 @@ import threading
 import hashlib
 import shutil
 import time
+import sqlite3
 
 # Constants
 IMAGE_FOLDER = r"C:\spotbillfiles\backup\image"
@@ -759,6 +760,7 @@ def update_progress_bar(percent):
     progress_var.set(percent)
     root.update_idletasks()
 
+
 # --- GUI SECTION ---
 
 root = tb.Window(themename="minty")
@@ -786,10 +788,10 @@ entry_meter_number = tb.Entry(frame_top, width=20, font=("Arial", 12), state=tk.
 entry_meter_number.pack(side=LEFT, padx=5)
 entry_meter_number.bind("<Return>", lambda event: search_meter())
 
-btn_search_meter = tb.Button(frame_top, text="Update List", command=update_meter_list, bootstyle="info")
+btn_search_meter = tb.Button(frame_top, text="Update List", command=update_meter_list, bootstyle="success")
 btn_search_meter.pack(side=LEFT, padx=5)
 
-btn_refresh = tb.Button(frame_top, text="Refresh", command=refresh_search, bootstyle="warning")
+btn_refresh = tb.Button(frame_top, text="Refresh", command=refresh_search, bootstyle="info")
 btn_refresh.pack(side=LEFT, padx=5)
 
 label_image_count_frame = tb.Frame(frame_top)
