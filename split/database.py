@@ -10,20 +10,29 @@ def init_db():
         cursor.execute("PRAGMA journal_mode=WAL;")
         cursor.execute("PRAGMA synchronous=NORMAL;")
         
+        # New directories table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS directories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                dir_path TEXT UNIQUE
+            )
+        ''')
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS images (
                 consumer_id TEXT,
                 date_original TEXT,
                 date_iso TEXT,
                 mru TEXT,
-                file_path TEXT UNIQUE,
-                folder_source TEXT
+                filename TEXT,
+                dir_id INTEGER,
+                UNIQUE(filename, dir_id)
             )
         ''')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_cid ON images (consumer_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_date_iso ON images (date_iso)')
         
-        # New tables
+        # Other tables...
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS db_info (
                 key TEXT PRIMARY KEY,

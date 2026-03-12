@@ -1,5 +1,7 @@
 import database
 import json
+import urllib.request
+import threading
 
 def load_additional_folders():
     """Loads the list of additional network folders from the database."""
@@ -63,3 +65,21 @@ def console_log(message):
     import datetime
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{timestamp}] {message}")
+
+def check_for_updates_background(current_version, update_url, finished_callback):
+    def worker():
+        try:
+            with urllib.request.urlopen(update_url, timeout=5) as response:
+                data = json.loads(response.read().decode())
+            
+            version = data.get("version")
+            
+            if float(version) > current_version:
+                finished_callback("update_found", data)
+            else:
+                finished_callback("no_update", None)
+        except Exception as e:
+            console_log(f"Update check failed: {e}")
+            finished_callback("error", {"error": str(e)})
+
+    threading.Thread(target=worker, daemon=True).start()

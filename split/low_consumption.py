@@ -262,10 +262,24 @@ class LowConsumptionVerifier(tk.Toplevel):
         def worker():
             conn = get_db_connection()
             cur = conn.cursor()
-            cur.execute("SELECT date_original, file_path FROM images WHERE consumer_id = ? ORDER BY date_iso DESC LIMIT 24", (cid,))
+            cur.execute("""
+                SELECT d.dir_path, i.filename
+                FROM images i
+                JOIN directories d ON i.dir_id = d.id
+                WHERE i.consumer_id = ?
+                ORDER BY i.date_iso DESC
+                LIMIT 24
+            """, (cid,))
             rows = cur.fetchall()
             conn.close()
-            self.after(0, lambda: self.populate_ui(rows))
+
+            processed_rows = []
+            for dir_path, filename in rows:
+                full_path = os.path.join(dir_path, filename)
+                date_orig = filename[:8]
+                processed_rows.append((date_orig, full_path))
+
+            self.after(0, lambda: self.populate_ui(processed_rows))
             
         threading.Thread(target=worker, daemon=True).start()
 
