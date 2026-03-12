@@ -18,6 +18,7 @@ import config
 import database
 import utils
 from low_consumption import LowConsumptionVerifier
+import documentation
 
 # --- Global State Variables ---
 img_tk = None
@@ -636,6 +637,16 @@ def apply_network_colors(results):
 
 
 
+def update_meter_search_state():
+    if database.has_meter_data():
+        entry_meter_number.config(state="normal")
+        meter_button.config(text="Search Meter", command=search_meter, bootstyle="primary")
+    else:
+        entry_meter_number.config(state="disabled")
+        meter_button.config(text="Update List", command=update_meter_list_threaded, bootstyle="success")
+
+
+
 def show_history(event, key, widget):
     try:
         items = utils.load_search_history(key)[::-1] # Reverse for recent first
@@ -699,7 +710,7 @@ def update_meter_list_threaded():
             return
         
         utils.console_log("Step 3: Preparing UI for update...")
-        btn_upd.config(state="disabled", text="Updating...")
+        meter_button.config(state="disabled", text="Updating...")
         progress_bar.pack(side=RIGHT, padx=10)
         progress_bar.start(10)
         
@@ -720,13 +731,13 @@ def update_meter_list_threaded():
             root.after(0, lambda: messagebox.showinfo("Success", "Meter list updated."))
         except Exception as e:
             utils.console_log(f"!!! WORKER ERROR: {e}")
-            root.after(0, lambda: messagebox.showerror("Error", f"Failed to read Excel.\n{str(e)}\n\nEnsure 'openpyxl' is installed."))
+            root.after(0, lambda e=e: messagebox.showerror("Error", f"Failed to read Excel.\n{str(e)}\n\nEnsure 'openpyxl' is installed."))
         finally:
             utils.console_log("WORKER: Cleaning up UI.")
             root.after(0, reset_ui)
 
     def reset_ui():
-        btn_upd.config(state="normal", text="Update List")
+        update_meter_search_state()
         progress_bar.stop()
         progress_bar.pack_forget()
 
@@ -734,13 +745,40 @@ def update_meter_list_threaded():
     root.after(200, open_file_picker)
 
 def show_about():
-    msg = "Spot Image Viewer V15\n\nFastest Version.\n\nLow Consumption Verification added"
-    messagebox.showinfo("About", msg)
+    about_win = Toplevel(root)
+    about_win.title("About Spot Image Viewer")
+    about_win.geometry("450x350")
+    about_win.transient(root)
+    about_win.grab_set()
+
+    header_font = ("Segoe UI", 14, "bold")
+    title_font = ("Segoe UI", 11, "bold")
+    link_font = ("Segoe UI", 10, "underline")
+
+    main_frame = tb.Frame(about_win, padding=20)
+    main_frame.pack(fill=BOTH, expand=True)
+
+    tb.Label(main_frame, text=f"Spot Image Viewer V{config.CURRENT_VERSION}", font=header_font, bootstyle="primary").pack(pady=(0, 15))
+    
+    tb.Label(main_frame, text="Developer:", font=title_font).pack(anchor=NW)
+    tb.Label(main_frame, text="Pramod Verma", font=("Segoe UI", 10)).pack(anchor=NW, padx=(10, 0), pady=(0, 10))
+
+    tb.Label(main_frame, text="Contact & Support:", font=title_font).pack(anchor=NW, pady=(10, 0))
+    
+    # Email
+    email_label = tb.Label(main_frame, text="je.kushidaccc@gmail.com", font=link_font, cursor="hand2", bootstyle="info")
+    email_label.pack(anchor=NW, padx=(10, 0))
+    email_label.bind("<Button-1>", lambda e: webbrowser.open("mailto:je.kushidaccc@gmail.com"))
+
+    # WhatsApp
+    whatsapp_label = tb.Label(main_frame, text="WhatsApp Community", font=link_font, cursor="hand2", bootstyle="info")
+    whatsapp_label.pack(anchor=NW, padx=(10, 0), pady=(5, 0))
+    whatsapp_label.bind("<Button-1>", lambda e: webbrowser.open("https://chat.whatsapp.com/LZKLg40n8FxCLdnAIO9HGE"))
+    
+    tb.Button(main_frame, text="Close", command=about_win.destroy, bootstyle="secondary").pack(side=BOTTOM, pady=(20, 0))
 
 def open_help():
-    pdf = os.path.join(config.BASE_DIR, "help.pdf")
-    if os.path.exists(pdf): os.startfile(pdf)
-    else: messagebox.showinfo("Info", "help.pdf not found in backup folder.")
+    documentation.show_documentation(root)
 
 def prompt_update(version, notes, link):
     title = f"New Version Available: v{version}"
@@ -781,7 +819,8 @@ def manual_update_check():
 def on_startup_check():
     try:
         utils.check_for_updates_background(config.CURRENT_VERSION, config.UPDATE_URL, on_update_check_finished_auto)
-        update_folder_list_ui() 
+        update_folder_list_ui()
+        update_meter_search_state()
         cnt = database.get_total_image_count()
         status_label.config(text=f"Total Indexed Images: {cnt}")
         
@@ -795,7 +834,7 @@ def on_startup_check():
 # GUI SETUP 
 # ==============================================================================
 root = tb.Window(themename="cosmo") 
-root.title("Spot Image Viewer V15")
+root.title(f"Spot Image Viewer V{config.CURRENT_VERSION}")
 root.geometry("1300x850")
 root.state("zoomed")
 
@@ -811,6 +850,7 @@ root.config(menu=mb)
 fm = Menu(mb, tearoff=0)
 mb.add_cascade(label="File", menu=fm)
 fm.add_command(label="Reload Images", command=start_indexing_process)
+fm.add_command(label="Update Meter List", command=update_meter_list_threaded)
 fm.add_separator()
 fm.add_command(label="Exit", command=root.quit)
 
@@ -852,10 +892,8 @@ entry_meter_number.pack(side=LEFT, padx=5)
 entry_meter_number.bind("<Return>", lambda e: search_meter())
 entry_meter_number.bind("<space>", lambda e: show_history(e, "meter_numbers", entry_meter_number))
 
-tb.Button(search_card, text="Search Meter", bootstyle="primary", command=search_meter).pack(side=LEFT, padx=5)
-
-btn_upd = tb.Button(search_card, text="Update List", bootstyle="success", command=update_meter_list_threaded)
-btn_upd.pack(side=RIGHT, padx=5)
+meter_button = tb.Button(search_card, text="Search Meter") # Text/command set dynamically
+meter_button.pack(side=LEFT, padx=5)
 
 btn_reload = tb.Button(search_card, text="Reload Images", bootstyle="warning", command=start_indexing_process)
 btn_reload.pack(side=RIGHT, padx=5)
