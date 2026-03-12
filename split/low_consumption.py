@@ -1,7 +1,8 @@
 import os
 import json
 import threading
-import pandas as pd
+import openpyxl
+import csv
 import tkinter as tk
 from tkinter import messagebox, filedialog, Listbox, ttk, END, LEFT, RIGHT, TOP, BOTTOM, BOTH, X, Y, HORIZONTAL
 import ttkbootstrap as tb
@@ -33,7 +34,8 @@ class LowConsumptionVerifier(tk.Toplevel):
     def create_widgets(self):
         toolbar = tb.Frame(self, bootstyle="secondary", padding=5)
         toolbar.pack(fill=X, side=TOP)
-        tb.Button(toolbar, text="Load Data (New Session)", command=self.ask_data_source, bootstyle="info").pack(side=LEFT, padx=5)
+        tb.Button(toolbar, text="Load Excel", command=self.load_excel, bootstyle="info").pack(side=LEFT, padx=5)
+        tb.Button(toolbar, text="Paste from Clipboard", command=self.load_paste, bootstyle="info").pack(side=LEFT, padx=5)
         tb.Button(toolbar, text="Export CSV", command=self.export_report, bootstyle="success").pack(side=LEFT, padx=5)
         tb.Label(toolbar, text=" |  Shortcuts: Alt+S (Save), Alt+N (Skip)", bootstyle="inverse-secondary").pack(side=LEFT, padx=15)
 
@@ -143,6 +145,7 @@ class LowConsumptionVerifier(tk.Toplevel):
         self.bind("<Alt-s>", lambda e: self.save_and_next())
         self.bind("<Alt-n>", lambda e: self.skip_item())
 
+
     def startup_check(self):
         if os.path.exists(self.session_file):
             try:
@@ -150,19 +153,25 @@ class LowConsumptionVerifier(tk.Toplevel):
                     self.data = json.load(f)
                 
                 if self.data:
-                    self.filter_tree()
-                    messagebox.showinfo("Session Restored", f"Restored previous session with {len(self.data)} records.")
-                    self.lift()
-                    self.focus_force()
-                    first_pending = next((item['id'] for item in self.data if item['status'] == "PENDING"), None)
-                    if first_pending is not None:
-                        self.tree.selection_set(first_pending)
-                        self.tree.see(first_pending)
-                    return
+                    if messagebox.askyesno("Session Found", f"Restore previous session with {len(self.data)} records?"):
+                        self.filter_tree()
+                        self.lift()
+                        self.focus_force()
+                        first_pending = next((item['id'] for item in self.data if item['status'] == "PENDING"), None)
+                        if first_pending is not None:
+                            self.tree.selection_set(first_pending)
+                            self.tree.see(first_pending)
+                    else:
+                        self.data = []
+                        self.save_session()
+                        self.filter_tree()
             except Exception as e:
                 print(f"Session load error: {e}")
+                self.data = []
+                self.save_session()
+                self.filter_tree()
         
-        self.ask_data_source()
+
 
     def save_session(self):
         try:
@@ -170,53 +179,67 @@ class LowConsumptionVerifier(tk.Toplevel):
                 json.dump(self.data, f)
         except: pass
 
-    def ask_data_source(self):
-        self.lift() 
-        win = tb.Toplevel(self)
-        win.title("Load Data")
-        win.geometry("400x300")
-        tb.Label(win, text="Import Data Source", font=("Segoe UI", 14)).pack(pady=20)
+    def load_excel(self):
+        path = filedialog.askopenfilename(filetypes=[("Excel", "*.xlsx *.xls")])
+        if not path:
+            return
         
-        def load_excel():
-            path = filedialog.askopenfilename(filetypes=[("Excel", "*.xlsx")])
-            if path:
-                try:
-                    df = pd.read_excel(path)
-                    self.load_dataframe(df)
-                    win.destroy()
-                except Exception as e: messagebox.showerror("Error", str(e))
-        
-        def load_paste():
-            pwin = tb.Toplevel(self)
-            pwin.title("Paste Data")
-            tk.Label(pwin, text="Paste: ID | Meter | Unit").pack()
-            txt = tk.Text(pwin, height=10); txt.pack()
-            def go():
-                raw = txt.get("1.0", END)
-                rows = [line.split()[:3] for line in raw.split('\n') if len(line.split()) >= 3]
-                if rows:
-                    self.load_dataframe(pd.DataFrame(rows, columns=["A","B","C"]))
-                    pwin.destroy(); win.destroy()
-            tb.Button(pwin, text="Go", command=go).pack()
+        try:
+            wb = openpyxl.load_workbook(path)
+            sheet = wb.active
+            
+            new_data = []
+            for idx, row in enumerate(sheet.iter_rows(values_only=True)):
+                if not any(row): continue
+                cid = str(row[0]).strip() if row[0] else ""
+                if not cid or cid.lower() == "nan": continue
+                meter = str(row[1]).strip() if len(row) > 1 and row[1] else ""
+                unit = str(row[2]).strip() if len(row) > 2 and row[2] else "0"
+                new_data.append({"id": idx, "cid": cid, "meter": meter, "unit": unit, "status": "PENDING", "remarks": ""})
+            
+            self.data = new_data
+            self.save_session()
+            self.filter_tree()
+            messagebox.showinfo("Loaded", f"{len(self.data)} records from Excel.")
+            self.lift()
+            self.focus_force()
 
-        tb.Button(win, text="Excel File", command=load_excel, bootstyle="success").pack(fill=X, padx=50, pady=5)
-        tb.Button(win, text="Paste Data", command=load_paste, bootstyle="info").pack(fill=X, padx=50, pady=5)
+        except Exception as e:
+            messagebox.showerror("Excel Error", f"Failed to read Excel file.\n{e}")
 
-    def load_dataframe(self, df):
-        self.data = []
-        for idx, row in df.iterrows():
-            vals = list(row.values)
-            cid = str(vals[0]).strip()
-            if not cid or cid.lower() == "nan": continue
-            meter = str(vals[1]).strip() if len(vals) > 1 else ""
-            unit = str(vals[2]).strip() if len(vals) > 2 else "0"
-            self.data.append({"id": idx, "cid": cid, "meter": meter, "unit": unit, "status": "PENDING", "remarks": ""})
+    def load_paste(self):
+        pwin = tb.Toplevel(self)
+        pwin.title("Paste Data")
+        pwin.geometry("400x350")
+
+        tb.Label(pwin, text="Paste data from clipboard (ID | Meter | Unit)").pack(pady=10)
         
-        self.save_session()
-        self.filter_tree()
-        messagebox.showinfo("Loaded", f"{len(self.data)} records.")
-        self.lift()
-        self.focus_force()
+        txt = tk.Text(pwin, height=10, width=50)
+        txt.pack(pady=5, padx=10, fill="both", expand=True)
+        
+        def go():
+            raw = txt.get("1.0", END)
+            rows = [line.split() for line in raw.split('\n') if line.strip()]
+            
+            new_data = []
+            for idx, row in enumerate(rows):
+                if not row: continue
+                cid = str(row[0]).strip() if row[0] else ""
+                if not cid or cid.lower() == "nan": continue
+                meter = str(row[1]).strip() if len(row) > 1 and row[1] else ""
+                unit = str(row[2]).strip() if len(row) > 2 and row[2] else "0"
+                new_data.append({"id": idx, "cid": cid, "meter": meter, "unit": unit, "status": "PENDING", "remarks": ""})
+
+            self.data = new_data
+            self.save_session()
+            self.filter_tree()
+            messagebox.showinfo("Loaded", f"{len(self.data)} records from clipboard.", parent=self)
+            pwin.destroy()
+
+        tb.Button(pwin, text="Import Data", command=go, bootstyle="success").pack(pady=10)
+        pwin.transient(self)
+        pwin.grab_set()
+        pwin.focus_set()
 
     def filter_tree(self, *args):
         query = self.var_filter.get().lower()
@@ -363,7 +386,19 @@ class LowConsumptionVerifier(tk.Toplevel):
             messagebox.showinfo("Done", "End of list.")
 
     def export_report(self):
-        path = filedialog.asksaveasfilename(defaultextension=".csv")
-        if path:
-            pd.DataFrame(self.data).to_csv(path, index=False)
-            messagebox.showinfo("Saved", "Report Exported.")
+        if not self.data:
+            messagebox.showwarning("No Data", "There is no data to export.")
+            return
+
+        path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")])
+        if not path:
+            return
+            
+        try:
+            with open(path, "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=self.data[0].keys())
+                writer.writeheader()
+                writer.writerows(self.data)
+            messagebox.showinfo("Saved", "Report Exported Successfully.")
+        except Exception as e:
+            messagebox.showerror("Export Error", f"Failed to export CSV.\n{e}")

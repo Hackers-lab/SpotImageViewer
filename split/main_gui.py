@@ -6,7 +6,7 @@ import csv
 import json
 import webbrowser
 from datetime import datetime
-import pandas as pd
+import openpyxl
 from PIL import Image, ImageTk
 
 import tkinter as tk
@@ -485,15 +485,19 @@ def print_image():
 def save_image():
     if not img_original: return
     
-    cid = entry_consumer_id.get().strip()
-    sel = listbox_dates.curselection()
-    date_str = "image" if not sel else listbox_dates.get(sel[0])
+    original_filename = os.path.basename(img_original.filename)
     
-    path = filedialog.asksaveasfilename(initialfile=f"{cid}_{date_str}.png", defaultextension=".png")
+    path = filedialog.asksaveasfilename(
+        initialfile=original_filename,
+        defaultextension=".png",
+        filetypes=[("PNG", "*.png"), ("JPEG", "*.jpg"), ("All files", "*.*")]
+    )
     if not path: return
 
-    try: img_copy = img_original.copy()
-    except: img_copy = img_original
+    try:
+        img_copy = img_original.copy()
+    except:
+        img_copy = img_original
 
     prog = Toplevel()
     prog.title("Saving Image")
@@ -508,14 +512,16 @@ def save_image():
         except Exception as e:
             root.after(0, lambda: messagebox.showerror("Error", f"Save failed: {e}"))
         finally:
-            try: root.after(0, prog.destroy)
-            except: pass
+            try:
+                root.after(0, prog.destroy)
+            except:
+                pass
 
     threading.Thread(target=worker, args=(img_copy, path), daemon=True).start()
 
 def save_all_images():
     cid = entry_consumer_id.get().strip()
-    if not cid or cid not in current_search_data: return 
+    if not cid or not current_search_data: return 
     
     dest = filedialog.askdirectory(title="Select Destination Folder")
     if not dest: return
@@ -539,12 +545,12 @@ def save_all_images():
             for date, paths in data.items():
                 for p in paths:
                     if os.path.exists(p):
-                        ext = os.path.splitext(p)[1]
-                        save_name = f"{date}{ext}"
+                        original_filename = os.path.basename(p)
                         try:
-                            shutil.copy2(p, os.path.join(out_dir, save_name))
+                            shutil.copy2(p, os.path.join(out_dir, original_filename))
                             count += 1
-                        except: pass
+                        except Exception as copy_e:
+                            print(f"Could not copy {p}: {copy_e}")
             root.after(0, lambda: messagebox.showinfo("Success", f"Saved {count} images to {out_dir}"))
         except Exception as e:
             root.after(0, lambda: messagebox.showerror("Error", f"Save all failed: {e}"))
@@ -552,7 +558,8 @@ def save_all_images():
             try:
                 root.after(0, pbar.stop)
                 root.after(0, prog.destroy)
-            except: pass
+            except:
+                pass
 
     threading.Thread(target=worker, args=(current_search_data, target_dir), daemon=True).start()
 
@@ -643,7 +650,7 @@ def update_meter_search_state():
         meter_button.config(text="Search Meter", command=search_meter, bootstyle="primary")
     else:
         entry_meter_number.config(state="disabled")
-        meter_button.config(text="Update List", command=update_meter_list_threaded, bootstyle="success")
+        meter_button.config(text="Update Meter List", command=update_meter_list_threaded, bootstyle="success")
 
 
 
@@ -717,12 +724,19 @@ def update_meter_list_threaded():
         threading.Thread(target=worker, args=(path,), daemon=True).start()
 
     def worker(file_path):
-        utils.console_log(f"WORKER: Reading file {file_path}")
+        utils.console_log(f"WORKER: Reading file {file_path} with openpyxl")
         try:
-            df = pd.read_excel(file_path, header=None, usecols=[0,1], dtype=str)
-            utils.console_log("WORKER: Excel read success. Converting to Dict...")
+            d = {}
+            wb = openpyxl.load_workbook(file_path)
+            sheet = wb.active
             
-            d = {r[0].strip(): r[1].strip() for _, r in df.iterrows() if r[0] and pd.notna(r[0])}
+            for row in sheet.iter_rows():
+                if len(row) >= 2 and row[0].value and row[1].value:
+                    cid = str(row[0].value).strip()
+                    meter = str(row[1].value).strip()
+                    if cid and meter:
+                        d[cid] = meter
+            
             utils.console_log(f"WORKER: Processed {len(d)} rows.")
             
             utils.update_meter_mapping(d)
