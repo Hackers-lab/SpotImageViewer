@@ -219,10 +219,21 @@ def update_meter_mapping(mapping_dict):
         conn = get_db_connection()
         cursor = conn.cursor()
         # You might want to clear the table first if this is a complete refresh
-        # cursor.execute("DELETE FROM meter_mapping") 
+        cursor.execute("DELETE FROM meter_mapping") 
         data_to_insert = list(mapping_dict.items())
         cursor.executemany("INSERT OR REPLACE INTO meter_mapping VALUES (?, ?)", data_to_insert)
         conn.commit()
         conn.close()
+    except Exception as e:
+        print(f"DATABASE ERROR in update_meter_mapping: {e}")
+
+def has_meter_data():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM meter_mapping")
+        count = cursor.fetchone()[0]
+        conn.close()
+        return count > 0
     except:
-        pass
+        return False

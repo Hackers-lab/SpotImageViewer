@@ -72,9 +72,13 @@ def check_for_updates_background(current_version, update_url, finished_callback)
             with urllib.request.urlopen(update_url, timeout=5) as response:
                 data = json.loads(response.read().decode())
             
-            version = data.get("version")
+            latest_version = data.get("version")
             
-            if float(version) > current_version:
+            # Convert version strings to comparable tuples of integers
+            current_v_tuple = tuple(map(int, str(current_version).split('.')))
+            latest_v_tuple = tuple(map(int, str(latest_version).split('.')))
+
+            if latest_v_tuple > current_v_tuple:
                 finished_callback("update_found", data)
             else:
                 finished_callback("no_update", None)
