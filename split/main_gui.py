@@ -4,6 +4,7 @@ import threading
 import time
 import csv
 import json
+import webbrowser
 from datetime import datetime
 import pandas as pd
 from PIL import Image, ImageTk
@@ -76,6 +77,7 @@ def index_images_thread(progress_callback, finish_callback):
         total_inserted = 0
 
         cursor.execute("DELETE FROM images")
+        cursor.execute("DELETE FROM directories") # Also clear directories
         conn.commit()
         
         start_time = time.time()
@@ -85,6 +87,11 @@ def index_images_thread(progress_callback, finish_callback):
                 continue
             
             for root_dir, dirs, files in os.walk(folder):
+                # Get the directory ID for the current root_dir
+                cursor.execute("INSERT OR IGNORE INTO directories (dir_path) VALUES (?)", (root_dir,))
+                cursor.execute("SELECT id FROM directories WHERE dir_path = ?", (root_dir,))
+                dir_id = cursor.fetchone()[0]
+
                 for filename in files:
                     try:
                         if len(filename) < 20: continue
@@ -99,12 +106,11 @@ def index_images_thread(progress_callback, finish_callback):
 
                         mru = filename[8:16]
                         cid = filename[16:25]
-                        path = os.path.join(root_dir, filename)
 
-                        batch_data.append((cid, date_orig, date_iso, mru, path, folder))
+                        batch_data.append((cid, date_orig, date_iso, mru, filename, dir_id))
 
                         if len(batch_data) >= BATCH_SIZE:
-                            cursor.executemany("INSERT OR IGNORE INTO images VALUES (?,?,?,?,?,?)", batch_data)
+                            cursor.executemany("INSERT OR IGNORE INTO images (consumer_id, date_original, date_iso, mru, filename, dir_id) VALUES (?,?,?,?,?,?)", batch_data)
                             conn.commit()
                             total_inserted += len(batch_data)
                             batch_data = []
@@ -115,17 +121,15 @@ def index_images_thread(progress_callback, finish_callback):
                         continue
 
         if batch_data:
-            cursor.executemany("INSERT OR IGNORE INTO images VALUES (?,?,?,?,?,?)", batch_data)
+            cursor.executemany("INSERT OR IGNORE INTO images (consumer_id, date_original, date_iso, mru, filename, dir_id) VALUES (?,?,?,?,?,?)", batch_data)
             conn.commit()
             total_inserted += len(batch_data)
         
         cursor.execute("ANALYZE;") 
-
-        # --- ADD THESE THREE LINES TO SHRINK THE DB ---
-        print("Optimizing and compressing database...")
-        cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);") # Forces WAL file to merge and clear
-        cursor.execute("VACUUM;") # Rebuilds the database, removing all empty "ghost" space
-        # ----------------------------------------------
+        
+        # Optimize and compress database
+        cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+        cursor.execute("VACUUM;")
         
         conn.close()
 
@@ -236,7 +240,12 @@ def run_backup_thread(iso_date_limit, target_folder):
         try:
             conn = database.get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT file_path, folder_source FROM images WHERE date_iso <= ?", (iso_date_limit,))
+            cursor.execute("""
+                SELECT d.dir_path, i.filename 
+                FROM images i
+                JOIN directories d ON i.dir_id = d.id
+                WHERE i.date_iso <= ?
+            """, (iso_date_limit,))
             rows = cursor.fetchall()
             conn.close()
             
@@ -252,13 +261,13 @@ def run_backup_thread(iso_date_limit, target_folder):
             count = 0
             moved = 0
             
-            for file_path, src_folder in rows:
-                if src_folder == config.IMAGE_FOLDER:
+            for dir_path, filename in rows:
+                if dir_path == config.IMAGE_FOLDER:
                     try:
-                        if os.path.exists(file_path):
-                            fname = os.path.basename(file_path)
-                            dst = os.path.join(target_folder, fname)
-                            shutil.move(file_path, dst)
+                        full_path = os.path.join(dir_path, filename)
+                        if os.path.exists(full_path):
+                            dst = os.path.join(target_folder, filename)
+                            shutil.move(full_path, dst)
                             moved += 1
                     except: pass
                 count += 1
@@ -319,7 +328,13 @@ def search_consumer():
     try:
         conn = database.get_db_connection()
         cur = conn.cursor()
-        cur.execute("SELECT date_original, mru, file_path FROM images WHERE consumer_id = ? ORDER BY date_iso DESC", (cid,))
+        cur.execute("""
+            SELECT i.date_original, i.mru, d.dir_path, i.filename 
+            FROM images i 
+            JOIN directories d ON i.dir_id = d.id 
+            WHERE i.consumer_id = ? 
+            ORDER BY i.date_iso DESC
+        """, (cid,))
         rows = cur.fetchall()
         conn.close()
         
@@ -335,7 +350,8 @@ def search_consumer():
         current_search_data = {}
         dates_ordered = []
         
-        for date, _, path in rows:
+        for date, _, dir_path, filename in rows:
+            path = os.path.join(dir_path, filename)
             if date not in current_search_data:
                 current_search_data[date] = []
                 dates_ordered.append(date)
@@ -726,8 +742,45 @@ def open_help():
     if os.path.exists(pdf): os.startfile(pdf)
     else: messagebox.showinfo("Info", "help.pdf not found in backup folder.")
 
+def prompt_update(version, notes, link):
+    title = f"New Version Available: v{version}"
+    message = f"A new version of the application is available.\n\nRelease Notes:\n{notes}\n\nDo you want to download it now?"
+    if messagebox.askyesno(title, message):
+        webbrowser.open(link)
+
+def on_update_found(version, notes, link):
+    root.after(0, lambda: prompt_update(version, notes, link))
+
+def on_update_check_finished_auto(status, data):
+    if status == "update_found":
+        on_update_found(
+            data.get("version"),
+            data.get("release_notes"),
+            data.get("download_url")
+        )
+
+def on_update_check_finished_manual(status, data):
+    if status == "update_found":
+        version = data.get("version")
+        notes = data.get("release_notes")
+        link = data.get("download_url")
+        root.after(0, lambda: prompt_update(version, notes, link))
+    elif status == "no_update":
+        root.after(0, lambda: messagebox.showinfo("No Updates", "You are already using the latest version."))
+    elif status == "error":
+        error_msg = data.get('error', 'An unknown error occurred.')
+        root.after(0, lambda: messagebox.showerror("Update Error", f"Failed to check for updates:\n{error_msg}"))
+
+def manual_update_check():
+    utils.check_for_updates_background(
+        config.CURRENT_VERSION, 
+        config.UPDATE_URL, 
+        on_update_check_finished_manual
+    )
+
 def on_startup_check():
     try:
+        utils.check_for_updates_background(config.CURRENT_VERSION, config.UPDATE_URL, on_update_check_finished_auto)
         update_folder_list_ui() 
         cnt = database.get_total_image_count()
         status_label.config(text=f"Total Indexed Images: {cnt}")
@@ -776,6 +829,7 @@ vm.add_command(label="Low Consumption Check", command=lambda: LowConsumptionVeri
 hm = Menu(mb, tearoff=0)
 mb.add_cascade(label="Help", menu=hm)
 hm.add_command(label="Documentation", command=open_help)
+hm.add_command(label="Check for Updates", command=manual_update_check)
 hm.add_command(label="About", command=show_about)
 
 top_f = tb.Frame(root, padding=15, bootstyle="light") 
@@ -866,6 +920,18 @@ preview_canvas_scroller.configure(yscrollcommand=preview_scrollbar.set)
 
 preview_canvas_scroller.pack(side="left", fill="both", expand=True)
 preview_scrollbar.pack(side="right", fill="y")
+
+def _on_preview_mousewheel(event):
+    preview_canvas_scroller.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+def _bind_preview_mousewheel(event):
+    preview_canvas_scroller.bind_all("<MouseWheel>", _on_preview_mousewheel)
+
+def _unbind_preview_mousewheel(event):
+    preview_canvas_scroller.unbind_all("<MouseWheel>")
+
+preview_canvas_scroller.bind('<Enter>', _bind_preview_mousewheel)
+preview_canvas_scroller.bind('<Leave>', _unbind_preview_mousewheel)
 
 canvas_container = tb.Frame(right_inner_frame)
 canvas_container.grid(row=0, column=0, sticky="nsew")
