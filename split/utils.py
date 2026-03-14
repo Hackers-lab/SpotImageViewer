@@ -2,6 +2,7 @@ import database
 import json
 import urllib.request
 import threading
+import ssl
 
 def load_additional_folders():
     """Loads the list of additional network folders from the database."""
@@ -69,7 +70,9 @@ def console_log(message):
 def check_for_updates_background(current_version, update_url, finished_callback):
     def worker():
         try:
-            with urllib.request.urlopen(update_url, timeout=5) as response:
+            # Create an unverified SSL context
+            context = ssl._create_unverified_context()
+            with urllib.request.urlopen(update_url, context=context, timeout=5) as response:
                 data = json.loads(response.read().decode())
             
             latest_version = data.get("version")
