@@ -1,0 +1,28 @@
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(17, 1, 0, 0),
+    prodvers=(17, 1, 0, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+    ),
+  kids=[
+    StringFileInfo(
+      [
+      StringTable(
+        u'040904B0',
+        [StringStruct(u'CompanyName', u'WBSEDCL'),
+        StringStruct(u'FileDescription', u'Spot Image Viewer and Verification Tool'),
+        StringStruct(u'FileVersion', u'17.1.0'),
+        StringStruct(u'InternalName', u'SpotImageViewer'),
+        StringStruct(u'LegalCopyright', u'Copyright (c) 2026 Pramod Kumar Verma'),
+        StringStruct(u'OriginalFilename', u'SpotImageViewerV17.1.exe'),
+        StringStruct(u'ProductName', u'Spot Image Viewer'),
+        StringStruct(u'ProductVersion', u'17.1.0')])
+      ]), 
+    VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
+  ]
+)
