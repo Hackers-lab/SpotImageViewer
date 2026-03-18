@@ -1,0 +1,95 @@
+{
+    "Domestic (Rural) - Rate A(DM-R)": {
+        "fixed_charge": 30.0,
+        "min_charge": 30.0,
+        "slabs": [
+            {"limit": 34, "rate": 5.00},
+            {"limit": 26, "rate": 6.24},
+            {"limit": 40, "rate": 6.89},
+            {"limit": 100, "rate": 7.44},
+            {"limit": 100, "rate": 7.61},
+            {"limit": null, "rate": 9.22}
+        ],
+        "ed_slabs": [
+            {"limit": 300, "rate": 0.0},
+            {"limit": null, "rate": 0.10}
+        ]
+    },
+    "Domestic (Urban) - Rate A(DM-U)": {
+        "fixed_charge": 30.0,
+        "min_charge": 30.0,
+        "slabs": [
+            {"limit": 34, "rate": 5.04},
+            {"limit": 26, "rate": 6.33},
+            {"limit": 40, "rate": 7.12},
+            {"limit": 100, "rate": 7.52},
+            {"limit": 100, "rate": 7.69},
+            {"limit": null, "rate": 9.22}
+        ],
+        "ed_slabs": [
+            {"limit": 300, "rate": 0.0},
+            {"limit": null, "rate": 0.10}
+        ]
+    },
+    "Commercial - Rate A(CM)": {
+        "fixed_charge": 60.0,
+        "min_charge": 105.0,
+        "slabs": [
+            {"limit": 60, "rate": 5.77},
+            {"limit": 40, "rate": 7.52},
+            {"limit": 50, "rate": 8.20},
+            {"limit": 150, "rate": 8.51},
+            {"limit": null, "rate": 9.02}
+        ],
+        "ed_slabs": [
+            {"limit": 150, "rate": 0.0},
+            {"limit": null, "rate": 0.10}
+        ]
+    },
+    "Agriculture Normal - Rate C(A)": {
+        "fixed_charge": 60.0,
+        "min_charge": 0.0,
+        "slabs": [
+            {"limit": null, "rate": 4.66}
+        ],
+        "ed_slabs": [
+            {"limit": null, "rate": 0.0}
+        ]
+    },
+    "Agriculture TOD - Rate C(T)": {
+        "fixed_charge": 40.0,
+        "min_charge": 0.0,
+        "tod_slabs": {
+            "Normal": 3.50,
+            "Peak": 7.71,
+            "Off_Peak": 2.65
+        },
+        "ed_slabs": [
+            {"limit": null, "rate": 0.0}
+        ]
+    },
+    "Industry (Rural) - Rate B(I-R)": {
+        "fixed_charge": 75.0,
+        "min_charge": 200.0,
+        "slabs": [
+            {"limit": 500, "rate": 5.07},
+            {"limit": null, "rate": 7.65}
+        ],
+        "ed_slabs": [
+            {"limit": 500, "rate": 0.0},
+            {"limit": null, "rate": 0.02475}
+        ]
+    },
+    "Industry (Urban) - Rate B(I-U)": {
+        "fixed_charge": 75.0,
+        "min_charge": 200.0,
+        "slabs": [
+            {"limit": 500, "rate": 7.57},
+            {"limit": 1500, "rate": 7.86},
+            {"limit": null, "rate": 9.83}
+        ],
+        "ed_slabs": [
+            {"limit": null, "rate": 0.15}
+        ]
+    }
+}
