@@ -187,7 +187,7 @@ def calculate_all(*args):
 
 # --- UI SETUP ---
 app = ttk.Window(themename="cosmo") 
-app.title("Real-Time WBSEDCL Assessor")
+app.title("Theft Assessment Calculator - SpotImageViewer")
 app.geometry("1050x760")
 
 # Fonts
@@ -204,16 +204,20 @@ main_frame.pack(fill=BOTH, expand=YES, padx=15, pady=15)
 top_frame = ttk.Frame(main_frame)
 top_frame.pack(fill=X, pady=(0, 15))
 
-ttk.Label(top_frame, text="Section 135 Theft Assessment Calculator", font=FONT_TITLE, bootstyle=PRIMARY).pack(pady=(0, 15))
+ttk.Label(top_frame, text="Theft Assessment Calculator", font=FONT_TITLE, bootstyle=PRIMARY).pack(pady=(0, 15))
 
 input_bar = ttk.Frame(top_frame)
-input_bar.pack()
+input_bar.pack(fill=X, padx=20, pady=10)
+
+# Configure grid to have a labels column and an inputs column that expands
+input_bar.columnconfigure(0, weight=0) 
+input_bar.columnconfigure(1, weight=1)
 
 # Variables
 category_var = ttk.StringVar()
 consumer_type_var = ttk.StringVar(value="Consumer")
-load_var = ttk.StringVar(value="4.38")
-load_unit_var = ttk.StringVar(value="KVA") 
+load_var = ttk.StringVar(value="0")
+load_unit_var = ttk.StringVar(value="KVA")
 
 p_days_var = ttk.StringVar(value="365")
 p_hours_var = ttk.StringVar(value="24")
@@ -223,19 +227,26 @@ adj_e_var = ttk.StringVar(value="0")
 adj_f_var = ttk.StringVar(value="0")
 adj_ed_var = ttk.StringVar(value="0")
 
-ttk.Label(input_bar, text="Offender Type:", font=FONT_LABEL).grid(row=0, column=0, padx=5)
-ttk.Radiobutton(input_bar, text="Consumer", variable=consumer_type_var, value="Consumer", bootstyle="info").grid(row=0, column=1, padx=5)
-ttk.Radiobutton(input_bar, text="Non-Consumer", variable=consumer_type_var, value="Non-Consumer", bootstyle="warning").grid(row=0, column=2, padx=5)
+# --- Row 1: Offender Type ---
+ttk.Label(input_bar, text="Offender Type:", font=FONT_LABEL).grid(row=0, column=0, sticky=W, pady=5)
+offender_subframe = ttk.Frame(input_bar)
+offender_subframe.grid(row=0, column=1, sticky=W)
+ttk.Radiobutton(offender_subframe, text="Consumer", variable=consumer_type_var, value="Consumer", bootstyle="info").pack(side=LEFT, padx=5)
+ttk.Radiobutton(offender_subframe, text="Non-Consumer", variable=consumer_type_var, value="Non-Consumer", bootstyle="warning").pack(side=LEFT, padx=5)
 
-ttk.Label(input_bar, text="Tariff Category:", font=FONT_LABEL).grid(row=0, column=3, padx=(25,5))
-category_cb = ttk.Combobox(input_bar, textvariable=category_var, values=list(TARIFF_DATA.keys()), state="readonly", width=25)
+# --- Row 2: Tariff Category ---
+ttk.Label(input_bar, text="Tariff Category:", font=FONT_LABEL).grid(row=1, column=0, sticky=W, pady=5)
+category_cb = ttk.Combobox(input_bar, textvariable=category_var, values=list(TARIFF_DATA.keys()), state="readonly")
 if list(TARIFF_DATA.keys()): category_cb.current(0)
-category_cb.grid(row=0, column=4, padx=5)
+category_cb.grid(row=1, column=1, sticky=EW, padx=5)
 
-ttk.Label(input_bar, text="Assessed Load:", font=FONT_LABEL).grid(row=0, column=5, padx=(25,5))
-ttk.Entry(input_bar, textvariable=load_var, justify="center", width=8).grid(row=0, column=6, padx=2)
-unit_cb = ttk.Combobox(input_bar, textvariable=load_unit_var, values=["KVA", "kW"], state="readonly", width=5)
-unit_cb.grid(row=0, column=7, padx=2)
+# --- Row 3: Assessed Load ---
+ttk.Label(input_bar, text="Assessed Load:", font=FONT_LABEL).grid(row=2, column=0, sticky=W, pady=5)
+load_subframe = ttk.Frame(input_bar)
+load_subframe.grid(row=2, column=1, sticky=W)
+ttk.Entry(load_subframe, textvariable=load_var, justify="center", width=12).pack(side=LEFT, padx=5)
+unit_cb = ttk.Combobox(load_subframe, textvariable=load_unit_var, values=["KVA", "kW"], state="readonly", width=6)
+unit_cb.pack(side=LEFT)
 
 # ================= MIDDLE PANELS (PERFECT SYMMETRY GRID) =================
 panels_frame = ttk.Frame(main_frame)

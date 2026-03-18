@@ -3,16 +3,77 @@ import os
 
 CONFIG_FILE = "tariff_settings.json"
 
+# Verified 2025-26 Source of Truth for automatic pre-filling
+DEFAULT_TARIFF = {
+    "Domestic (Rural) - Rate A(DM-R)": {
+        "fixed_charge": 30.0,
+        "min_charge": 75.0, # WBERC 2025-26 standard [cite: 266]
+        "load_factor": 0.5,
+        "slabs": [
+            {"limit": 34, "rate": 5.00}, {"limit": 26, "rate": 6.24},
+            {"limit": 40, "rate": 6.89}, {"limit": 100, "rate": 7.44},
+            {"limit": 100, "rate": 7.61}, {"limit": None, "rate": 9.22}
+        ],
+        "ed_slabs": [{"limit": 300, "rate": 0.0}, {"limit": None, "rate": 0.10}]
+    },
+    "Domestic (Urban) - Rate A(DM-U)": {
+        "fixed_charge": 30.0,
+        "min_charge": 75.0,
+        "load_factor": 0.5,
+        "slabs": [
+            {"limit": 34, "rate": 5.04}, {"limit": 26, "rate": 6.33},
+            {"limit": 40, "rate": 7.12}, {"limit": 100, "rate": 7.52},
+            {"limit": 100, "rate": 7.69}, {"limit": None, "rate": 9.22}
+        ],
+        "ed_slabs": [{"limit": 300, "rate": 0.0}, {"limit": None, "rate": 0.10}]
+    },
+    "Commercial - Rate A(CM)": {
+        "fixed_charge": 60.0,
+        "min_charge": 105.0, # [cite: 266]
+        "load_factor": 0.75,
+        "slabs": [
+            {"limit": 60, "rate": 5.77}, {"limit": 40, "rate": 7.52},
+            {"limit": 50, "rate": 8.20}, {"limit": 150, "rate": 8.51},
+            {"limit": None, "rate": 9.02}
+        ],
+        "ed_slabs": [{"limit": 450, "rate": 0.0}, {"limit": None, "rate": 0.10}]
+    },
+    "Agriculture Normal - Rate C(A)": {
+        "fixed_charge": 60.0,
+        "min_charge": 60.0, # Minimum matches fixed for irrigation [cite: 268]
+        "load_factor": 0.75,
+        "slabs": [{"limit": None, "rate": 4.66}], # [cite: 206]
+        "ed_slabs": [{"limit": None, "rate": 0.0}]
+    },
+    "Agriculture TOD - Rate C(T)": {
+        "fixed_charge": 40.0,
+        "min_charge": 40.0,
+        "load_factor": 0.75,
+        "tod_slabs": {"Normal": 3.50, "Peak": 7.71, "Off_Peak": 2.65}, # [cite: 206]
+        "ed_slabs": [{"limit": None, "rate": 0.0}]
+    },
+    "Industry (Rural) - Rate B(I-R)": {
+        "fixed_charge": 75.0,
+        "min_charge": 200.0, # [cite: 266]
+        "load_factor": 0.75,
+        "slabs": [
+            {"limit": 500, "rate": 5.07}, # Verified from industrial bills
+            {"limit": None, "rate": 7.65}
+        ],
+        "ed_slabs": [{"limit": 500, "rate": 0.0}, {"limit": None, "rate": 0.02475}]
+    }
+}
+
 def load_tariff():
-    """Reads the JSON file and returns it as a Python dictionary."""
+    """Returns tariff data; creates file with defaults if missing."""
     if not os.path.exists(CONFIG_FILE):
-        print("Error: tariff_settings.json not found in the directory.")
-        return {}
+        save_tariff(DEFAULT_TARIFF)
+        return DEFAULT_TARIFF
     
     with open(CONFIG_FILE, "r") as f:
         return json.load(f)
 
 def save_tariff(tariff_data):
-    """Saves updated rates back to the JSON file."""
+    """Saves updated dictionary back to JSON."""
     with open(CONFIG_FILE, "w") as f:
         json.dump(tariff_data, f, indent=4)
