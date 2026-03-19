@@ -4,6 +4,8 @@ import threading
 import time
 import csv
 import json
+import subprocess
+import sys
 import webbrowser
 from datetime import datetime
 import openpyxl
@@ -29,6 +31,17 @@ additional_folders = utils.load_additional_folders()
 indexing_active = False
 current_search_data = {}  
 preview_references = [] 
+
+def launch_tool(script_name, tool_title):
+    try:
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), script_name)
+        if not os.path.exists(script_path):
+            messagebox.showerror("Tool Not Found", f"{tool_title} file was not found:\n{script_path}")
+            return
+
+        subprocess.Popen([sys.executable, script_path], cwd=os.path.dirname(script_path))
+    except Exception as e:
+        messagebox.showerror("Launch Error", f"Could not open {tool_title}.\n\n{e}")
 
 def add_network_folder():
     try:
@@ -879,6 +892,12 @@ nm.add_command(label="Export Notes", command=export_notes_csv)
 vm = Menu(mb, tearoff=0)
 mb.add_cascade(label="Verification", menu=vm)
 vm.add_command(label="Low Consumption Check", command=lambda: LowConsumptionVerifier(root))
+
+tm = Menu(mb, tearoff=0)
+mb.add_cascade(label="Tools", menu=tm)
+tm.add_command(label="Bill Calculator", command=lambda: launch_tool("bill_calculator.py", "Bill Calculator"))
+tm.add_command(label="Theft Bill Calculator", command=lambda: launch_tool("theft_calculator.py", "Theft Bill Calculator"))
+tm.add_command(label="Tariff Editor", command=lambda: launch_tool("tariff_editor.py", "Tariff Editor"))
 
 hm = Menu(mb, tearoff=0)
 mb.add_cascade(label="Help", menu=hm)
