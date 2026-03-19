@@ -1,3 +1,7 @@
+from bill_calculator import BillCalculatorApp
+from theft_calculator import TheftCalculatorApp
+from tariff_editor import TariffEditor
+
 import os
 import shutil
 import threading
@@ -893,11 +897,12 @@ vm = Menu(mb, tearoff=0)
 mb.add_cascade(label="Verification", menu=vm)
 vm.add_command(label="Low Consumption Check", command=lambda: LowConsumptionVerifier(root))
 
+# Remove the old launch_tool references and use the classes instead
 tm = Menu(mb, tearoff=0)
 mb.add_cascade(label="Tools", menu=tm)
-tm.add_command(label="Bill Calculator", command=lambda: launch_tool("bill_calculator.py", "Bill Calculator"))
-tm.add_command(label="Theft Bill Calculator", command=lambda: launch_tool("theft_calculator.py", "Theft Bill Calculator"))
-tm.add_command(label="Tariff Editor", command=lambda: launch_tool("tariff_editor.py", "Tariff Editor"))
+tm.add_command(label="Bill Calculator", command=lambda: BillCalculatorApp(root))
+tm.add_command(label="Theft Bill Calculator", command=lambda: TheftCalculatorApp(root))
+tm.add_command(label="Tariff Editor", command=lambda: TariffEditor(root))
 
 hm = Menu(mb, tearoff=0)
 mb.add_cascade(label="Help", menu=hm)

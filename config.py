@@ -9,5 +9,5 @@ if not os.path.exists(BASE_DIR):
         os.makedirs(BASE_DIR)
     except: pass
 
-CURRENT_VERSION = 17.1
+CURRENT_VERSION = 18.0
 UPDATE_URL = "https://raw.githubusercontent.com/Hackers-lab/SpotImageViewer/refs/heads/main/update.json"

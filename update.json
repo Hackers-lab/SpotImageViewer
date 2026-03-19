@@ -1,6 +1,5 @@
-
 {
-  "version": 17.1,
-  "release_notes": "🚀 V17.0 Major Updates:\n• Massive Efficiency Boost: Database completely rebuilt to be 70% smaller and much faster.\n• Live Updates: Added an automated background update checker.\n• Main Screen Scroll: Added mouse-wheel scrolling to the image preview gallery.\n• Low Consumption Refined: Verification module optimized for the new database engine.\n\n🛠️ V17.1 Hotfix:\n• General bug fixes and stability improvements for the network update checker.",
+  "version": 18.0,
+  "release_notes": "🚀 V18.0 Major Updates:\n\n• Energy Bill Calculator: Comprehensive support for Domestic, Commercial, Industrial, and STW (TOD & Whole-day) consumers. Input units and contractual load for exact billing based on the latest 2025-26 tariff rates. Includes a specialized module to calculate tariff benefits for consumers impacted by abrupt billing cycles.\n\n• Theft Assessment Calculator: Instantly generate Provisional and Final assessments for any category. Enter load and category for exact penal figures and an automated check if the final assessment is within the 25% reduction limit.\n\n• Tariff Manager: Centralized hub to view and manage active rate charts. Update tariff rates directly in the app to ensure calculations remain 100% accurate as regulatory charts evolve.",
   "download_url": "https://drive.google.com/uc?export=download&id=1xNNneIK4cJxH8nhaxYMuSAy95vt4_OVM"
 }

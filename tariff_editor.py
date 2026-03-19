@@ -50,18 +50,18 @@ class SlabEditor(ttk.Toplevel):
             self.result = {"limit": limit, "rate": rate}
             self.destroy()
         except ValueError:
-            Messagebox.show_error("Invalid input. Limit must be an integer (or 'None') and rate must be a number.", "Input Error")
+            Messagebox.show_error("Invalid input. Limit must be an integer (or 'None') and rate must be a number.", "Input Error", parent=self)
 
 class TariffEditor:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("WBSEDCL Tariff Editor")
-        self.root.geometry("900x600")
+    def __init__(self, parent):
+        self.window = ttk.Toplevel(parent)
+        self.window.title("WBSEDCL Tariff Editor")
+        self.window.geometry("900x600")
         self.data = tariff_manager.load_tariff()
         self.current_category = None
 
         # Main layout
-        self.paned_window = ttk.Panedwindow(self.root, orient=HORIZONTAL)
+        self.paned_window = ttk.Panedwindow(self.window, orient=HORIZONTAL)
         self.paned_window.pack(fill=BOTH, expand=YES, padx=10, pady=10)
 
         # Left Pane: Category List
@@ -111,14 +111,13 @@ class TariffEditor:
         # Initial Warning
         Messagebox.show_warning(
             "You are about to edit the live tariff configuration. Changes will directly impact calculations. Proceed with caution.",
-            "Editor Warning"
+            "Editor Warning", parent=self.window
         )
 
     def create_slab_tab(self, key, text):
         tab = ttk.Frame(self.notebook, padding=5)
         self.notebook.add(tab, text=text)
         
-        # Main content area for tree and scrollbar
         content_frame = ttk.Frame(tab)
         content_frame.pack(fill=BOTH, expand=YES, side=LEFT)
 
@@ -133,7 +132,6 @@ class TariffEditor:
         tree.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side=RIGHT, fill=Y)
 
-        # Buttons Frame (arranged vertically)
         btn_frame = ttk.Frame(tab)
         btn_frame.pack(side=RIGHT, fill=Y, padx=(10, 0))
         
@@ -151,33 +149,28 @@ class TariffEditor:
         self.current_category = selection[0]
         category_data = self.data[self.current_category]
 
-        # Show the details frame
         self.details_frame.pack(fill=BOTH, expand=YES)
         
-        # Populate general fields
         for key in self.vars:
             self.vars[key].set(category_data.get(key, ""))
         
-        # Populate slab trees
         self.populate_slab_tree(self.slabs_tree, category_data.get("slabs", []))
         self.populate_slab_tree(self.ed_slabs_tree, category_data.get("ed_slabs", []))
 
     def populate_slab_tree(self, tree, slabs):
-        # Clear existing
         for item in tree.get_children():
             tree.delete(item)
-        # Insert new
         for i, slab in enumerate(slabs):
             limit = "None" if slab.get("limit") is None else slab.get("limit")
             rate = slab.get("rate", "")
             tree.insert("", END, values=(limit, rate), iid=i)
 
     def add_slab(self, tree, key):
-        if not messagebox.askyesno("Confirm Add", "Are you sure you want to add a new slab?"):
+        if not messagebox.askyesno("Confirm Add", "Are you sure you want to add a new slab?", parent=self.window):
             return
             
         slab_type = 'rate' if key == 'slabs' else 'ed'
-        editor = SlabEditor(self.root, slab_type=slab_type)
+        editor = SlabEditor(self.window, slab_type=slab_type)
         if editor.result:
             values = ("None" if editor.result['limit'] is None else editor.result['limit'], editor.result['rate'])
             tree.insert("", END, values=values)
@@ -185,10 +178,10 @@ class TariffEditor:
     def edit_slab(self, tree, key):
         selected_item = tree.selection()
         if not selected_item:
-            Messagebox.show_warning("No slab selected to edit.", "Selection Error")
+            Messagebox.show_warning("No slab selected to edit.", "Selection Error", parent=self.window)
             return
         
-        if not messagebox.askyesno("Confirm Edit", "Are you sure you want to edit the selected slab?"):
+        if not messagebox.askyesno("Confirm Edit", "Are you sure you want to edit the selected slab?", parent=self.window):
             return
             
         item = tree.item(selected_item)
@@ -196,7 +189,7 @@ class TariffEditor:
         
         current_data = {"limit": values[0], "rate": values[1]}
         slab_type = 'rate' if key == 'slabs' else 'ed'
-        editor = SlabEditor(self.root, slab_data=current_data, slab_type=slab_type)
+        editor = SlabEditor(self.window, slab_data=current_data, slab_type=slab_type)
 
         if editor.result:
             new_values = ("None" if editor.result['limit'] is None else editor.result['limit'], editor.result['rate'])
@@ -205,10 +198,10 @@ class TariffEditor:
     def remove_slab(self, tree):
         selected_items = tree.selection()
         if not selected_items:
-            Messagebox.show_warning("No slab selected to remove.", "Selection Error")
+            Messagebox.show_warning("No slab selected to remove.", "Selection Error", parent=self.window)
             return
 
-        if not messagebox.askyesno("Confirm Remove", f"Are you sure you want to remove {len(selected_items)} slab(s)? This cannot be undone from the UI."):
+        if not messagebox.askyesno("Confirm Remove", f"Are you sure you want to remove {len(selected_items)} slab(s)? This cannot be undone from the UI.", parent=self.window):
             return
 
         for item in selected_items:
@@ -218,24 +211,19 @@ class TariffEditor:
         if not self.current_category: return
 
         try:
-            # Update general data
             for key in self.vars:
                 val = self.vars[key].get()
-                try:
-                    self.data[self.current_category][key] = float(val)
-                except (ValueError, TypeError):
-                     self.data[self.current_category][key] = val # Keep as string if not floatable
+                try: self.data[self.current_category][key] = float(val)
+                except (ValueError, TypeError): self.data[self.current_category][key] = val 
 
-            # Update slabs
             self.data[self.current_category]["slabs"] = self._get_slabs_from_tree(self.slabs_tree)
             self.data[self.current_category]["ed_slabs"] = self._get_slabs_from_tree(self.ed_slabs_tree)
 
-            # Save the whole file
             tariff_manager.save_tariff(self.data)
-            Messagebox.show_info("Category saved successfully!", "Success")
+            Messagebox.show_info("Category saved successfully!", "Success", parent=self.window)
 
         except Exception as e:
-            Messagebox.show_error(f"Failed to save category: {e}", "Save Error")
+            Messagebox.show_error(f"Failed to save category: {e}", "Save Error", parent=self.window)
 
     def _get_slabs_from_tree(self, tree):
         slabs = []
