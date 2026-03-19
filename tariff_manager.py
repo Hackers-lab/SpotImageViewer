@@ -1,13 +1,15 @@
 import json
 import os
+import config
 
-CONFIG_FILE = "tariff_settings.json"
+# Use the global BASE_DIR from config.py
+CONFIG_FILE = os.path.join(config.BASE_DIR, "tariff_settings.json")
 
 # Verified 2025-26 Source of Truth for automatic pre-filling
 DEFAULT_TARIFF = {
     "Domestic (Rural) - Rate A(DM-R)": {
         "fixed_charge": 30.0,
-        "min_charge": 75.0, # WBERC 2025-26 standard [cite: 266]
+        "min_charge": 75.0, 
         "load_factor": 0.5,
         "slabs": [
             {"limit": 34, "rate": 5.00}, {"limit": 26, "rate": 6.24},
@@ -29,7 +31,7 @@ DEFAULT_TARIFF = {
     },
     "Commercial - Rate A(CM)": {
         "fixed_charge": 60.0,
-        "min_charge": 105.0, # [cite: 266]
+        "min_charge": 105.0, 
         "load_factor": 0.75,
         "slabs": [
             {"limit": 60, "rate": 5.77}, {"limit": 40, "rate": 7.52},
@@ -40,24 +42,24 @@ DEFAULT_TARIFF = {
     },
     "Agriculture Normal - Rate C(A)": {
         "fixed_charge": 60.0,
-        "min_charge": 60.0, # Minimum matches fixed for irrigation [cite: 268]
+        "min_charge": 60.0, 
         "load_factor": 0.75,
-        "slabs": [{"limit": None, "rate": 4.66}], # [cite: 206]
+        "slabs": [{"limit": None, "rate": 4.66}], 
         "ed_slabs": [{"limit": None, "rate": 0.0}]
     },
     "Agriculture TOD - Rate C(T)": {
         "fixed_charge": 40.0,
         "min_charge": 40.0,
         "load_factor": 0.75,
-        "tod_slabs": {"Normal": 3.50, "Peak": 7.71, "Off_Peak": 2.65}, # [cite: 206]
+        "tod_slabs": {"Normal": 3.50, "Peak": 7.71, "Off_Peak": 2.65}, 
         "ed_slabs": [{"limit": None, "rate": 0.0}]
     },
     "Industry (Rural) - Rate B(I-R)": {
         "fixed_charge": 75.0,
-        "min_charge": 200.0, # [cite: 266]
+        "min_charge": 200.0, 
         "load_factor": 0.75,
         "slabs": [
-            {"limit": 500, "rate": 5.07}, # Verified from industrial bills
+            {"limit": 500, "rate": 5.07}, 
             {"limit": None, "rate": 7.65}
         ],
         "ed_slabs": [{"limit": 500, "rate": 0.0}, {"limit": None, "rate": 0.02475}]
