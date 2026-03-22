@@ -829,25 +829,80 @@ class EstimateAppV9(QMainWindow):
     def export_pdf(self):
         filename, _ = QFileDialog.getSaveFileName(self, "Export Blueprint", "Project_Blueprint.pdf", "PDF Files (*.pdf)")
         if not filename: return
+
         printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
-        printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat); printer.setOutputFileName(filename); printer.setPageOrientation(QPageLayout.Orientation.Landscape)
+        printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
+        printer.setOutputFileName(filename)
+
         source_rect = self.scene.itemsBoundingRect()
-        if source_rect.isNull(): QMessageBox.warning(self, "Empty", "Canvas is empty."); return
-        source_rect.adjust(-50, -50, 50, 50) 
-        painter = QPainter(printer); page_rect = printer.pageRect(QPrinter.Unit.DevicePixel)
-        title_font = painter.font(); title_font.setPointSize(20); title_font.setBold(True); title_font.setUnderline(True); painter.setFont(title_font)
-        painter.drawText(page_rect, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter, self.subject_input.text() or 'ERP PROJECT BLUEPRINT')
-        legend_font = painter.font(); legend_font.setPointSize(10); painter.setFont(legend_font)
+        if source_rect.isNull():
+            QMessageBox.warning(self, "Empty", "Canvas is empty.")
+            return
+
+        # Auto-set orientation
+        if source_rect.width() > source_rect.height():
+            printer.setPageOrientation(QPageLayout.Orientation.Landscape)
+        else:
+            printer.setPageOrientation(QPageLayout.Orientation.Portrait)
+
+        painter = QPainter(printer)
+        page_rect_px = printer.pageRect(QPrinter.Unit.DevicePixel)
+        dpi = printer.resolution()
+        margin_px = 10
+
+        # 1. Define content area
+        border_rect = page_rect_px.adjusted(margin_px, margin_px, -margin_px, -margin_px)
+
+        # 2. Draw Title
+        painter.setPen(Qt.GlobalColor.black)
+        title_font = QFont("Arial", 12)
+        title_font.setBold(True)
+        title_font.setUnderline(True)
+        painter.setFont(title_font)
+        
+        title_text = self.subject_input.text() or 'ERP PROJECT BLUEPRINT'
+        text_flags = Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap
+
+        # Calculate the required rect for the wrapped title
+        # Add some padding to the width for calculation to avoid issues at the edges
+        title_rect_calc = QRectF(border_rect.x() + 5, border_rect.y(), border_rect.width() - 10, 9999)
+        required_rect = painter.boundingRect(title_rect_calc, text_flags, title_text)
+
+        # Use the calculated height for the final title rect
+        title_height = required_rect.height()
+        title_rect = QRectF(border_rect.x(), border_rect.y(), border_rect.width(), title_height)
+        painter.drawText(title_rect, text_flags, title_text)
+        
+        # 4. Render Scene
+        scene_target_rect = QRectF(border_rect)
+        scene_target_rect.setTop(border_rect.top() + title_height)
+        source_rect.adjust(-50, -50, 50, 50)
+        self.scene.render(painter, scene_target_rect, source_rect, Qt.AspectRatioMode.KeepAspectRatio)
+        
+        # 5. Draw Legend (on top)
+        legend_font = QFont("Arial", 7)
+        legend_font.setBold(False)
+        legend_font.setUnderline(False)
+        painter.setFont(legend_font)
         legend_text = "LEGEND:\n\n🔵 Blue = LT Pole | 🔴 Red = HT Pole\n🟩 Green = DP/Substation | 🟡 Yellow = Home\n〰〰 (Black) = AB Cable / Service Drop\n〰〰 (Green, Dashed) = PVC Cable\n── Straight Line = ACSR Conductor\n[+CG] = Cattle Guard Installed"
-        flags = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
-        legend_bounds = painter.boundingRect(QRectF(0, 0, page_rect.width(), page_rect.height()), flags, legend_text)
-        pad, margin = 15, 40; box_width, box_height = legend_bounds.width() + (pad * 2), legend_bounds.height() + (pad * 2)
-        legend_rect = QRectF(page_rect.width() - box_width - margin, page_rect.height() - box_height - margin, box_width, box_height)
-        painter.setBrush(QBrush(Qt.GlobalColor.white)); painter.setPen(QPen(Qt.GlobalColor.black, 2)); painter.drawRect(legend_rect) 
-        painter.setPen(QPen(Qt.GlobalColor.black)); painter.drawText(legend_rect.adjusted(pad, pad, -pad, -pad), flags, legend_text) 
-        target_rect = QRectF(margin, 60, page_rect.width() - (2 * margin), page_rect.height() - 60 - box_height - margin - 20)
-        self.scene.render(painter, target_rect, source_rect, Qt.AspectRatioMode.KeepAspectRatio)
-        painter.end(); QMessageBox.information(self, "Success", f"Blueprint PDF exported to:\n{filename}")
+        legend_flags = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+        
+        legend_bounds = painter.boundingRect(border_rect, legend_flags, legend_text)
+        pad = 5
+        box_width = legend_bounds.width() + (pad * 2)
+        box_height = legend_bounds.height() + (pad * 2)
+        
+        legend_rect = QRectF(border_rect.left(), border_rect.bottom() - box_height, box_width, box_height)
+        
+        painter.setBrush(QBrush(QColor(255, 255, 255, 230)))
+        painter.setPen(QPen(QColor(220, 220, 220), 0.5))
+        painter.drawRect(legend_rect)
+        
+        painter.setPen(Qt.GlobalColor.black)
+        painter.drawText(legend_rect.adjusted(pad, pad, -pad, -pad), legend_flags, legend_text)
+
+        painter.end()
+        QMessageBox.information(self, "Success", f"Blueprint PDF exported to:\n{filename}")
 
     def new_drawing(self):
         if QMessageBox.question(self, 'New Canvas', 'Clear canvas?', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
