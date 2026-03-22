@@ -151,7 +151,36 @@ class DraggableLabel(QGraphicsTextItem):
         super().focusOutEvent(event)
 
     def paint(self, painter, option, widget):
-        painter.setBrush(QBrush(QColor(255, 255, 255, 180))); painter.setPen(QPen(Qt.PenStyle.NoPen)); painter.drawRect(self.boundingRect()); super().paint(painter, option, widget)
+        painter.setBrush(QColor(255, 255, 255)) # White, 100% opacity
+        painter.setPen(Qt.PenStyle.NoPen)
+        
+        doc = self.document()
+        layout = doc.documentLayout()
+        
+        for i in range(doc.blockCount()):
+            block = doc.findBlockByNumber(i)
+            if not block.isValid():
+                continue
+            
+            text_layout = block.layout()
+            if not text_layout:
+                continue
+                
+            block_rect = layout.blockBoundingRect(block)
+            line = text_layout.lineAt(0)
+            if line.isValid():
+                used_width = line.naturalTextWidth()
+                offset_x = (block_rect.width() - used_width) / 2
+                
+                highlighter_rect = QRectF(
+                    block_rect.left() + offset_x, 
+                    block_rect.top(), 
+                    used_width, 
+                    block_rect.height()
+                )
+                painter.drawRect(highlighter_rect.adjusted(-3, 0, 3, 0))
+
+        super().paint(painter, option, widget)
 
 class SmartPole(QGraphicsPathItem):
     def __init__(self, x, y, pole_type="LT", is_existing=False):
@@ -176,8 +205,8 @@ class SmartPole(QGraphicsPathItem):
             self.setBrush(QBrush(brush_color)); self.setPen(QPen(Qt.GlobalColor.darkGray, 1, Qt.PenStyle.DashLine)); lbl_text = f"Existing {self.pole_type} Pole"
         else:
             self.setPen(QPen(Qt.GlobalColor.black, 1))
-            if self.pole_type == "LT": self.setBrush(QBrush(Qt.GlobalColor.blue)); lbl_text = f"LT Pole ({self.height})"
-            elif self.pole_type == "HT": self.setBrush(QBrush(Qt.GlobalColor.red)); lbl_text = f"HT Pole ({self.height})"
+            if self.pole_type == "LT": self.setBrush(QBrush(Qt.GlobalColor.blue)); lbl_text = f"LT Pole ({self.height[:-2]})"
+            elif self.pole_type == "HT": self.setBrush(QBrush(Qt.GlobalColor.red)); lbl_text = f"HT Pole ({self.height[:-2]})"
             elif self.pole_type == "DTR": self.setBrush(QBrush(Qt.GlobalColor.green)); lbl_text = "DP Structure" if self.dtr_size == "None" else f"DP Structure\n{self.dtr_size} DTR"
         
         if self.earth_count > 0: lbl_text += f"\n+ {self.earth_count} Earth"
