@@ -11,14 +11,14 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QPushButton, QLabel, QComboBox, QGraphicsView, QGraphicsScene, 
                              QGraphicsTextItem, QFormLayout, QGroupBox, QSpinBox, QGraphicsPathItem, 
                              QLineEdit, QFileDialog, QMessageBox, QCheckBox, QTableWidget, QTableWidgetItem,
-                             QHeaderView, QSplitter, QDialog, QListWidget, QScrollArea)
+                             QHeaderView, QSplitter, QDialog, QListWidget)
 from PyQt6.QtGui import QPen, QBrush, QColor, QPainterPath, QTextOption, QPainter, QPageLayout
 from PyQt6.QtCore import Qt, QTimer, QRectF
 from PyQt6.QtPrintSupport import QPrinter
 
 # --- 1. EXACT OFFICIAL DATABASE ENGINE ---
 def setup_database():
-    conn = sqlite3.connect('dr_enterprises_master.db')
+    conn = sqlite3.connect('erp_master.db')
     cursor = conn.cursor()
     cursor.execute('''DROP TABLE IF EXISTS materials''')
     cursor.execute('''DROP TABLE IF EXISTS labor''')
@@ -43,13 +43,17 @@ def setup_database():
         ("195021741", "UH-LT BKT 4 WAY", 500.00, "NOS"), ("597011541", "UH-CLAMP FOR 8 MTR PCC POLE", 150.00, "NOS"),
         ("597011741", "UH-Diron Clump", 40.00, "NOS"), ("304010532", "T.P.G.O. Isolator (200Amps) 11KV", 10384.98, "SET"),
         ("309010841", "Lightning Arrestor 12 KV", 524.23, "NOS"), ("912011441", "G.I. Turn Buckle", 238.70, "NOS"),
-        ("407010641", "LT Distribution KIOSK FOR 25 KVA DTR", 8878.41, "NOS"), ("501017821", "PVC Cable 4 Core 25SQMM", 229429.95, "KM")
+        ("407010641", "LT Distribution KIOSK FOR 25 KVA DTR", 8878.41, "NOS"), ("501017821", "PVC Cable 4 Core 25SQMM", 229429.95, "KM"),
+        ("504060941", "LT Distribution Box along with steel Strap & Buckle for 3ph connection in ABC system", 1489.9, "NOS"),
+        ("501017421", "CABLE (PVC 1.1 KV GRADE) 4Core X10 sq mm", 125852.36, "KM"), ("501017721", "CABLE (PVC 1.1 KV GRADE) 4CX16 sq mm", 119154.63, "KM"),
+        ("501017821", "CABLE (PVC 1.1 KV GRADE) 4CX25 sq mm", 229429.95, "KM")
     ]
     labor = [
         ("Erection of . 8mtr  PCC Pole ( LT)", 1501.00, "NOS"), ("Erection of . 8mtr  PCC Pole (HT)", 1680.00, "NOS"),
-        ("Erection of . 9mtr  PCC Pole (HT)", 2620.00, "NOS"), 
-        ("Erection of S/S D.P. Structure  (8 mtr without Painted)", 9875.00, "NOS"), ("Sub-Stationn Str with 9 Mtr PCC pole DP", 13169.00, "NOS"), # FIXED: 9M DTR labor
-        ("Erection of 8 mtr D.P structure (HT)", 5654.00, "NOS"), ("Erection of 9 MTR Long PCC pole D/P for HTOH line", 9438.00, "NOS"), # FIXED: 9M DP labor
+        ("Erection of . 9mtr  PCC Pole (HT)", 2620.00, "NOS"), ("Erection of . 9mtr  PCC Pole (HT) Without Painted", 2620.00, "NOS"),
+        ("Erection of S/S D.P. Structure  (8 mtr without Painted)", 9875.00, "NOS"), ("Sub-Stationn Str with 9 Mtr PCC pole DP", 13169.00, "NOS"),
+        ("Sub-Stationn Str with 9 Mtr PCC pole DP Without Painted", 13169.00, "NOS"),
+        ("Erection of 8 mtr D.P structure (HT)", 5654.00, "NOS"), ("Erection of 9 MTR Long PCC pole D/P for HTOH line", 9438.00, "NOS"), 
         ("Erection of 25 KVA Transformer", 1925.00, "NOS"),
         ("Stringing & Sagging with 50 sq.mm A.C.S.R. 3 Wire", 8289.00, "KM"), ("Strining& saging with ACSR 50sqmm 4wire", 9715.00, "KM"),
         ("Stringing & Sagging of LT AB Cable", 46000.00, "KM"), ("H.T. Stay Set Complete Labor", 641.00, "SET"),
@@ -58,11 +62,16 @@ def setup_database():
         ("Extension of 8 mtr PCC Pole (Without Painted)HT", 1506.00, "NOS"), ("Fixing Cross lacing", 15.00, "NOS"), 
         ("Lead Wire above above 60 Mtrs (2 Wire)", 506.00, "NOS"), ("Fixing of Caution Board", 24.00, "NOS"), 
         ("Fixing of LT Bracket(Without Painted)", 596.00, "NOS"), ("Pole GIS survey", 31.00, "NOS"),
-        ("Fixing of 11 KV Pin Insulator", 63.00, "NOS"), ("Fixing of 11 KV Disc Insulator", 65.00, "SET"),
+        ("Fixing of 11 KV Pin Insulator", 63.00, "NOS"), ("Fixing of 11 KV Disc Insulator", 65.00, "NOS"), 
         ("Fixing of LT Shackle Insulator (with N/B)", 52.00, "NOS"), ("Fixing of LT spacer", 56.00, "NOS"),
         ("Fixing of  11 KV TGPO Isolator on S/Stn Structure", 1193.00, "SET"), ("Fixing of neutral earthing of DTR WITH G", 3816.00, "NOS"),
         ("Fixing of 11 KV Lightning Arrestor", 339.00, "SET"), ("FIXING OF LT Distribution KIOSK FOR 25 KVA DTR", 2155.00, "NOS"),
-        ("Erection of Anchoring/Suspension Clamp", 154.00, "NOS"), ("Survey for H.T.O.H Line", 2761.00, "KM"), ("Survey for L.T.O.H Line", 1714.00, "KM")
+        ("Erection of Anchoring/Suspension Clamp", 154.00, "NOS"), ("Survey for H.T.O.H Line", 2761.00, "KM"), ("Survey for L.T.O.H Line", 1714.00, "KM"),
+        ("Fixing of Solid Tee-off Bracket on S.P", 1495.00, "NOS"), ("Fixing of Solid Tee-off Bracket on D.P", 1483.00, "NOS"),
+        ("DTR Code Painting", 65.00, "NOS"), 
+        ("Fixing of 3ph Service Connection (Cable provided)", 570.00, "NOS"), ("Fixing of 1ph Service Connection (Cable provided)", 270.00, "NOS"),
+        ("Fixing of 3ph Service Connection (No Cable)", 6117.00, "NOS"), ("Fixing of 1ph Service Connection (No Cable)", 1578.00, "NOS"),
+        ("Erection of distribution box", 507.00, "NOS"), ("Laying & Dressing of 1.1 KV PVC/XLPE 2x10,4x10/16, 3.5/4x25 Sqmm Cable", 15000.00, "KM")
     ]
     cursor.executemany('INSERT INTO materials VALUES (?,?,?,?)', materials)
     cursor.executemany('INSERT INTO labor VALUES (?,?,?)', labor)
@@ -89,7 +98,7 @@ class SearchDialog(QDialog):
         self.items_data = {}; self.load_data(db_type)
 
     def load_data(self, db_type):
-        conn = sqlite3.connect('dr_enterprises_master.db'); cursor = conn.cursor()
+        conn = sqlite3.connect('erp_master.db'); cursor = conn.cursor()
         if db_type == "Material": cursor.execute("SELECT item_code, item_name, unit, rate FROM materials")
         else: cursor.execute("SELECT '' as item_code, task_name, unit, rate FROM labor")
         for row in cursor.fetchall():
@@ -109,16 +118,19 @@ class SearchDialog(QDialog):
 
 class InteractiveView(QGraphicsView):
     def __init__(self, scene, parent_app):
-        super().__init__(scene); self.parent_app = parent_app
+        super().__init__(scene)
+        self.parent_app = parent_app
         self.setRenderHints(self.renderHints() | self.renderHints().Antialiasing)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
 
     def wheelEvent(self, event):
         zoom = 1.15 if event.angleDelta().y() > 0 else 1.0 / 1.15
         self.scale(zoom, zoom)
+        self.parent_app.update_view_drag_mode()
 
     def mousePressEvent(self, event):
-        self.parent_app.handle_canvas_click(event, self); super().mousePressEvent(event)
+        self.parent_app.handle_canvas_click(event, self)
+        super().mousePressEvent(event)
 
 class DraggableLabel(QGraphicsTextItem):
     def __init__(self, parent=None):
@@ -154,7 +166,8 @@ class SmartPole(QGraphicsPathItem):
         else: path.addEllipse(-10, -10, 20, 20); self.label.setPos(-60, 15) 
         self.setPath(path)
         if self.is_existing:
-            self.setBrush(QBrush(Qt.GlobalColor.lightGray)); self.setPen(QPen(Qt.GlobalColor.darkGray, 1, Qt.PenStyle.DashLine)); lbl_text = "Existing Pole"
+            brush_color = Qt.GlobalColor.blue if self.pole_type == "LT" else Qt.GlobalColor.red
+            self.setBrush(QBrush(brush_color)); self.setPen(QPen(Qt.GlobalColor.darkGray, 1, Qt.PenStyle.DashLine)); lbl_text = f"Existing {self.pole_type} Pole"
         else:
             self.setPen(QPen(Qt.GlobalColor.black, 1))
             if self.pole_type == "LT": self.setBrush(QBrush(Qt.GlobalColor.blue)); lbl_text = f"LT Pole ({self.height})"
@@ -183,38 +196,87 @@ class SmartHome(QGraphicsPathItem):
 class SmartSpan(QGraphicsPathItem):
     def __init__(self, pole1, pole2):
         super().__init__(); self.p1 = pole1; self.p2 = pole2; self.setZValue(0); self.setFlag(QGraphicsPathItem.GraphicsItemFlag.ItemIsSelectable)
-        self.conductor = "AB Cable" if getattr(self.p1, 'pole_type', 'LT') == "LT" else "ACSR"; self.length = 40; self.aug_type = "New"; self.wire_count = "3"; self.wire_size = "50SQMM"; self.has_cg = False 
+        
+        self.is_service_drop = isinstance(self.p1, SmartHome) or isinstance(self.p2, SmartHome)
+        if self.is_service_drop:
+            self.conductor = "Service Drop"; self.length = 20; self.consider_cable = False; self.cable_size = "10 SQMM"; self.phase = "3 Phase"; self.has_cg = False
+            self.aug_type = "New"; self.wire_count = "3"; self.wire_size = "50SQMM"
+        else:
+            is_ht = getattr(self.p1, 'pole_type', 'LT') != 'LT' or getattr(self.p2, 'pole_type', 'LT') != 'LT'
+            self.conductor = "ACSR" if is_ht else "AB Cable"
+            self.length = 40; self.aug_type = "New"
+            self.wire_count = "3"; self.wire_size = "50SQMM"; self.cable_size = "25 SQMM"; self.has_cg = False 
+
         self.label = DraggableLabel(); self.label.setTextWidth(100); self.update_position(); self.update_visuals()
 
     def update_position(self):
-        path = QPainterPath(); path.moveTo(self.p1.x(), self.p1.y()); dx = self.p2.x() - self.p1.x(); dy = self.p2.y() - self.p1.y(); px_length = math.hypot(dx, dy)
-        if self.conductor == "AB Cable" and px_length > 0:
-            steps = max(1, int(px_length / 6)); nx, ny = -dy/px_length, dx/px_length 
+        path = QPainterPath()
+        path.moveTo(self.p1.x(), self.p1.y())
+        dx = self.p2.x() - self.p1.x()
+        dy = self.p2.y() - self.p1.y()
+        px_length = math.hypot(dx, dy)
+
+        if self.conductor in ["AB Cable", "Service Drop", "PVC Cable"] and px_length > 0:
+            steps = max(20, int(px_length / 2)) # More steps for a smoother curve
+            nx = -dy / px_length  # Normalized normal vector x
+            ny = dx / px_length   # Normalized normal vector y
+            
+            # Sine wave parameters
+            wave_wavelength_pixels = 15  # The length of a single wave in pixels. Smaller means more waves (higher frequency).
+            frequency = px_length / wave_wavelength_pixels  # Dynamically set frequency for consistent wave density
+            amplitude = 4  # How high the waves are in pixels
+
             for i in range(1, steps + 1):
-                t = i / steps; cx, cy = self.p1.x() + dx * t, self.p1.y() + dy * t
-                amp = (4 if i % 2 == 0 else -4) if i != steps else 0; path.lineTo(cx + nx*amp, cy + ny*amp)
-        else: path.lineTo(self.p2.x(), self.p2.y())
-        self.setPath(path); nx_norm = -dy / (px_length if px_length>0 else 1); ny_norm = dx / (px_length if px_length>0 else 1); mid_x, mid_y = (self.p1.x() + self.p2.x()) / 2, (self.p1.y() + self.p2.y()) / 2
-        self.label.setPos(mid_x + (nx_norm*30) - 50, mid_y + (ny_norm*30) - 15)
+                t = i / float(steps)
+                # Position along the straight line
+                cx = self.p1.x() + dx * t
+                cy = self.p1.y() + dy * t
+                
+                # Sine wave offset
+                sine_offset = math.sin(t * frequency * 2 * math.pi) * amplitude
+                
+                # Add the offset along the normal vector
+                path.lineTo(cx + nx * sine_offset, cy + ny * sine_offset)
+        else:
+            path.lineTo(self.p2.x(), self.p2.y())
+
+        self.setPath(path)
+        nx_norm = -dy / (px_length if px_length > 0 else 1)
+        ny_norm = dx / (px_length if px_length > 0 else 1)
+        mid_x = (self.p1.x() + self.p2.x()) / 2
+        mid_y = (self.p1.y() + self.p2.y()) / 2
+        self.label.setPos(mid_x + (nx_norm * 30) - 50, mid_y + (ny_norm * 30) - 15)
 
     def update_visuals(self):
-        self.update_position(); self.setPen(QPen(Qt.GlobalColor.black, 1.5)) 
-        if self.conductor == "ACSR": lbl_text = f"{self.length}m\n{self.wire_count}W ACSR"
-        else: lbl_text = f"{self.length}m\nABC"
-        if self.aug_type != "New": lbl_text += f"\n({self.aug_type})"
-        if self.has_cg: lbl_text += f"\n[+CG]"
+        self.update_position()
+        if self.conductor == "PVC Cable":
+            pen = QPen(QColor("#107C41"), 1.5, Qt.PenStyle.DashLine)
+            self.setPen(pen)
+        else:
+            self.setPen(QPen(Qt.GlobalColor.black, 1.5)) 
+        
+        if self.is_service_drop:
+            lbl_text = f"Service Cable {self.length}m\n{self.phase}"
+            if self.consider_cable: lbl_text += f"\n({self.cable_size} PVC)"
+        else:
+            if self.conductor == "ACSR": lbl_text = f"{self.length}m\n{self.wire_count}W ACSR"
+            elif self.conductor == "PVC Cable": lbl_text = f"{self.length}m\n{self.cable_size} PVC"
+            else: lbl_text = f"{self.length}m\nABC"
+            if self.aug_type != "New": lbl_text += f"\n({self.aug_type})"
+            if self.has_cg: lbl_text += f"\n[+CG]"
+            
         self.label.setPlainText(lbl_text)
         if not self.label.scene() and self.scene(): self.scene().addItem(self.label)
         QTimer.singleShot(10, self.label.avoid_overlap)
 
 # --- 4. THE MASTER APPLICATION ---
-class EstimateAppV8(QMainWindow):
+class EstimateAppV9(QMainWindow):
     def __init__(self):
         super().__init__()
         setup_database()
-        self.setWindowTitle("Smart CAD Builder V8.1 (DP Core Fixes)")
+        self.setWindowTitle("ERP Estimate Generator V9.0 (Ultimate Logic Engine)")
         self.setGeometry(50, 50, 1600, 900)
-        self.current_tool = "SELECT"; self.span_start_pole = None; self.autosave_file = "autosave_drawing.json"
+        self.current_tool = "SELECT"; self.span_start_pole = None; self.autosave_file = "autosave_erp.json"
         
         self.bom_overrides = {}
         self.live_bom_data = [] 
@@ -239,7 +301,7 @@ class EstimateAppV8(QMainWindow):
         left_layout.addLayout(file_toolbar)
 
         draw_toolbar = QHBoxLayout(); self.tools_btns = {}
-        self.tools = { "SELECT": "🖱 Select / Edit", "ADD_LT": "🔵 Add LT", "ADD_HT": "🔴 Add HT", "ADD_DTR": "🟩 DP/DTR", "ADD_EXISTING": "⚪ Existing", "ADD_HOME": "🏠 Home", "ADD_SPAN": "📏 Span"}
+        self.tools = { "SELECT": "🖱 Select / Edit", "ADD_LT": "🔵 LT Pole", "ADD_HT": "🔴 HT Pole", "ADD_DTR": "🟩 DP/DTR", "ADD_EXISTING": "⚪ Ex Pole", "ADD_HOME": "🏠 Home", "ADD_SPAN": "📏 Span"}
         for key, txt in self.tools.items():
             btn = QPushButton(txt); btn.clicked.connect(lambda checked, t=key: self.set_tool(t))
             btn.setStyleSheet("padding: 8px; font-weight: bold; background-color: lightgray;"); 
@@ -251,7 +313,7 @@ class EstimateAppV8(QMainWindow):
 
         right_splitter = QSplitter(Qt.Orientation.Vertical)
         self.splitter.addWidget(right_splitter)
-        self.splitter.setSizes([1000, 600]) 
+        self.splitter.setSizes([950, 650]) # Fixed width allocation
         
         editor_widget = QWidget(); editor_widget_layout = QVBoxLayout(editor_widget)
         self.subject_input = QLineEdit(); self.subject_input.setPlaceholderText("Enter Project Name / Subject...")
@@ -260,10 +322,10 @@ class EstimateAppV8(QMainWindow):
         self.uh_checkbox = QCheckBox("Use UH (Readymade) Materials instead of Raw Steel"); self.uh_checkbox.setStyleSheet("font-weight: bold; color: #107C41;")
         self.uh_checkbox.stateChanged.connect(self.refresh_live_estimate); editor_widget_layout.addWidget(self.uh_checkbox)
         
-        scroll_area = QScrollArea(); scroll_area.setWidgetResizable(True)
+        # UI FIX: Removed ScrollArea to make Property Box perfectly visible always
         self.editor_group = QGroupBox("1. Object Properties"); self.editor_layout = QFormLayout(); self.editor_group.setLayout(self.editor_layout)
-        scroll_area.setWidget(self.editor_group)
-        editor_widget_layout.addWidget(scroll_area)
+        editor_widget_layout.addWidget(self.editor_group)
+        editor_widget_layout.addStretch() # Pushes properties to top cleanly
         right_splitter.addWidget(editor_widget)
 
         table_widget = QWidget(); table_layout = QVBoxLayout(table_widget)
@@ -288,10 +350,11 @@ class EstimateAppV8(QMainWindow):
         self.grand_total_label.setStyleSheet("font-size: 16px; color: #d32f2f; margin-top: 5px;")
         table_layout.addWidget(self.grand_total_label)
         right_splitter.addWidget(table_widget)
-        right_splitter.setSizes([200, 700]) 
+        right_splitter.setSizes([300, 700]) # Optimal height for properties vs table
 
         self.set_tool("SELECT"); self.load_autosave() 
 
+    # --- UI & CANVAS LOGIC ---
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace): self.delete_selected_items()
         super().keyPressEvent(event)
@@ -309,7 +372,7 @@ class EstimateAppV8(QMainWindow):
         self.span_start_pole = None
         for key, btn in self.tools_btns.items():
             btn.setStyleSheet("padding: 8px; font-weight: bold; background-color: " + ("lightblue" if key == tool_name else "lightgray"))
-        self.view.setDragMode(QGraphicsView.DragMode.RubberBandDrag if tool_name == "SELECT" else QGraphicsView.DragMode.NoDrag)
+        self.update_view_drag_mode()
 
     def handle_canvas_click(self, event, view):
         if event.button() == Qt.MouseButton.RightButton: self.set_tool("SELECT"); return
@@ -345,10 +408,22 @@ class EstimateAppV8(QMainWindow):
         
         if isinstance(item, DraggableLabel): self.editor_group.setTitle("Text Label Selected"); return
         
+        if isinstance(item, SmartHome):
+            self.editor_group.setTitle("Editing Consumer Home")
+            self.editor_layout.addRow(QLabel("<i>Service cable connection point. Select the actual Line (Span) connecting to this home to edit PVC sizes and Phase details.</i>"))
+            del_btn = QPushButton("🗑 Delete Selected"); del_btn.setStyleSheet("background-color: #ff4c4c; color: white;")
+            del_btn.clicked.connect(lambda: self.delete_item(item)); self.editor_layout.addRow(del_btn)
+            return
+
         if isinstance(item, SmartPole):
             if item.is_existing:
                 self.editor_group.setTitle("Editing Existing Pole")
-                self.editor_layout.addRow(QLabel("<i>Connection point only. No materials calculated.</i>"))
+                pole_type_cb = QComboBox(); pole_type_cb.addItems(["LT", "HT"]); pole_type_cb.setCurrentText(item.pole_type)
+                pole_type_cb.currentTextChanged.connect(lambda t: self.update_pole(item, "pole_type", t)); self.editor_layout.addRow("Pole Type:", pole_type_cb)
+                stay_type_cb = QComboBox(); stay_type_cb.addItems(["HT", "LT"]); stay_type_cb.setCurrentText(getattr(item, 'stay_type', 'HT'))
+                stay_type_cb.currentTextChanged.connect(lambda t: self.update_pole(item, "stay_type", t)); self.editor_layout.addRow("Stay Type:", stay_type_cb)
+                stay_spin = QSpinBox(); stay_spin.setRange(0, 10); stay_spin.setValue(item.stay_count)
+                stay_spin.valueChanged.connect(lambda v: self.update_pole(item, "stay_count", v)); self.editor_layout.addRow("Stay Sets:", stay_spin)
                 del_btn = QPushButton("🗑 Delete Selected"); del_btn.setStyleSheet("background-color: #ff4c4c; color: white;")
                 del_btn.clicked.connect(lambda: self.delete_item(item)); self.editor_layout.addRow(del_btn)
                 return
@@ -366,24 +441,38 @@ class EstimateAppV8(QMainWindow):
             stay_spin.valueChanged.connect(lambda v: self.update_pole(item, "stay_count", v)); self.editor_layout.addRow("Stay Sets:", stay_spin)
 
         elif isinstance(item, SmartSpan):
-            self.editor_group.setTitle("Editing Span")
             length_spin = QSpinBox(); length_spin.setRange(1, 150); length_spin.setValue(int(item.length))
-            length_spin.valueChanged.connect(lambda v: self.update_span(item, "length", v)); self.editor_layout.addRow("Length (Meters):", length_spin)
+            length_spin.valueChanged.connect(lambda v: self.update_span(item, "length", v))
             
-            cg_chk = QCheckBox(); cg_chk.setChecked(item.has_cg)
-            cg_chk.stateChanged.connect(lambda v: self.update_span(item, "has_cg", v == 2)); self.editor_layout.addRow("Cattle Guard:", cg_chk)
-            
-            cond_cb = QComboBox(); cond_cb.addItems(["ACSR", "AB Cable"]); cond_cb.setCurrentText(item.conductor)
-            cond_cb.currentTextChanged.connect(lambda t: self.update_conductor_logic(item, t)); self.editor_layout.addRow("Conductor:", cond_cb)
-            
-            if item.conductor == "ACSR":
-                wire_cnt_cb = QComboBox(); wire_cnt_cb.addItems(["2", "3", "4"]); wire_cnt_cb.setCurrentText(item.wire_count)
-                wire_cnt_cb.currentTextChanged.connect(lambda t: self.update_span(item, "wire_count", t)); self.editor_layout.addRow("Wire Count:", wire_cnt_cb)
-                wire_sz_cb = QComboBox(); wire_sz_cb.addItems(["30SQMM", "50SQMM"]); wire_sz_cb.setCurrentText(item.wire_size)
-                wire_sz_cb.currentTextChanged.connect(lambda t: self.update_span(item, "wire_size", t)); self.editor_layout.addRow("Wire Size:", wire_sz_cb)
+            if item.is_service_drop:
+                self.editor_group.setTitle("Editing Service Connection")
+                self.editor_layout.addRow("Length (Meters):", length_spin)
+                phase_cb = QComboBox(); phase_cb.addItems(["1 Phase", "3 Phase"]); phase_cb.setCurrentText(item.phase)
+                phase_cb.currentTextChanged.connect(lambda t: self.update_span(item, "phase", t)); self.editor_layout.addRow("Phase:", phase_cb)
+                cons_cb = QCheckBox("Consider Cable in Estimate?"); cons_cb.setChecked(item.consider_cable)
+                cons_cb.stateChanged.connect(lambda v: self.update_span(item, "consider_cable", v == 2)); self.editor_layout.addRow(cons_cb)
+                sz_cb = QComboBox(); sz_cb.addItems(["10 SQMM", "16 SQMM", "25 SQMM"]); sz_cb.setCurrentText(item.cable_size)
+                sz_cb.currentTextChanged.connect(lambda t: self.update_span(item, "cable_size", t)); self.editor_layout.addRow("PVC Size:", sz_cb)
+            else:
+                self.editor_group.setTitle("Editing Span")
+                self.editor_layout.addRow("Length (Meters):", length_spin)
+                cg_chk = QCheckBox(); cg_chk.setChecked(item.has_cg)
+                cg_chk.stateChanged.connect(lambda v: self.update_span(item, "has_cg", v == 2)); self.editor_layout.addRow("Cattle Guard:", cg_chk)
                 
-            aug_cb = QComboBox(); aug_cb.addItems(["New", "Replace 2W->4W", "Add-on 2W"]); aug_cb.setCurrentText(item.aug_type)
-            aug_cb.currentTextChanged.connect(lambda t: self.update_span(item, "aug_type", t)); self.editor_layout.addRow("Work Nature:", aug_cb)
+                cond_cb = QComboBox(); cond_cb.addItems(["ACSR", "AB Cable", "PVC Cable"]); cond_cb.setCurrentText(item.conductor)
+                cond_cb.currentTextChanged.connect(lambda t: self.update_conductor_logic(item, t)); self.editor_layout.addRow("Conductor:", cond_cb)
+                
+                if item.conductor == "ACSR":
+                    wire_cnt_cb = QComboBox(); wire_cnt_cb.addItems(["2", "3", "4"]); wire_cnt_cb.setCurrentText(item.wire_count)
+                    wire_cnt_cb.currentTextChanged.connect(lambda t: self.update_span(item, "wire_count", t)); self.editor_layout.addRow("Wire Count:", wire_cnt_cb)
+                    wire_sz_cb = QComboBox(); wire_sz_cb.addItems(["30SQMM", "50SQMM"]); wire_sz_cb.setCurrentText(item.wire_size)
+                    wire_sz_cb.currentTextChanged.connect(lambda t: self.update_span(item, "wire_size", t)); self.editor_layout.addRow("Wire Size:", wire_sz_cb)
+                elif item.conductor == "PVC Cable":
+                    sz_cb = QComboBox(); sz_cb.addItems(["10 SQMM", "16 SQMM", "25 SQMM"]); sz_cb.setCurrentText(item.cable_size)
+                    sz_cb.currentTextChanged.connect(lambda t: self.update_span(item, "cable_size", t)); self.editor_layout.addRow("PVC Size:", sz_cb)
+                    
+                aug_cb = QComboBox(); aug_cb.addItems(["New", "Replace 2W->4W", "Add-on 2W"]); aug_cb.setCurrentText(item.aug_type)
+                aug_cb.currentTextChanged.connect(lambda t: self.update_span(item, "aug_type", t)); self.editor_layout.addRow("Work Nature:", aug_cb)
 
         del_btn = QPushButton("🗑 Delete Selected"); del_btn.setStyleSheet("background-color: #ff4c4c; color: white;")
         del_btn.clicked.connect(lambda: self.delete_item(item)); self.editor_layout.addRow(del_btn)
@@ -429,17 +518,109 @@ class EstimateAppV8(QMainWindow):
 
     def refresh_live_estimate(self):
         raw_bom = {}; total_lab_tasks = {}; use_uh = self.uh_checkbox.isChecked()
+        d_boxes_poles = set() # Track poles that receive Distribution Boxes
         
         for item in self.scene.items():
-            if isinstance(item, SmartPole):
-                if item.is_existing: continue 
-                
+            if isinstance(item, SmartSpan):
+                length_km = item.length / 1000.0
+
+                if item.is_service_drop:
+                    pole = item.p1 if isinstance(item.p1, SmartPole) else item.p2
+                    
+                    if item.consider_cable:
+                        if item.phase == "3 Phase": total_lab_tasks["Fixing of 3ph Service Connection (Cable provided)"] = total_lab_tasks.get("Fixing of 3ph Service Connection (Cable provided)", 0) + 1
+                        else: total_lab_tasks["Fixing of 1ph Service Connection (Cable provided)"] = total_lab_tasks.get("Fixing of 1ph Service Connection (Cable provided)", 0) + 1
+                        
+                        if item.cable_size == "10 SQMM": raw_bom["CABLE (PVC 1.1 KV GRADE) 4Core X10 sq mm"] = raw_bom.get("CABLE (PVC 1.1 KV GRADE) 4Core X10 sq mm", 0) + length_km
+                        elif item.cable_size == "16 SQMM": raw_bom["CABLE (PVC 1.1 KV GRADE) 4CX16 sq mm"] = raw_bom.get("CABLE (PVC 1.1 KV GRADE) 4CX16 sq mm", 0) + length_km
+                        else: raw_bom["CABLE (PVC 1.1 KV GRADE) 4CX25 sq mm"] = raw_bom.get("CABLE (PVC 1.1 KV GRADE) 4CX25 sq mm", 0) + length_km
+                        total_lab_tasks["Laying & Dressing of 1.1 KV PVC/XLPE 2x10,4x10/16, 3.5/4x25 Sqmm Cable"] = total_lab_tasks.get("Laying & Dressing of 1.1 KV PVC/XLPE 2x10,4x10/16, 3.5/4x25 Sqmm Cable", 0) + length_km
+                    else:
+                        if item.phase == "3 Phase": total_lab_tasks["Fixing of 3ph Service Connection (No Cable)"] = total_lab_tasks.get("Fixing of 3ph Service Connection (No Cable)", 0) + 1
+                        else: total_lab_tasks["Fixing of 1ph Service Connection (No Cable)"] = total_lab_tasks.get("Fixing of 1ph Service Connection (No Cable)", 0) + 1
+
+                    if pole not in d_boxes_poles:
+                        has_ab_cable = any(getattr(s, 'conductor', '') == "AB Cable" for s in pole.connected_spans)
+                        if has_ab_cable:
+                            raw_bom["LT Distribution Box along with steel Strap & Buckle for 3ph connection in ABC system"] = raw_bom.get("LT Distribution Box along with steel Strap & Buckle for 3ph connection in ABC system", 0) + 1
+                            total_lab_tasks["Erection of distribution box"] = total_lab_tasks.get("Erection of distribution box", 0) + 1
+                            d_boxes_poles.add(pole)
+
+                else:
+                    if item.length > 60: total_lab_tasks["Lead Wire above above 60 Mtrs (2 Wire)"] = total_lab_tasks.get("Lead Wire above above 60 Mtrs (2 Wire)", 0) + 1
+                    if item.has_cg:
+                        raw_bom["G.I. 8 SWG Wire (4mm)"] = raw_bom.get("G.I. 8 SWG Wire (4mm)", 0) + (item.length * 0.0001)
+                        total_lab_tasks["Fixing Cross lacing"] = total_lab_tasks.get("Fixing Cross lacing", 0) + int(item.length / 2)
+
+                    is_lt_span = (getattr(item.p1, 'pole_type', '') == "LT") or (getattr(item.p2, 'pole_type', '') == "LT")
+
+                    if item.conductor == "PVC Cable":
+                        if item.cable_size == "10 SQMM": raw_bom["CABLE (PVC 1.1 KV GRADE) 4Core X10 sq mm"] = raw_bom.get("CABLE (PVC 1.1 KV GRADE) 4Core X10 sq mm", 0) + length_km
+                        elif item.cable_size == "16 SQMM": raw_bom["CABLE (PVC 1.1 KV GRADE) 4CX16 sq mm"] = raw_bom.get("CABLE (PVC 1.1 KV GRADE) 4CX16 sq mm", 0) + length_km
+                        else: raw_bom["CABLE (PVC 1.1 KV GRADE) 4CX25 sq mm"] = raw_bom.get("CABLE (PVC 1.1 KV GRADE) 4CX25 sq mm", 0) + length_km
+                        total_lab_tasks["Laying & Dressing of 1.1 KV PVC/XLPE 2x10,4x10/16, 3.5/4x25 Sqmm Cable"] = total_lab_tasks.get("Laying & Dressing of 1.1 KV PVC/XLPE 2x10,4x10/16, 3.5/4x25 Sqmm Cable", 0) + length_km
+                        total_lab_tasks["Survey for L.T.O.H Line"] = total_lab_tasks.get("Survey for L.T.O.H Line", 0) + length_km 
+                        
+                    elif item.conductor == "ACSR":
+                        wire_multiplier = int(item.wire_count)
+                        total_wire_km = length_km * wire_multiplier
+                        if item.aug_type in ["New", "Add-on 2W", "Replace 2W->4W"]:
+                            raw_bom[f"ACSR Conductor {item.wire_size}"] = raw_bom.get(f"ACSR Conductor {item.wire_size}", 0) + total_wire_km
+                            total_lab_tasks[f"Stringing & Sagging with 50 sq.mm A.C.S.R. {item.wire_count} Wire"] = total_lab_tasks.get(f"Stringing & Sagging with 50 sq.mm A.C.S.R. {item.wire_count} Wire", 0) + length_km 
+                        
+                        if not is_lt_span: total_lab_tasks["Survey for H.T.O.H Line"] = total_lab_tasks.get("Survey for H.T.O.H Line", 0) + length_km 
+                        else:
+                            total_lab_tasks["Survey for L.T.O.H Line"] = total_lab_tasks.get("Survey for L.T.O.H Line", 0) + length_km 
+                            raw_bom["LT Spacer 3 PHASE 4 WIRE"] = raw_bom.get("LT Spacer 3 PHASE 4 WIRE", 0) + 4
+                            total_lab_tasks["Fixing of LT spacer"] = total_lab_tasks.get("Fixing of LT spacer", 0) + 4
+                            if use_uh:
+                                raw_bom["UH-LT BKT 4 WAY"] = raw_bom.get("UH-LT BKT 4 WAY", 0) + 1
+                                raw_bom["UH-CLAMP FOR 8 MTR PCC POLE"] = raw_bom.get("UH-CLAMP FOR 8 MTR PCC POLE", 0) + 4
+                                raw_bom["UH-Diron Clump"] = raw_bom.get("UH-Diron Clump", 0) + wire_multiplier
+                                raw_bom["Shakle Insulator"] = raw_bom.get("Shakle Insulator", 0) + wire_multiplier
+                                total_lab_tasks["Fixing of LT Bracket(Without Painted)"] = total_lab_tasks.get("Fixing of LT Bracket(Without Painted)", 0) + 1
+                                total_lab_tasks["Fixing of LT Shackle Insulator (with N/B)"] = total_lab_tasks.get("Fixing of LT Shackle Insulator (with N/B)", 0) + wire_multiplier
+                            else:
+                                raw_bom["M.S Angle 65X65X6mm"] = raw_bom.get("M.S Angle 65X65X6mm", 0) + (1.0 * 6.5 / 1000)
+                                raw_bom["M.S Flat 65X6 mm"] = raw_bom.get("M.S Flat 65X6 mm", 0) + (1.0 * 3.5 / 1000)
+                                raw_bom["Shakle Insulator"] = raw_bom.get("Shakle Insulator", 0) + wire_multiplier
+                                total_lab_tasks["Fixing of LT Shackle Insulator (with N/B)"] = total_lab_tasks.get("Fixing of LT Shackle Insulator (with N/B)", 0) + wire_multiplier
+                    
+                    elif item.conductor == "AB Cable":
+                        if item.aug_type in ["New", "Add-on 2W", "Replace 2W->4W"]:
+                            raw_bom["LT AB CABLE 1.1KV 3CX50+1CX16+1CX35sqmm"] = raw_bom.get("LT AB CABLE 1.1KV 3CX50+1CX16+1CX35sqmm", 0) + length_km
+                            total_lab_tasks["Stringing & Sagging of LT AB Cable"] = total_lab_tasks.get("Stringing & Sagging of LT AB Cable", 0) + length_km 
+                        total_lab_tasks["Survey for L.T.O.H Line"] = total_lab_tasks.get("Survey for L.T.O.H Line", 0) + length_km 
+                        raw_bom["M.S Flat 65X6 mm"] = raw_bom.get("M.S Flat 65X6 mm", 0) + (0.5 * 3.5 / 1000)
+                        raw_bom["Suspension Clamp Suitable for 35sq.mm. Messenger Conductor"] = raw_bom.get("Suspension Clamp Suitable for 35sq.mm. Messenger Conductor", 0) + 1
+                        total_lab_tasks["Erection of Anchoring/Suspension Clamp"] = total_lab_tasks.get("Erection of Anchoring/Suspension Clamp", 0) + 1
+
+            elif isinstance(item, SmartPole):
+                if item.is_existing:
+                    if item.stay_count > 0:
+                        if getattr(item, 'stay_type', 'HT') == "LT":
+                            raw_bom["LT Stay set"] = raw_bom.get("LT Stay set", 0) + item.stay_count
+                            raw_bom["GI STAY WIRE 7/12 SWG"] = raw_bom.get("GI STAY WIRE 7/12 SWG", 0) + (item.stay_count * 0.004)
+                            raw_bom["LT Guy Insulator"] = raw_bom.get("LT Guy Insulator", 0) + item.stay_count
+                            total_lab_tasks["LT Stay set complete"] = total_lab_tasks.get("LT Stay set complete", 0) + item.stay_count
+                        else:
+                            raw_bom["H.T. Stay Set Complete"] = raw_bom.get("H.T. Stay Set Complete", 0) + item.stay_count
+                            raw_bom["G.I. Stay Wire 7/3..15MM 10 SWG(HT)"] = raw_bom.get("G.I. Stay Wire 7/3..15MM 10 SWG(HT)", 0) + (item.stay_count * 0.006)
+                            raw_bom["H.T. Guy Insulator 11KV"] = raw_bom.get("H.T. Guy Insulator 11KV", 0) + item.stay_count
+                            total_lab_tasks["H.T. Stay Set Complete Labor"] = total_lab_tasks.get("H.T. Stay Set Complete Labor", 0) + item.stay_count
+                    has_cg = any(getattr(s, 'has_cg', False) for s in item.connected_spans)
+                    if has_cg:
+                        raw_bom["M.S Angle 65X65X6mm"] = raw_bom.get("M.S Angle 65X65X6mm", 0) + (1.9 * 6.5 / 1000)
+                        raw_bom["M.S Flat 65X6 mm"] = raw_bom.get("M.S Flat 65X6 mm", 0) + (0.5 * 3.5 / 1000)
+                        total_lab_tasks["Fabrication & Fixing  of Cattle Guard Bracket (SP)"] = total_lab_tasks.get("Fabrication & Fixing  of Cattle Guard Bracket (SP)", 0) + 1
+                    continue
+
                 p_type = f"P C C POLE:{item.height[:1]} Mtrs.Long"
                 pole_count = 2 if item.pole_type == "DTR" else 1
                 raw_bom[p_type] = raw_bom.get(p_type, 0) + pole_count
                 
                 if item.pole_type != "DTR":
-                    lab_pole_key = "Erection of . 8mtr  PCC Pole ( LT)" if item.pole_type=="LT" else f"Erection of . {item.height[:1]}mtr  PCC Pole (HT)"
+                    lab_pole_key = "Erection of . 8mtr  PCC Pole ( LT)" if item.pole_type=="LT" else f"Erection of . {item.height[:1]}mtr  PCC Pole (HT) Without Painted"
                     total_lab_tasks[lab_pole_key] = total_lab_tasks.get(lab_pole_key, 0) + 1
                 
                 total_lab_tasks["Pole GIS survey"] = total_lab_tasks.get("Pole GIS survey", 0) + pole_count
@@ -463,10 +644,12 @@ class EstimateAppV8(QMainWindow):
                     if item.pole_type == "LT":
                         raw_bom["LT Stay set"] = raw_bom.get("LT Stay set", 0) + item.stay_count
                         raw_bom["GI STAY WIRE 7/12 SWG"] = raw_bom.get("GI STAY WIRE 7/12 SWG", 0) + (item.stay_count * 0.004)
+                        raw_bom["LT Guy Insulator"] = raw_bom.get("LT Guy Insulator", 0) + item.stay_count
                         total_lab_tasks["LT Stay set complete"] = total_lab_tasks.get("LT Stay set complete", 0) + item.stay_count
                     else:
                         raw_bom["H.T. Stay Set Complete"] = raw_bom.get("H.T. Stay Set Complete", 0) + item.stay_count
                         raw_bom["G.I. Stay Wire 7/3..15MM 10 SWG(HT)"] = raw_bom.get("G.I. Stay Wire 7/3..15MM 10 SWG(HT)", 0) + (item.stay_count * 0.006)
+                        raw_bom["H.T. Guy Insulator 11KV"] = raw_bom.get("H.T. Guy Insulator 11KV", 0) + item.stay_count
                         total_lab_tasks["H.T. Stay Set Complete Labor"] = total_lab_tasks.get("H.T. Stay Set Complete Labor", 0) + item.stay_count
 
                 has_cg = any(getattr(s, 'has_cg', False) for s in item.connected_spans)
@@ -499,12 +682,10 @@ class EstimateAppV8(QMainWindow):
                     if item.dtr_size != "None":
                         raw_bom[f"Dist. Transformer {item.dtr_size}"] = raw_bom.get(f"Dist. Transformer {item.dtr_size}", 0) + 1
                         total_lab_tasks["Erection of 25 KVA Transformer"] = total_lab_tasks.get("Erection of 25 KVA Transformer", 0) + 1
+                        total_lab_tasks["DTR Code Painting"] = total_lab_tasks.get("DTR Code Painting", 0) + 1
                         
-                        # DTR S/S Erection Labor correctly applied based on Pole Height
-                        if item.height == "8MTR":
-                            total_lab_tasks["Erection of S/S D.P. Structure  (8 mtr without Painted)"] = total_lab_tasks.get("Erection of S/S D.P. Structure  (8 mtr without Painted)", 0) + 1
-                        else:
-                            total_lab_tasks["Sub-Stationn Str with 9 Mtr PCC pole DP"] = total_lab_tasks.get("Sub-Stationn Str with 9 Mtr PCC pole DP", 0) + 1
+                        if item.height == "8MTR": total_lab_tasks["Erection of S/S D.P. Structure  (8 mtr without Painted)"] = total_lab_tasks.get("Erection of S/S D.P. Structure  (8 mtr without Painted)", 0) + 1
+                        else: total_lab_tasks["Sub-Stationn Str with 9 Mtr PCC pole DP Without Painted"] = total_lab_tasks.get("Sub-Stationn Str with 9 Mtr PCC pole DP Without Painted", 0) + 1
 
                         raw_bom["M.S Channel 75X40 mm"] = raw_bom.get("M.S Channel 75X40 mm", 0) + (14.5 * 7.5 / 1000)
                         raw_bom["M.S Angle 65X65X6mm"] = raw_bom.get("M.S Angle 65X65X6mm", 0) + (12.25 * 6.5 / 1000)
@@ -512,7 +693,9 @@ class EstimateAppV8(QMainWindow):
                         
                         raw_bom["11 KV Polymer Disc Insulator 45KN"] = raw_bom.get("11 KV Polymer Disc Insulator 45KN", 0) + 3 
                         raw_bom["Hardware fittings 11KV"] = raw_bom.get("Hardware fittings 11KV", 0) + 3
+                        total_lab_tasks["Fixing of 11 KV Disc Insulator"] = total_lab_tasks.get("Fixing of 11 KV Disc Insulator", 0) + 3
                         raw_bom["11 KV Polymer Pin Insulator 45KN"] = raw_bom.get("11 KV Polymer Pin Insulator 45KN", 0) + 9 
+                        total_lab_tasks["Fixing of 11 KV Pin Insulator"] = total_lab_tasks.get("Fixing of 11 KV Pin Insulator", 0) + 9
                         
                         raw_bom["ACSR Conductor 50SQMM"] = raw_bom.get("ACSR Conductor 50SQMM", 0) + 0.030 
                         raw_bom["Lightning Arrestor 12 KV"] = raw_bom.get("Lightning Arrestor 12 KV", 0) + 3
@@ -525,62 +708,18 @@ class EstimateAppV8(QMainWindow):
                         raw_bom["LT Distribution KIOSK FOR 25 KVA DTR"] = raw_bom.get("LT Distribution KIOSK FOR 25 KVA DTR", 0) + 1
                         total_lab_tasks["FIXING OF LT Distribution KIOSK FOR 25 KVA DTR"] = total_lab_tasks.get("FIXING OF LT Distribution KIOSK FOR 25 KVA DTR", 0) + 1
                     else:
-                        # Blank DP Structure Labor based on height
-                        if item.height == "8MTR":
-                            total_lab_tasks["Erection of 8 mtr D.P structure (HT)"] = total_lab_tasks.get("Erection of 8 mtr D.P structure (HT)", 0) + 1
-                        else:
-                            total_lab_tasks["Erection of 9 MTR Long PCC pole D/P for HTOH line"] = total_lab_tasks.get("Erection of 9 MTR Long PCC pole D/P for HTOH line", 0) + 1
+                        if item.height == "8MTR": total_lab_tasks["Erection of 8 mtr D.P structure (HT)"] = total_lab_tasks.get("Erection of 8 mtr D.P structure (HT)", 0) + 1
+                        else: total_lab_tasks["Erection of 9 MTR Long PCC pole D/P for HTOH line"] = total_lab_tasks.get("Erection of 9 MTR Long PCC pole D/P for HTOH line", 0) + 1
 
                         raw_bom["M.S Channel 75X40 mm"] = raw_bom.get("M.S Channel 75X40 mm", 0) + (5.0 * 7.5 / 1000)
                         raw_bom["M.S Flat 65X6 mm"] = raw_bom.get("M.S Flat 65X6 mm", 0) + (3.0 * 3.5 / 1000)
-                        raw_bom["11 KV Polymer Disc Insulator 45KN"] = raw_bom.get("11 KV Polymer Disc Insulator 45KN", 0) + 6
-                        raw_bom["Hardware fittings 11KV"] = raw_bom.get("Hardware fittings 11KV", 0) + 6
+                        raw_bom["11 KV Polymer Disc Insulator 45KN"] = raw_bom.get("11 KV Polymer Disc Insulator 45KN", 0) + 3
+                        raw_bom["Hardware fittings 11KV"] = raw_bom.get("Hardware fittings 11KV", 0) + 3
+                        total_lab_tasks["Fixing of 11 KV Disc Insulator"] = total_lab_tasks.get("Fixing of 11 KV Disc Insulator", 0) + 3
                         raw_bom["11 KV Polymer Pin Insulator 45KN"] = raw_bom.get("11 KV Polymer Pin Insulator 45KN", 0) + 3 
+                        total_lab_tasks["Fixing of 11 KV Pin Insulator"] = total_lab_tasks.get("Fixing of 11 KV Pin Insulator", 0) + 3
 
-            elif isinstance(item, SmartSpan):
-                length_km = item.length / 1000.0
-                cond_mat = "ACSR Conductor 50SQMM" if item.conductor == "ACSR" else "LT AB CABLE 1.1KV 3CX50+1CX16+1CX35sqmm"
-                cond_lab = f"Stringing & Sagging with 50 sq.mm A.C.S.R. {item.wire_count} Wire" if item.conductor == "ACSR" else "Stringing & Sagging of LT AB Cable"
-                
-                if item.length > 60: total_lab_tasks["Lead Wire above above 60 Mtrs (2 Wire)"] = total_lab_tasks.get("Lead Wire above above 60 Mtrs (2 Wire)", 0) + 1
-                if item.has_cg:
-                    raw_bom["G.I. 8 SWG Wire (4mm)"] = raw_bom.get("G.I. 8 SWG Wire (4mm)", 0) + (item.length * 0.001)
-                    total_lab_tasks["Fixing Cross lacing"] = total_lab_tasks.get("Fixing Cross lacing", 0) + int(item.length / 2)
-
-                wire_multiplier = int(item.wire_count) if item.conductor == "ACSR" else 1
-                total_wire_km = length_km * wire_multiplier if item.conductor == "ACSR" else length_km
-                
-                if item.aug_type in ["New", "Add-on 2W", "Replace 2W->4W"]:
-                    raw_bom[cond_mat] = raw_bom.get(cond_mat, 0) + total_wire_km
-                    total_lab_tasks[cond_lab] = total_lab_tasks.get(cond_lab, 0) + length_km 
-                
-                is_lt_span = (getattr(item.p1, 'pole_type', '') == "LT") or (getattr(item.p2, 'pole_type', '') == "LT")
-                
-                if item.conductor == "ACSR" and not is_lt_span:
-                    total_lab_tasks["Survey for H.T.O.H Line"] = total_lab_tasks.get("Survey for H.T.O.H Line", 0) + length_km 
-                elif item.conductor == "ACSR" and is_lt_span:
-                    total_lab_tasks["Survey for L.T.O.H Line"] = total_lab_tasks.get("Survey for L.T.O.H Line", 0) + length_km 
-                    raw_bom["LT Spacer 3 PHASE 4 WIRE"] = raw_bom.get("LT Spacer 3 PHASE 4 WIRE", 0) + 4
-                    total_lab_tasks["Fixing of LT spacer"] = total_lab_tasks.get("Fixing of LT spacer", 0) + 4
-                    if use_uh:
-                        raw_bom["UH-LT BKT 4 WAY"] = raw_bom.get("UH-LT BKT 4 WAY", 0) + 1
-                        raw_bom["UH-CLAMP FOR 8 MTR PCC POLE"] = raw_bom.get("UH-CLAMP FOR 8 MTR PCC POLE", 0) + 4
-                        raw_bom["UH-Diron Clump"] = raw_bom.get("UH-Diron Clump", 0) + wire_multiplier
-                        raw_bom["Shakle Insulator"] = raw_bom.get("Shakle Insulator", 0) + wire_multiplier
-                        total_lab_tasks["Fixing of LT Bracket(Without Painted)"] = total_lab_tasks.get("Fixing of LT Bracket(Without Painted)", 0) + 1
-                        total_lab_tasks["Fixing of LT Shackle Insulator (with N/B)"] = total_lab_tasks.get("Fixing of LT Shackle Insulator (with N/B)", 0) + wire_multiplier
-                    else:
-                        raw_bom["M.S Angle 65X65X6mm"] = raw_bom.get("M.S Angle 65X65X6mm", 0) + (1.0 * 6.5 / 1000)
-                        raw_bom["M.S Flat 65X6 mm"] = raw_bom.get("M.S Flat 65X6 mm", 0) + (1.0 * 3.5 / 1000)
-                        raw_bom["Shakle Insulator"] = raw_bom.get("Shakle Insulator", 0) + wire_multiplier
-                        total_lab_tasks["Fixing of LT Shackle Insulator (with N/B)"] = total_lab_tasks.get("Fixing of LT Shackle Insulator (with N/B)", 0) + wire_multiplier
-                elif item.conductor == "AB Cable":
-                    total_lab_tasks["Survey for L.T.O.H Line"] = total_lab_tasks.get("Survey for L.T.O.H Line", 0) + length_km 
-                    raw_bom["M.S Flat 65X6 mm"] = raw_bom.get("M.S Flat 65X6 mm", 0) + (0.5 * 3.5 / 1000)
-                    raw_bom["Suspension Clamp Suitable for 35sq.mm. Messenger Conductor"] = raw_bom.get("Suspension Clamp Suitable for 35sq.mm. Messenger Conductor", 0) + 1
-                    total_lab_tasks["Erection of Anchoring/Suspension Clamp"] = total_lab_tasks.get("Erection of Anchoring/Suspension Clamp", 0) + 1
-
-        conn = sqlite3.connect('dr_enterprises_master.db'); cursor = conn.cursor()
+        conn = sqlite3.connect('erp_master.db'); cursor = conn.cursor()
         self.live_bom_data.clear()
         
         all_materials = list(set(raw_bom.keys()) | set([k for k,v in self.bom_overrides.items() if v['type'] == "Material"]))
@@ -637,7 +776,7 @@ class EstimateAppV8(QMainWindow):
         filename, _ = QFileDialog.getSaveFileName(self, "Export ERP Estimate", "ERP_Estimate.xlsx", "Excel Files (*.xlsx)")
         if not filename: return
         wb = openpyxl.Workbook(); ws = wb.active; ws.title = "Estimate"
-        ws.merge_cells('A1:G1'); ws['A1'] = "AUTOMATED ESTIMATE"; ws['A1'].font = Font(bold=True, size=14, color="FFFFFF"); ws['A1'].fill = PatternFill("solid", fgColor="4F81BD"); ws['A1'].alignment = Alignment(horizontal='center')
+        ws.merge_cells('A1:G1'); ws['A1'] = "AUTOMATED ERP ESTIMATE"; ws['A1'].font = Font(bold=True, size=14, color="FFFFFF"); ws['A1'].fill = PatternFill("solid", fgColor="4F81BD"); ws['A1'].alignment = Alignment(horizontal='center')
         ws.merge_cells('A2:G2'); ws['A2'] = f"Subject: {self.subject_input.text()} | Date: {datetime.now().strftime('%d-%m-%Y')}"
         ws.append(["Sl No.", "Material Code", "Description", "Qty", "Unit", "Rate", "Amount"])
         for col_num, cell in enumerate(ws[3], 1): cell.font = Font(bold=True)
@@ -692,9 +831,9 @@ class EstimateAppV8(QMainWindow):
         source_rect.adjust(-50, -50, 50, 50) 
         painter = QPainter(printer); page_rect = printer.pageRect(QPrinter.Unit.DevicePixel)
         title_font = painter.font(); title_font.setPointSize(20); title_font.setBold(True); title_font.setUnderline(True); painter.setFont(title_font)
-        painter.drawText(page_rect, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter, self.subject_input.text() or ' PROJECT BLUEPRINT')
+        painter.drawText(page_rect, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter, self.subject_input.text() or 'ERP PROJECT BLUEPRINT')
         legend_font = painter.font(); legend_font.setPointSize(10); painter.setFont(legend_font)
-        legend_text = "LEGEND:\n\n🔵 Blue = LT Pole | 🔴 Red = HT Pole\n🟩 Green = DP/Substation | 🟡 Yellow = Home\n〰〰 Wavy Line = AB Cable\n── Straight Line = ACSR Conductor\n[+CG] = Cattle Guard Installed"
+        legend_text = "LEGEND:\n\n🔵 Blue = LT Pole | 🔴 Red = HT Pole\n🟩 Green = DP/Substation | 🟡 Yellow = Home\n〰〰 (Black) = AB Cable / Service Drop\n〰〰 (Green, Dashed) = PVC Cable\n── Straight Line = ACSR Conductor\n[+CG] = Cattle Guard Installed"
         flags = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
         legend_bounds = painter.boundingRect(QRectF(0, 0, page_rect.width(), page_rect.height()), flags, legend_text)
         pad, margin = 15, 40; box_width, box_height = legend_bounds.width() + (pad * 2), legend_bounds.height() + (pad * 2)
@@ -716,23 +855,23 @@ class EstimateAppV8(QMainWindow):
             if isinstance(item, (SmartPole, SmartHome)):
                 item._temp_id = i; node_map[i] = item
                 node_data = {'id': i, 'type': 'Pole' if isinstance(item, SmartPole) else 'Home', 'x': item.x(), 'y': item.y(), 'label_x': item.label.pos().x(), 'label_y': item.label.pos().y(), 'label_text': item.label.toPlainText()}
-                if isinstance(item, SmartPole): node_data.update({'pole_type': item.pole_type, 'is_existing': item.is_existing, 'height': item.height, 'dtr_size': item.dtr_size, 'earth_count': item.earth_count, 'stay_count': item.stay_count})
+                if isinstance(item, SmartPole): node_data.update({'pole_type': item.pole_type, 'is_existing': item.is_existing, 'height': item.height, 'dtr_size': item.dtr_size, 'earth_count': item.earth_count, 'stay_count': item.stay_count, 'stay_type': getattr(item, 'stay_type', 'HT')})
                 state['nodes'].append(node_data)
         for item in self.scene.items():
-            if isinstance(item, SmartSpan): state['spans'].append({'p1_id': item.p1._temp_id, 'p2_id': item.p2._temp_id, 'length': item.length, 'conductor': item.conductor, 'has_cg': item.has_cg, 'aug_type': item.aug_type, 'wire_count': item.wire_count, 'wire_size': item.wire_size, 'label_x': item.label.pos().x(), 'label_y': item.label.pos().y(), 'label_text': item.label.toPlainText()})
+            if isinstance(item, SmartSpan): state['spans'].append({'p1_id': item.p1._temp_id, 'p2_id': item.p2._temp_id, 'length': item.length, 'conductor': item.conductor, 'has_cg': item.has_cg, 'aug_type': item.aug_type, 'wire_count': item.wire_count, 'wire_size': item.wire_size, 'cable_size': getattr(item, 'cable_size', '10 SQMM'), 'consider_cable': getattr(item, 'consider_cable', False), 'phase': getattr(item, 'phase', '3 Phase'), 'is_service_drop': getattr(item, 'is_service_drop', False), 'label_x': item.label.pos().x(), 'label_y': item.label.pos().y(), 'label_text': item.label.toPlainText()})
         return state
 
     def parse_load_data(self, state):
         self.scene.clear(); self.subject_input.setText(state.get('subject', '')); self.uh_checkbox.setChecked(state.get('uh_toggle', False)); self.bom_overrides = state.get('overrides', {}); node_map = {}
         for n_data in state.get('nodes', []):
             if n_data['type'] == 'Pole':
-                pole = SmartPole(n_data['x'], n_data['y'], n_data['pole_type'], n_data.get('is_existing', False)); pole.height = n_data['height']; pole.dtr_size = n_data['dtr_size']; pole.earth_count = n_data['earth_count']; pole.stay_count = n_data['stay_count']; pole.update_visuals(); pole.label.setPos(n_data['label_x'], n_data['label_y']); pole.label.setPlainText(n_data['label_text']); self.scene.addItem(pole); node_map[n_data['id']] = pole
+                pole = SmartPole(n_data['x'], n_data['y'], n_data['pole_type'], n_data.get('is_existing', False)); pole.height = n_data['height']; pole.dtr_size = n_data['dtr_size']; pole.earth_count = n_data['earth_count']; pole.stay_count = n_data['stay_count']; pole.stay_type = n_data.get('stay_type', 'HT'); pole.update_visuals(); pole.label.setPos(n_data['label_x'], n_data['label_y']); pole.label.setPlainText(n_data['label_text']); self.scene.addItem(pole); node_map[n_data['id']] = pole
             else:
                 home = SmartHome(n_data['x'], n_data['y']); home.label.setPos(n_data['label_x'], n_data['label_y']); home.label.setPlainText(n_data['label_text']); self.scene.addItem(home); node_map[n_data['id']] = home
         for s_data in state.get('spans', []):
             p1 = node_map.get(s_data['p1_id']); p2 = node_map.get(s_data['p2_id'])
             if p1 and p2:
-                span = SmartSpan(p1, p2); span.length = s_data['length']; span.conductor = s_data['conductor']; span.has_cg = s_data.get('has_cg', False); span.aug_type = s_data['aug_type']; span.wire_count = s_data.get('wire_count', '3'); span.wire_size = s_data.get('wire_size', '50SQMM'); span.update_visuals(); span.label.setPos(s_data['label_x'], s_data['label_y']); span.label.setPlainText(s_data['label_text']); p1.connected_spans.append(span); p2.connected_spans.append(span); self.scene.addItem(span); self.scene.addItem(span.label)
+                span = SmartSpan(p1, p2); span.length = s_data['length']; span.conductor = s_data['conductor']; span.has_cg = s_data.get('has_cg', False); span.aug_type = s_data.get('aug_type', 'New'); span.wire_count = s_data.get('wire_count', '3'); span.wire_size = s_data.get('wire_size', '50SQMM'); span.cable_size = s_data.get('cable_size', '10 SQMM'); span.consider_cable = s_data.get('consider_cable', False); span.phase = s_data.get('phase', '3 Phase'); span.is_service_drop = s_data.get('is_service_drop', False); span.update_visuals(); span.label.setPos(s_data['label_x'], s_data['label_y']); span.label.setPlainText(s_data['label_text']); p1.connected_spans.append(span); p2.connected_spans.append(span); self.scene.addItem(span); self.scene.addItem(span.label)
         self.refresh_live_estimate()
 
     def save_to_file(self):
@@ -747,7 +886,23 @@ class EstimateAppV8(QMainWindow):
 
     def load_autosave(self):
         if os.path.exists(self.autosave_file):
-            with open(self.autosave_file, 'r') as f: self.parse_load_data(json.load(f))
+            try:
+                with open(self.autosave_file, 'r') as f:
+                    if os.path.getsize(self.autosave_file) > 0:
+                        self.parse_load_data(json.load(f))
+            except json.JSONDecodeError:
+                pass # Ignore corrupted autosave file
+
+    def update_view_drag_mode(self):
+        # Panning is enabled only when zoomed in (greater than 100%)
+        is_zoomed_in = self.view.transform().m11() > 1.0
+        if self.current_tool == "SELECT":
+            if is_zoomed_in:
+                self.view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+            else:
+                self.view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
+        else:
+            self.view.setDragMode(QGraphicsView.DragMode.NoDrag)
 
     def closeEvent(self, event):
         with open(self.autosave_file, 'w') as f: json.dump(self.compile_save_data(), f)
@@ -755,6 +910,6 @@ class EstimateAppV8(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = EstimateAppV8()
-    window.show()
+    window = EstimateAppV9()
+    window.showMaximized()
     sys.exit(app.exec())
