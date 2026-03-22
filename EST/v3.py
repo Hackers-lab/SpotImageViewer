@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QGraphicsTextItem, QFormLayout, QGroupBox, QSpinBox, QGraphicsPathItem, 
                              QLineEdit, QFileDialog, QMessageBox, QCheckBox, QTableWidget, QTableWidgetItem,
                              QHeaderView, QSplitter, QDialog, QListWidget)
-from PyQt6.QtGui import QPen, QBrush, QColor, QPainterPath, QTextOption, QPainter, QPageLayout
+from PyQt6.QtGui import QPen, QBrush, QColor, QPainterPath, QTextOption, QPainter, QPageLayout, QFont
 from PyQt6.QtCore import Qt, QTimer, QRectF
 from PyQt6.QtPrintSupport import QPrinter
 
@@ -134,18 +134,24 @@ class InteractiveView(QGraphicsView):
 
 class DraggableLabel(QGraphicsTextItem):
     def __init__(self, parent=None):
-        super().__init__(parent); self.setFlag(QGraphicsTextItem.GraphicsItemFlag.ItemIsMovable)
+        super().__init__(parent)
+        self.setFlag(QGraphicsTextItem.GraphicsItemFlag.ItemIsMovable)
+        self.setFlag(QGraphicsTextItem.GraphicsItemFlag.ItemIsSelectable)
+        self.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+        self.document().setDefaultTextOption(QTextOption(Qt.AlignmentFlag.AlignCenter)); self.setZValue(20)
+        self.setFont(QFont("Arial", 7))
+
+    def mouseDoubleClickEvent(self, event):
         self.setTextInteractionFlags(Qt.TextInteractionFlag.TextEditorInteraction)
-        self.document().setDefaultTextOption(QTextOption(Qt.AlignmentFlag.AlignCenter)); self.setZValue(20) 
+        self.setFocus(Qt.FocusReason.MouseFocusReason)
+        super().mouseDoubleClickEvent(event)
+
+    def focusOutEvent(self, event):
+        self.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+        super().focusOutEvent(event)
 
     def paint(self, painter, option, widget):
         painter.setBrush(QBrush(QColor(255, 255, 255, 180))); painter.setPen(QPen(Qt.PenStyle.NoPen)); painter.drawRect(self.boundingRect()); super().paint(painter, option, widget)
-        
-    def avoid_overlap(self):
-        if not self.scene(): return
-        for item in self.collidingItems():
-            if isinstance(item, DraggableLabel) and item != self:
-                self.moveBy(0, 25); self.avoid_overlap(); break
 
 class SmartPole(QGraphicsPathItem):
     def __init__(self, x, y, pole_type="LT", is_existing=False):
@@ -157,13 +163,13 @@ class SmartPole(QGraphicsPathItem):
         elif self.pole_type == "DTR": self.dtr_size = "None"; self.earth_count = 2; self.stay_count = 4  
         else: self.dtr_size = "None"; self.earth_count = 1; self.stay_count = 0
 
-        self.connected_spans = []; self.label = DraggableLabel(self); self.label.setTextWidth(120); self.update_visuals()
+        self.connected_spans = []; self.label = DraggableLabel(self); self.label.setTextWidth(80); self.update_visuals()
 
     def update_visuals(self):
         path = QPainterPath()
         if self.pole_type == "DTR":
-            path.addEllipse(-8, -20, 16, 16); path.addEllipse(-8, 4, 16, 16); path.moveTo(0, -4); path.lineTo(0, 4); self.label.setPos(-60, 25) 
-        else: path.addEllipse(-10, -10, 20, 20); self.label.setPos(-60, 15) 
+            path.addEllipse(-8, -20, 16, 16); path.addEllipse(-8, 4, 16, 16); path.moveTo(0, -4); path.lineTo(0, 4); self.label.setPos(-40, 20) 
+        else: path.addEllipse(-10, -10, 20, 20); self.label.setPos(-40, 12) 
         self.setPath(path)
         if self.is_existing:
             brush_color = Qt.GlobalColor.blue if self.pole_type == "LT" else Qt.GlobalColor.red
@@ -176,7 +182,7 @@ class SmartPole(QGraphicsPathItem):
         
         if self.earth_count > 0: lbl_text += f"\n+ {self.earth_count} Earth"
         if self.stay_count > 0: lbl_text += f"\n+ {self.stay_count} Stay"
-        self.label.setPlainText(lbl_text); QTimer.singleShot(10, self.label.avoid_overlap)
+        self.label.setPlainText(lbl_text)
 
     def itemChange(self, change, value):
         if change == QGraphicsPathItem.GraphicsItemChange.ItemPositionHasChanged:
@@ -187,7 +193,7 @@ class SmartHome(QGraphicsPathItem):
     def __init__(self, x, y):
         super().__init__(); self.setPos(x, y); self.setZValue(10); self.setFlag(QGraphicsPathItem.GraphicsItemFlag.ItemIsSelectable); self.setFlag(QGraphicsPathItem.GraphicsItemFlag.ItemIsMovable); self.setFlag(QGraphicsPathItem.GraphicsItemFlag.ItemSendsGeometryChanges)
         self.connected_spans = []; path = QPainterPath(); path.addRect(-10, 0, 20, 20); path.moveTo(-15, 0); path.lineTo(0, -15); path.lineTo(15, 0); path.closeSubpath()
-        self.setPath(path); self.setBrush(QBrush(Qt.GlobalColor.yellow)); self.setPen(QPen(Qt.GlobalColor.black, 1)); self.label = DraggableLabel(self); self.label.setTextWidth(100); self.label.setPos(-50, 25); self.label.setPlainText("Consumer\nHome")
+        self.setPath(path); self.setBrush(QBrush(Qt.GlobalColor.yellow)); self.setPen(QPen(Qt.GlobalColor.black, 1)); self.label = DraggableLabel(self); self.label.setTextWidth(60); self.label.setPos(-30, 22); self.label.setPlainText("Consumer\nHome")
     def itemChange(self, change, value):
         if change == QGraphicsPathItem.GraphicsItemChange.ItemPositionHasChanged:
             for span in self.connected_spans: span.update_position()
@@ -207,7 +213,7 @@ class SmartSpan(QGraphicsPathItem):
             self.length = 40; self.aug_type = "New"
             self.wire_count = "3"; self.wire_size = "50SQMM"; self.cable_size = "25 SQMM"; self.has_cg = False 
 
-        self.label = DraggableLabel(); self.label.setTextWidth(100); self.update_position(); self.update_visuals()
+        self.label = DraggableLabel(); self.label.setTextWidth(80); self.update_position(); self.update_visuals()
 
     def update_position(self):
         path = QPainterPath()
@@ -245,7 +251,7 @@ class SmartSpan(QGraphicsPathItem):
         ny_norm = dx / (px_length if px_length > 0 else 1)
         mid_x = (self.p1.x() + self.p2.x()) / 2
         mid_y = (self.p1.y() + self.p2.y()) / 2
-        self.label.setPos(mid_x + (nx_norm * 30) - 50, mid_y + (ny_norm * 30) - 15)
+        self.label.setPos(mid_x + (nx_norm * 15) - 40, mid_y + (ny_norm * 15) - 10)
 
     def update_visuals(self):
         self.update_position()
@@ -267,7 +273,6 @@ class SmartSpan(QGraphicsPathItem):
             
         self.label.setPlainText(lbl_text)
         if not self.label.scene() and self.scene(): self.scene().addItem(self.label)
-        QTimer.singleShot(10, self.label.avoid_overlap)
 
 # --- 4. THE MASTER APPLICATION ---
 class EstimateAppV9(QMainWindow):
