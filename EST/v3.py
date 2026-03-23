@@ -256,7 +256,7 @@ class SmartHome(QGraphicsPathItem):
 class SmartSpan(QGraphicsPathItem):
     def __init__(self, pole1, pole2):
         super().__init__(); self.p1 = pole1; self.p2 = pole2; self.setZValue(0); self.setFlag(QGraphicsPathItem.GraphicsItemFlag.ItemIsSelectable)
-        self.is_existing_span = getattr(self.p1, 'is_existing', False) and getattr(self.p2, 'is_existing', False)
+        self.is_existing_span = False # Default to False. Will be updated by recalculate_all_span_types
 
         self.is_service_drop = isinstance(self.p1, SmartHome) or isinstance(self.p2, SmartHome)
         if self.is_service_drop:
@@ -620,12 +620,51 @@ class EstimateAppV9(QMainWindow):
                 name = self.live_table.item(item.row(), 2).text()
                 row_type = self.live_table.item(item.row(), 0).text()
                 self.bom_overrides[name] = {"qty": new_qty, "type": row_type}
-                self.live_table.itemChanged.disconnect(self.on_table_edit)
                 self.refresh_live_estimate()
-                self.live_table.itemChanged.connect(self.on_table_edit)
-            except ValueError: pass 
+            except (ValueError, RuntimeError): pass 
+
+    def recalculate_all_span_types(self):
+        all_poles = [item for item in self.scene.items() if isinstance(item, SmartPole)]
+        effectively_existing_poles = set(p for p in all_poles if p.is_existing)
+        
+        while True:
+            promoted_this_round = set()
+            # Consider only poles that are not yet classified as "effectively existing"
+            poles_to_check = [p for p in all_poles if p not in effectively_existing_poles]
+            
+            for pole in poles_to_check:
+                # Count how many existing connections a new pole has
+                connected_to_existing = 0
+                for span in pole.connected_spans:
+                    other_end = span.p1 if span.p2 == pole else span.p2
+                    if other_end in effectively_existing_poles:
+                        connected_to_existing += 1
+                
+                # A new pole becomes "effectively existing" if it connects to 2 or more existing poles
+                if connected_to_existing >= 2:
+                    promoted_this_round.add(pole)
+            
+            if not promoted_this_round:
+                break # Exit loop if no new poles were promoted in a full pass
+            
+            effectively_existing_poles.update(promoted_this_round)
+            
+        # 2. Update all spans based on the final set of existing poles
+        all_spans = [item for item in self.scene.items() if isinstance(item, SmartSpan)]
+        for span in all_spans:
+            is_now_existing = (span.p1 in effectively_existing_poles and span.p2 in effectively_existing_poles)
+            
+            # Service drops should not be marked as 'existing' for calculation purposes
+            if span.is_service_drop:
+                is_now_existing = False
+                
+            if span.is_existing_span != is_now_existing:
+                span.is_existing_span = is_now_existing
+                span.update_visuals()
 
     def refresh_live_estimate(self):
+        self.recalculate_all_span_types()
+
         # --- Automatic Stay State Management ---
         all_poles = [item for item in self.scene.items() if isinstance(item, SmartPole)]
         poles_to_update = []
@@ -674,9 +713,7 @@ class EstimateAppV9(QMainWindow):
         
         for item in self.scene.items():
             if isinstance(item, SmartSpan):
-                p1_is_existing = getattr(item.p1, 'is_existing', False)
-                p2_is_existing = getattr(item.p2, 'is_existing', False)
-                if p1_is_existing and p2_is_existing:
+                if item.is_existing_span:
                     continue
                 
                 length_km = item.length / 1000.0
