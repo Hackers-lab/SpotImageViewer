@@ -31,7 +31,10 @@ def setup_database():
         ("301018141", "Dist. Transformer 25KVA", 103528.11, "NOS"), ("301018241", "Dist. Transformer 63KVA", 107589.53, "NOS"),
         ("102010611", "M.S Channel 75X40 mm", 110043.09, "MT"), ("101011311", "M.S Angle 65X65X6mm", 108667.24, "MT"),
         ("103011511", "M.S Flat 65X6 mm", 117493.74, "MT"), ("505030641", "Suspension Clamp Suitable for 35sq.mm. Messenger Conductor", 367.62, "NOS"),
-        ("505034141", "Dead end clamp LT ABC", 389.66, "NOS"), ("508040441", "Shakle Insulator", 23.34, "NOS"), 
+        ("505034141", "Dead end clamp LT ABC", 389.66, "NOS"), 
+        ("505030841", "Eye hook for anchor clamp", 110.64, "NOS"),
+        ("504027141", "IPC for connecting ABC to ABC TEE joint", 149.17, "NOS"),
+        ("508040441", "Shakle Insulator", 23.34, "NOS"), 
         ("508030541", "11 KV Polymer Disc Insulator 45KN", 183.15, "NOS"), ("508011141", "11 KV Polymer Pin Insulator 45KN", 243.79, "NOS"),
         ("504010132", "Hardware fittings 11KV", 327.83, "SET"), ("504070441", "LT Spacer 3 PHASE 4 WIRE", 77.62, "NOS"),
         ("502010921", "ACSR Conductor 50SQMM", 62290.12, "KM"), ("501030521", "LT AB CABLE 1.1KV 3CX50+1CX16+1CX35sqmm", 315558.99, "KM"), 
@@ -69,8 +72,10 @@ def setup_database():
         ("Erection of Anchoring/Suspension Clamp", 154.00, "NOS"), ("Survey for H.T.O.H Line", 2761.00, "KM"), ("Survey for L.T.O.H Line", 1714.00, "KM"),
         ("Fixing of Solid Tee-off Bracket on S.P", 1495.00, "NOS"), ("Fixing of Solid Tee-off Bracket on D.P", 1483.00, "NOS"),
         ("DTR Code Painting", 65.00, "NOS"), 
-        ("Fixing of 3ph Service Connection (Cable provided)", 570.00, "NOS"), ("Fixing of 1ph Service Connection (Cable provided)", 270.00, "NOS"),
-        ("Fixing of 3ph Service Connection (No Cable)", 6117.00, "NOS"), ("Fixing of 1ph Service Connection (No Cable)", 1578.00, "NOS"),
+        ("Fixing of 3ph Service Connection with cable", 570.00, "NOS"), 
+        ("Fixing of 1ph Service Connection with cable", 270.00, "NOS"),
+        ("Fixing of 3ph Service Connection", 6117.00, "NOS"), 
+        ("Fixing of 1ph Service Connection", 1578.00, "NOS"),
         ("Erection of distribution box", 507.00, "NOS"), ("Laying & Dressing of 1.1 KV PVC/XLPE 2x10,4x10/16, 3.5/4x25 Sqmm Cable", 15000.00, "KM")
     ]
     cursor.executemany('INSERT INTO materials VALUES (?,?,?,?)', materials)
@@ -183,11 +188,13 @@ class DraggableLabel(QGraphicsTextItem):
         super().paint(painter, option, widget)
 
 class SmartPole(QGraphicsPathItem):
-    def __init__(self, x, y, pole_type="LT", is_existing=False):
+    def __init__(self, x, y, parent_app, pole_type="LT", is_existing=False):
         super().__init__(); self.setPos(x, y); self.setZValue(10) 
         self.setFlag(QGraphicsPathItem.GraphicsItemFlag.ItemIsSelectable); self.setFlag(QGraphicsPathItem.GraphicsItemFlag.ItemIsMovable); self.setFlag(QGraphicsPathItem.GraphicsItemFlag.ItemSendsGeometryChanges)
+        self.parent_app = parent_app
         self.pole_type = pole_type; self.is_existing = is_existing; self.height = "8MTR" if pole_type == "LT" else "9MTR"
         self.has_extension = False
+        self.override_auto_stay = False
 
         if self.is_existing: self.dtr_size = "None"; self.earth_count = 0; self.stay_count = 0
         elif self.pole_type == "DTR": self.dtr_size = "None"; self.earth_count = 2; self.stay_count = 4  
@@ -226,17 +233,24 @@ class SmartPole(QGraphicsPathItem):
 
     def itemChange(self, change, value):
         if change == QGraphicsPathItem.GraphicsItemChange.ItemPositionHasChanged:
-            for span in self.connected_spans: span.update_position()
+            for span in self.connected_spans: 
+                span.update_position()
+            if self.parent_app:
+                self.parent_app.refresh_live_estimate()
         return super().itemChange(change, value)
 
 class SmartHome(QGraphicsPathItem):
-    def __init__(self, x, y):
+    def __init__(self, x, y, parent_app):
         super().__init__(); self.setPos(x, y); self.setZValue(10); self.setFlag(QGraphicsPathItem.GraphicsItemFlag.ItemIsSelectable); self.setFlag(QGraphicsPathItem.GraphicsItemFlag.ItemIsMovable); self.setFlag(QGraphicsPathItem.GraphicsItemFlag.ItemSendsGeometryChanges)
+        self.parent_app = parent_app
         self.connected_spans = []; path = QPainterPath(); path.addRect(-10, 0, 20, 20); path.moveTo(-15, 0); path.lineTo(0, -15); path.lineTo(15, 0); path.closeSubpath()
         self.setPath(path); self.setBrush(QBrush(Qt.GlobalColor.yellow)); self.setPen(QPen(Qt.GlobalColor.black, 1)); self.label = DraggableLabel(self); self.label.setTextWidth(60); self.label.setPos(-30, 22); self.label.setPlainText("Consumer\nHome")
     def itemChange(self, change, value):
         if change == QGraphicsPathItem.GraphicsItemChange.ItemPositionHasChanged:
-            for span in self.connected_spans: span.update_position()
+            for span in self.connected_spans: 
+                span.update_position()
+            if self.parent_app:
+                self.parent_app.refresh_live_estimate()
         return super().itemChange(change, value)
 
 class SmartSpan(QGraphicsPathItem):
@@ -458,10 +472,10 @@ class EstimateAppV9(QMainWindow):
 
         if self.current_tool in ["ADD_LT", "ADD_HT", "ADD_DTR", "ADD_EXISTING"]:
             p_type = "LT" if self.current_tool == "ADD_EXISTING" else self.current_tool.split("_")[1]
-            self.scene.addItem(SmartPole(pos.x(), pos.y(), p_type, self.current_tool == "ADD_EXISTING"))
+            self.scene.addItem(SmartPole(pos.x(), pos.y(), self, p_type, self.current_tool == "ADD_EXISTING"))
             self.refresh_live_estimate()
         elif self.current_tool == "ADD_HOME":
-            self.scene.addItem(SmartHome(pos.x(), pos.y())); self.refresh_live_estimate()
+            self.scene.addItem(SmartHome(pos.x(), pos.y(), self)); self.refresh_live_estimate()
         elif self.current_tool == "ADD_SPAN" and isinstance(item_clicked, (SmartPole, SmartHome)):
             if not self.span_start_pole:
                 self.span_start_pole = item_clicked; item_clicked.setPen(QPen(Qt.GlobalColor.yellow, 3)) 
@@ -560,7 +574,9 @@ class EstimateAppV9(QMainWindow):
         del_btn = QPushButton("🗑 Delete Selected"); del_btn.setStyleSheet("background-color: #ff4c4c; color: white;")
         del_btn.clicked.connect(lambda: self.delete_item(item)); self.editor_layout.addRow(del_btn)
 
-    def update_pole(self, item, prop, value): 
+    def update_pole(self, item, prop, value):
+        if prop == 'stay_count':
+            item.override_auto_stay = True
         setattr(item, prop, value)
         item.update_visuals()
         self.refresh_live_estimate()
@@ -610,6 +626,49 @@ class EstimateAppV9(QMainWindow):
             except ValueError: pass 
 
     def refresh_live_estimate(self):
+        # --- Automatic Stay State Management ---
+        all_poles = [item for item in self.scene.items() if isinstance(item, SmartPole)]
+        poles_to_update = []
+
+        for pole in all_poles:
+            # This logic only applies to poles that have not been manually edited by the user
+            if pole.pole_type == "DTR" or getattr(pole, 'override_auto_stay', False):
+                continue
+
+            spans = [s for s in pole.connected_spans if not s.is_service_drop and not s.is_existing_span]
+            num_spans = len(spans)
+            
+            should_have_stay = False
+            # Condition 1: End pole requires one stay
+            if num_spans == 1:
+                should_have_stay = True
+            # Condition 2: Turning pole requires one stay
+            elif num_spans == 2:
+                span1, span2 = spans[0], spans[1]
+                p0 = pole
+                p1 = span1.p1 if span1.p2 == p0 else span1.p2
+                p2 = span2.p1 if span2.p2 == p0 else span2.p2
+                v1 = (p1.x() - p0.x(), p1.y() - p0.y()); v2 = (p2.x() - p0.x(), p2.y() - p0.y())
+                dot = v1[0] * v2[0] + v1[1] * v2[1]
+                mag1 = math.sqrt(v1[0]**2 + v1[1]**2); mag2 = math.sqrt(v2[0]**2 + v2[1]**2)
+                if mag1 > 0 and mag2 > 0:
+                    angle_rad = math.acos(min(1.0, max(-1.0, dot / (mag1 * mag2))))
+                    turning_angle = 180 - math.degrees(angle_rad)
+                    if turning_angle > 20:
+                        should_have_stay = True
+            
+            # If the pole's current stay count doesn't match the calculated required state, schedule an update
+            if pole.stay_count != int(should_have_stay):
+                poles_to_update.append((pole, int(should_have_stay)))
+        
+        # Apply all stay count updates after the analysis is complete
+        # This prevents the table from flickering during the main estimation loop
+        if poles_to_update:
+            for pole, new_stay_count in poles_to_update:
+                pole.stay_count = new_stay_count
+                pole.update_visuals()
+
+        # --- Main Estimation ---
         raw_bom = {}; total_lab_tasks = {}; use_uh = self.uh_checkbox.isChecked()
         d_boxes_poles = set() # Track poles that receive Distribution Boxes
         
@@ -626,16 +685,16 @@ class EstimateAppV9(QMainWindow):
                     pole = item.p1 if isinstance(item.p1, SmartPole) else item.p2
                     
                     if item.consider_cable:
-                        if item.phase == "3 Phase": total_lab_tasks["Fixing of 3ph Service Connection (Cable provided)"] = total_lab_tasks.get("Fixing of 3ph Service Connection (Cable provided)", 0) + 1
-                        else: total_lab_tasks["Fixing of 1ph Service Connection (Cable provided)"] = total_lab_tasks.get("Fixing of 1ph Service Connection (Cable provided)", 0) + 1
+                        if item.phase == "3 Phase": total_lab_tasks["Fixing of 3ph Service Connection with cable"] = total_lab_tasks.get("Fixing of 3ph Service Connection with cable", 0) + 1
+                        else: total_lab_tasks["Fixing of 1ph Service Connection with cable"] = total_lab_tasks.get("Fixing of 1ph Service Connection with cable", 0) + 1
                         
                         if item.cable_size == "10 SQMM": raw_bom["CABLE (PVC 1.1 KV GRADE) 4Core X10 sq mm"] = raw_bom.get("CABLE (PVC 1.1 KV GRADE) 4Core X10 sq mm", 0) + length_km
                         elif item.cable_size == "16 SQMM": raw_bom["CABLE (PVC 1.1 KV GRADE) 4CX16 sq mm"] = raw_bom.get("CABLE (PVC 1.1 KV GRADE) 4CX16 sq mm", 0) + length_km
                         else: raw_bom["CABLE (PVC 1.1 KV GRADE) 4CX25 sq mm"] = raw_bom.get("CABLE (PVC 1.1 KV GRADE) 4CX25 sq mm", 0) + length_km
                         total_lab_tasks["Laying & Dressing of 1.1 KV PVC/XLPE 2x10,4x10/16, 3.5/4x25 Sqmm Cable"] = total_lab_tasks.get("Laying & Dressing of 1.1 KV PVC/XLPE 2x10,4x10/16, 3.5/4x25 Sqmm Cable", 0) + length_km
                     else:
-                        if item.phase == "3 Phase": total_lab_tasks["Fixing of 3ph Service Connection (No Cable)"] = total_lab_tasks.get("Fixing of 3ph Service Connection (No Cable)", 0) + 1
-                        else: total_lab_tasks["Fixing of 1ph Service Connection (No Cable)"] = total_lab_tasks.get("Fixing of 1ph Service Connection (No Cable)", 0) + 1
+                        if item.phase == "3 Phase": total_lab_tasks["Fixing of 3ph Service Connection"] = total_lab_tasks.get("Fixing of 3ph Service Connection", 0) + 1
+                        else: total_lab_tasks["Fixing of 1ph Service Connection"] = total_lab_tasks.get("Fixing of 1ph Service Connection", 0) + 1
 
                     if pole not in d_boxes_poles:
                         has_ab_cable = any(getattr(s, 'conductor', '') == "AB Cable" for s in pole.connected_spans)
@@ -690,8 +749,6 @@ class EstimateAppV9(QMainWindow):
                             total_lab_tasks["Stringing & Sagging of LT AB Cable"] = total_lab_tasks.get("Stringing & Sagging of LT AB Cable", 0) + length_km 
                         total_lab_tasks["Survey for L.T.O.H Line"] = total_lab_tasks.get("Survey for L.T.O.H Line", 0) + length_km 
                         raw_bom["M.S Flat 65X6 mm"] = raw_bom.get("M.S Flat 65X6 mm", 0) + (0.5 * 3.5 / 1000)
-                        raw_bom["Suspension Clamp Suitable for 35sq.mm. Messenger Conductor"] = raw_bom.get("Suspension Clamp Suitable for 35sq.mm. Messenger Conductor", 0) + 1
-                        total_lab_tasks["Erection of Anchoring/Suspension Clamp"] = total_lab_tasks.get("Erection of Anchoring/Suspension Clamp", 0) + 1
 
             elif isinstance(item, SmartPole):
                 if item.is_existing:
@@ -817,6 +874,56 @@ class EstimateAppV9(QMainWindow):
                         raw_bom["11 KV Polymer Pin Insulator 45KN"] = raw_bom.get("11 KV Polymer Pin Insulator 45KN", 0) + 3 
                         total_lab_tasks["Fixing of 11 KV Pin Insulator"] = total_lab_tasks.get("Fixing of 11 KV Pin Insulator", 0) + 3
 
+        # --- Post-processing for Clamps, Hooks, and IPC ---
+        dead_end_clamps = 0
+        suspension_clamps = 0
+        has_ab_cable = False
+        has_dtr = False
+
+        for pole in all_poles:
+            if pole.is_existing: continue
+
+            if pole.pole_type == "DTR" and pole.dtr_size != "None":
+                has_dtr = True
+            
+            ab_spans = [s for s in pole.connected_spans if getattr(s, 'conductor', '') == "AB Cable" and not s.is_service_drop]
+            if not ab_spans: continue
+            
+            has_ab_cable = True
+            
+            if len(ab_spans) == 1: # End Pole
+                dead_end_clamps += 1
+            elif len(ab_spans) == 2: # Intermediate Pole
+                span1, span2 = ab_spans[0], ab_spans[1]
+                p0 = pole
+                p1 = span1.p1 if span1.p2 == p0 else span1.p2
+                p2 = span2.p1 if span2.p2 == p0 else span2.p2
+                v1 = (p1.x() - p0.x(), p1.y() - p0.y()); v2 = (p2.x() - p0.x(), p2.y() - p0.y())
+                dot = v1[0] * v2[0] + v1[1] * v2[1]
+                mag1 = math.sqrt(v1[0]**2 + v1[1]**2); mag2 = math.sqrt(v2[0]**2 + v2[1]**2)
+                if mag1 > 0 and mag2 > 0:
+                    angle_rad = math.acos(min(1.0, max(-1.0, dot / (mag1 * mag2))))
+                    angle_deg = 180 - math.degrees(angle_rad)
+                    if angle_deg > 60: dead_end_clamps += 1 # Turning Pole
+                    else: suspension_clamps += 1 # Straight-through Pole
+                else: suspension_clamps += 1
+            else: # Junction Pole (>2 spans)
+                dead_end_clamps += 1
+
+        if dead_end_clamps > 0:
+            raw_bom["Dead end clamp LT ABC"] = raw_bom.get("Dead end clamp LT ABC", 0) + dead_end_clamps
+        if suspension_clamps > 0:
+            raw_bom["Suspension Clamp Suitable for 35sq.mm. Messenger Conductor"] = raw_bom.get("Suspension Clamp Suitable for 35sq.mm. Messenger Conductor", 0) + suspension_clamps
+
+        total_clamps = dead_end_clamps + suspension_clamps
+        if total_clamps > 0:
+            raw_bom["Eye hook for anchor clamp"] = raw_bom.get("Eye hook for anchor clamp", 0) + total_clamps
+            total_lab_tasks["Erection of Anchoring/Suspension Clamp"] = total_lab_tasks.get("Erection of Anchoring/Suspension Clamp", 0) + total_clamps
+        
+        if has_ab_cable and not has_dtr:
+            raw_bom["IPC for connecting ABC to ABC TEE joint"] = raw_bom.get("IPC for connecting ABC to ABC TEE joint", 0) + 4
+
+        # --- Final BOM Assembly ---
         conn = sqlite3.connect('erp_master.db'); cursor = conn.cursor()
         self.live_bom_data.clear()
         
@@ -1142,7 +1249,7 @@ class EstimateAppV9(QMainWindow):
             if isinstance(item, (SmartPole, SmartHome)):
                 item._temp_id = i; node_map[i] = item
                 node_data = {'id': i, 'type': 'Pole' if isinstance(item, SmartPole) else 'Home', 'x': item.x(), 'y': item.y(), 'label_x': item.label.pos().x(), 'label_y': item.label.pos().y(), 'label_text': item.label.toPlainText()}
-                if isinstance(item, SmartPole): node_data.update({'pole_type': item.pole_type, 'is_existing': item.is_existing, 'height': item.height, 'dtr_size': item.dtr_size, 'earth_count': item.earth_count, 'stay_count': item.stay_count, 'stay_type': getattr(item, 'stay_type', 'HT')})
+                if isinstance(item, SmartPole): node_data.update({'pole_type': item.pole_type, 'is_existing': item.is_existing, 'height': item.height, 'dtr_size': item.dtr_size, 'earth_count': item.earth_count, 'stay_count': item.stay_count, 'stay_type': getattr(item, 'stay_type', 'HT'), 'override_auto_stay': getattr(item, 'override_auto_stay', False)})
                 state['nodes'].append(node_data)
         for item in self.scene.items():
             if isinstance(item, SmartSpan): state['spans'].append({'p1_id': item.p1._temp_id, 'p2_id': item.p2._temp_id, 'length': item.length, 'conductor': item.conductor, 'has_cg': item.has_cg, 'aug_type': item.aug_type, 'wire_count': item.wire_count, 'wire_size': item.wire_size, 'cable_size': getattr(item, 'cable_size', '10 SQMM'), 'consider_cable': getattr(item, 'consider_cable', False), 'phase': getattr(item, 'phase', '3 Phase'), 'is_service_drop': getattr(item, 'is_service_drop', False), 'label_x': item.label.pos().x(), 'label_y': item.label.pos().y(), 'label_text': item.label.toPlainText()})
@@ -1156,9 +1263,9 @@ class EstimateAppV9(QMainWindow):
         self.uh_checkbox.setChecked(state.get('uh_toggle', False)); self.bom_overrides = state.get('overrides', {}); node_map = {}
         for n_data in state.get('nodes', []):
             if n_data['type'] == 'Pole':
-                pole = SmartPole(n_data['x'], n_data['y'], n_data['pole_type'], n_data.get('is_existing', False)); pole.height = n_data['height']; pole.dtr_size = n_data['dtr_size']; pole.earth_count = n_data['earth_count']; pole.stay_count = n_data['stay_count']; pole.stay_type = n_data.get('stay_type', 'HT'); pole.update_visuals(); pole.label.setPos(n_data['label_x'], n_data['label_y']); pole.label.setPlainText(n_data['label_text']); self.scene.addItem(pole); node_map[n_data['id']] = pole
+                pole = SmartPole(n_data['x'], n_data['y'], self, n_data['pole_type'], n_data.get('is_existing', False)); pole.height = n_data['height']; pole.dtr_size = n_data['dtr_size']; pole.earth_count = n_data['earth_count']; pole.stay_count = n_data['stay_count']; pole.stay_type = n_data.get('stay_type', 'HT'); pole.override_auto_stay = n_data.get('override_auto_stay', False); pole.update_visuals(); pole.label.setPos(n_data['label_x'], n_data['label_y']); pole.label.setPlainText(n_data['label_text']); self.scene.addItem(pole); node_map[n_data['id']] = pole
             else:
-                home = SmartHome(n_data['x'], n_data['y']); home.label.setPos(n_data['label_x'], n_data['label_y']); home.label.setPlainText(n_data['label_text']); self.scene.addItem(home); node_map[n_data['id']] = home
+                home = SmartHome(n_data['x'], n_data['y'], self); home.label.setPos(n_data['label_x'], n_data['label_y']); home.label.setPlainText(n_data['label_text']); self.scene.addItem(home); node_map[n_data['id']] = home
         for s_data in state.get('spans', []):
             p1 = node_map.get(s_data['p1_id']); p2 = node_map.get(s_data['p2_id'])
             if p1 and p2:
