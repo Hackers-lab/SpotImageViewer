@@ -187,12 +187,16 @@ class SmartPole(QGraphicsPathItem):
         super().__init__(); self.setPos(x, y); self.setZValue(10) 
         self.setFlag(QGraphicsPathItem.GraphicsItemFlag.ItemIsSelectable); self.setFlag(QGraphicsPathItem.GraphicsItemFlag.ItemIsMovable); self.setFlag(QGraphicsPathItem.GraphicsItemFlag.ItemSendsGeometryChanges)
         self.pole_type = pole_type; self.is_existing = is_existing; self.height = "8MTR" if pole_type == "LT" else "9MTR"
-        
+        self.has_extension = False
+
         if self.is_existing: self.dtr_size = "None"; self.earth_count = 0; self.stay_count = 0
         elif self.pole_type == "DTR": self.dtr_size = "None"; self.earth_count = 2; self.stay_count = 4  
         else: self.dtr_size = "None"; self.earth_count = 1; self.stay_count = 0
 
-        self.connected_spans = []; self.label = DraggableLabel(self); self.label.setTextWidth(80); self.update_visuals()
+        self.connected_spans = []
+        self.label = DraggableLabel(self); self.label.setTextWidth(80)
+        self.ext_label = DraggableLabel(self); self.ext_label.setFont(QFont("Arial", 6, QFont.Weight.Bold)); self.ext_label.setPlainText("Ext"); self.ext_label.setPos(-10, -30)
+        self.update_visuals()
 
     def update_visuals(self):
         path = QPainterPath()
@@ -200,6 +204,8 @@ class SmartPole(QGraphicsPathItem):
             path.addEllipse(-8, -20, 16, 16); path.addEllipse(-8, 4, 16, 16); path.moveTo(0, -4); path.lineTo(0, 4); self.label.setPos(-40, 20) 
         else: path.addEllipse(-10, -10, 20, 20); self.label.setPos(-40, 12) 
         self.setPath(path)
+
+        self.ext_label.setVisible(self.has_extension)
 
         if self.is_existing:
             self.setBrush(QBrush(QColor("#dddddd"))) # Lighter gray
@@ -322,7 +328,7 @@ class EstimateAppV9(QMainWindow):
     def __init__(self):
         super().__init__()
         setup_database()
-        self.setWindowTitle("ERP Estimate Generator V9.0 (Ultimate Logic Engine)")
+        self.setWindowTitle("ERP Estimate Generator - Version 3.0")
         self.setGeometry(50, 50, 1600, 900)
         self.current_tool = "SELECT"; self.span_start_pole = None; self.autosave_file = "autosave_erp.json"
         
@@ -341,7 +347,7 @@ class EstimateAppV9(QMainWindow):
             btn = QPushButton(txt); btn.clicked.connect(cmd); btn.setStyleSheet("padding: 5px; font-weight: bold;"); file_toolbar.addWidget(btn)
         
         file_toolbar.addStretch()
-        pdf_btn = QPushButton("🗺️ Export PDF Blueprint"); pdf_btn.clicked.connect(self.export_pdf)
+        pdf_btn = QPushButton("🗺️ Export PDF Drawing"); pdf_btn.clicked.connect(self.export_pdf)
         pdf_btn.setStyleSheet("padding: 5px; font-weight: bold; background-color: #d32f2f; color: white;")
         xl_btn = QPushButton("📊 Generate ERP Excel"); xl_btn.clicked.connect(self.generate_excel)
         xl_btn.setStyleSheet("padding: 5px; font-weight: bold; background-color: #107C41; color: white;")
@@ -486,6 +492,13 @@ class EstimateAppV9(QMainWindow):
             self.editor_group.setTitle(f"Editing {item.pole_type} Structure")
             height_cb = QComboBox(); height_cb.addItems(["8MTR", "9MTR"]); height_cb.setCurrentText(item.height)
             height_cb.currentTextChanged.connect(lambda t: self.update_pole(item, "height", t)); self.editor_layout.addRow("Height:", height_cb)
+
+            if item.height == "8MTR" and item.pole_type in ["HT", "DTR"]:
+                ext_check = QCheckBox("Add 8MTR Extension")
+                ext_check.setChecked(item.has_extension)
+                ext_check.stateChanged.connect(lambda v, i=item: self.update_pole_extension(i, v == 2))
+                self.editor_layout.addRow(ext_check)
+
             if item.pole_type == "DTR":
                 dtr_cb = QComboBox(); dtr_cb.addItems(["None", "16 KVA", "25KVA", "63KVA", "100KVA", "160KVA"])
                 dtr_cb.setCurrentText(item.dtr_size); dtr_cb.currentTextChanged.connect(lambda t: self.update_dtr_logic(item, t)); self.editor_layout.addRow("DTR Size:", dtr_cb)
@@ -532,7 +545,17 @@ class EstimateAppV9(QMainWindow):
         del_btn = QPushButton("🗑 Delete Selected"); del_btn.setStyleSheet("background-color: #ff4c4c; color: white;")
         del_btn.clicked.connect(lambda: self.delete_item(item)); self.editor_layout.addRow(del_btn)
 
-    def update_pole(self, item, prop, value): setattr(item, prop, value); item.update_visuals(); self.refresh_live_estimate()
+    def update_pole(self, item, prop, value): 
+        setattr(item, prop, value)
+        item.update_visuals()
+        self.refresh_live_estimate()
+        QTimer.singleShot(10, self.on_selection_changed) 
+
+    def update_pole_extension(self, item, value):
+        item.has_extension = value
+        item.update_visuals()
+        self.refresh_live_estimate()
+        
     def update_span(self, item, prop, value): setattr(item, prop, value); item.update_visuals(); self.refresh_live_estimate()
     def update_dtr_logic(self, item, size): item.dtr_size = size; item.earth_count = 5 if size != "None" else 2; item.update_visuals(); self.refresh_live_estimate()
     def update_conductor_logic(self, item, conductor): item.conductor = conductor; item.update_visuals(); QTimer.singleShot(50, self.on_selection_changed); self.refresh_live_estimate()
@@ -882,7 +905,7 @@ class EstimateAppV9(QMainWindow):
         wb.save(filename); QMessageBox.information(self, "Success", f"ERP Estimate Excel saved to:\n{filename}")
 
     def export_pdf(self):
-        filename, _ = QFileDialog.getSaveFileName(self, "Export Blueprint", "Project_Blueprint.pdf", "PDF Files (*.pdf)")
+        filename, _ = QFileDialog.getSaveFileName(self, "Export PDF Drawing", "Project_Drawing.pdf", "PDF Files (*.pdf)")
         if not filename: return
 
         printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
@@ -908,7 +931,7 @@ class EstimateAppV9(QMainWindow):
         painter.setPen(Qt.GlobalColor.black)
         title_font = QFont("Arial", 12, QFont.Weight.Bold); title_font.setUnderline(True)
         painter.setFont(title_font)
-        title_text = self.subject_input.text() or 'ERP PROJECT BLUEPRINT'
+        title_text = self.subject_input.text() or 'ERP PROJECT DRAWING'
         text_flags = Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap
         title_rect_calc = QRectF(border_rect.x() + 5, border_rect.y(), border_rect.width() - 10, 9999)
         required_rect = painter.boundingRect(title_rect_calc, text_flags, title_text)
@@ -1030,7 +1053,7 @@ class EstimateAppV9(QMainWindow):
             painter.drawText(lat_long_rect, Qt.AlignmentFlag.AlignCenter, lat_long_text)
         
         painter.end()
-        QMessageBox.information(self, "Success", f"Blueprint PDF exported to:\n{filename}")
+        QMessageBox.information(self, "Success", f"PDF Drawing exported to:\n{filename}")
 
     def new_drawing(self):
         if QMessageBox.question(self, 'New Canvas', 'Clear canvas?', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
