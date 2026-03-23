@@ -200,9 +200,14 @@ class SmartPole(QGraphicsPathItem):
             path.addEllipse(-8, -20, 16, 16); path.addEllipse(-8, 4, 16, 16); path.moveTo(0, -4); path.lineTo(0, 4); self.label.setPos(-40, 20) 
         else: path.addEllipse(-10, -10, 20, 20); self.label.setPos(-40, 12) 
         self.setPath(path)
+
         if self.is_existing:
-            brush_color = Qt.GlobalColor.blue if self.pole_type == "LT" else Qt.GlobalColor.red
-            self.setBrush(QBrush(brush_color)); self.setPen(QPen(Qt.GlobalColor.darkGray, 1, Qt.PenStyle.DashLine)); lbl_text = f"Existing {self.pole_type} Pole"
+            self.setBrush(QBrush(QColor("#dddddd"))) # Lighter gray
+            self.setPen(QPen(Qt.GlobalColor.black, 1, Qt.PenStyle.SolidLine))
+            if self.pole_type == 'DTR':
+                lbl_text = "Existing DP/DTR"
+            else:
+                lbl_text = f"Existing {self.pole_type} Pole"
         else:
             self.setPen(QPen(Qt.GlobalColor.black, 1))
             if self.pole_type == "LT": self.setBrush(QBrush(Qt.GlobalColor.blue)); lbl_text = f"LT Pole ({self.height[:-2]})"
@@ -231,7 +236,8 @@ class SmartHome(QGraphicsPathItem):
 class SmartSpan(QGraphicsPathItem):
     def __init__(self, pole1, pole2):
         super().__init__(); self.p1 = pole1; self.p2 = pole2; self.setZValue(0); self.setFlag(QGraphicsPathItem.GraphicsItemFlag.ItemIsSelectable)
-        
+        self.is_existing_span = getattr(self.p1, 'is_existing', False) and getattr(self.p2, 'is_existing', False)
+
         self.is_service_drop = isinstance(self.p1, SmartHome) or isinstance(self.p2, SmartHome)
         if self.is_service_drop:
             self.conductor = "Service Drop"; self.length = 20; self.consider_cable = False; self.cable_size = "10 SQMM"; self.phase = "3 Phase"; self.has_cg = False
@@ -251,28 +257,23 @@ class SmartSpan(QGraphicsPathItem):
         dy = self.p2.y() - self.p1.y()
         px_length = math.hypot(dx, dy)
 
-        if self.conductor in ["AB Cable", "Service Drop", "PVC Cable"] and px_length > 0:
+        # Wavy line for ABC, PVC, and Service Drops
+        if self.conductor in ["AB Cable", "PVC Cable", "Service Drop"] and px_length > 0:
             steps = max(20, int(px_length / 2)) # More steps for a smoother curve
             nx = -dy / px_length  # Normalized normal vector x
             ny = dx / px_length   # Normalized normal vector y
             
-            # Sine wave parameters
-            wave_wavelength_pixels = 15  # The length of a single wave in pixels. Smaller means more waves (higher frequency).
-            frequency = px_length / wave_wavelength_pixels  # Dynamically set frequency for consistent wave density
-            amplitude = 4  # How high the waves are in pixels
+            wave_wavelength_pixels = 15
+            frequency = px_length / wave_wavelength_pixels
+            amplitude = 4
 
             for i in range(1, steps + 1):
                 t = i / float(steps)
-                # Position along the straight line
                 cx = self.p1.x() + dx * t
                 cy = self.p1.y() + dy * t
-                
-                # Sine wave offset
                 sine_offset = math.sin(t * frequency * 2 * math.pi) * amplitude
-                
-                # Add the offset along the normal vector
                 path.lineTo(cx + nx * sine_offset, cy + ny * sine_offset)
-        else:
+        else: # Straight line for ACSR
             path.lineTo(self.p2.x(), self.p2.y())
 
         self.setPath(path)
@@ -284,13 +285,26 @@ class SmartSpan(QGraphicsPathItem):
 
     def update_visuals(self):
         self.update_position()
-        if self.conductor == "PVC Cable":
-            pen = QPen(QColor("#107C41"), 1.5, Qt.PenStyle.DashLine)
-            self.setPen(pen)
-        else:
-            self.setPen(QPen(Qt.GlobalColor.black, 1.5)) 
+        pen = QPen(Qt.GlobalColor.black, 1.5)
+
+        if self.is_existing_span:
+            pen.setColor(Qt.GlobalColor.black) # 3. make existing line color to black instead of grey.
+            # 1. ACSR is hard line, ABC/PVC is wave (handled in update_position)
+            pen.setStyle(Qt.PenStyle.SolidLine)
+        else: # New line
+            # Only new ACSR is dashed. New AB Cable is solid (and wavy).
+            if self.conductor == "ACSR":
+                 pen.setStyle(Qt.PenStyle.DashLine)
+            
+            if self.conductor == "PVC Cable":
+                pen.setColor(QColor("#107C41"))
         
-        if self.is_service_drop:
+        self.setPen(pen)
+        
+        # 4. show Ex. ABC, or Ex. ACSR or Ex. PVC, in place of existing span.
+        if self.is_existing_span:
+            lbl_text = f"Ex. {self.conductor}"
+        elif self.is_service_drop:
             lbl_text = f"Service Cable {self.length}m\n{self.phase}"
             if self.consider_cable: lbl_text += f"\n({self.cable_size} PVC)"
         else:
@@ -352,6 +366,13 @@ class EstimateAppV9(QMainWindow):
         editor_widget = QWidget(); editor_widget_layout = QVBoxLayout(editor_widget)
         self.subject_input = QLineEdit(); self.subject_input.setPlaceholderText("Enter Project Name / Subject...")
         editor_widget_layout.addWidget(QLabel("<b>Project Subject:</b>")); editor_widget_layout.addWidget(self.subject_input)
+        
+        lat_long_layout = QHBoxLayout()
+        self.lat_input = QLineEdit(); self.lat_input.setPlaceholderText("Latitude...")
+        self.long_input = QLineEdit(); self.long_input.setPlaceholderText("Longitude...")
+        lat_long_layout.addWidget(QLabel("<b>Lat:</b>")); lat_long_layout.addWidget(self.lat_input)
+        lat_long_layout.addWidget(QLabel("<b>Long:</b>")); lat_long_layout.addWidget(self.long_input)
+        editor_widget_layout.addLayout(lat_long_layout)
         
         self.uh_checkbox = QCheckBox("Use UH (Readymade) Materials instead of Raw Steel"); self.uh_checkbox.setStyleSheet("font-weight: bold; color: #107C41;")
         self.uh_checkbox.stateChanged.connect(self.refresh_live_estimate); editor_widget_layout.addWidget(self.uh_checkbox)
@@ -452,7 +473,7 @@ class EstimateAppV9(QMainWindow):
         if isinstance(item, SmartPole):
             if item.is_existing:
                 self.editor_group.setTitle("Editing Existing Pole")
-                pole_type_cb = QComboBox(); pole_type_cb.addItems(["LT", "HT"]); pole_type_cb.setCurrentText(item.pole_type)
+                pole_type_cb = QComboBox(); pole_type_cb.addItems(["LT", "HT", "DTR"]); pole_type_cb.setCurrentText(item.pole_type)
                 pole_type_cb.currentTextChanged.connect(lambda t: self.update_pole(item, "pole_type", t)); self.editor_layout.addRow("Pole Type:", pole_type_cb)
                 stay_type_cb = QComboBox(); stay_type_cb.addItems(["HT", "LT"]); stay_type_cb.setCurrentText(getattr(item, 'stay_type', 'HT'))
                 stay_type_cb.currentTextChanged.connect(lambda t: self.update_pole(item, "stay_type", t)); self.editor_layout.addRow("Stay Type:", stay_type_cb)
@@ -556,6 +577,11 @@ class EstimateAppV9(QMainWindow):
         
         for item in self.scene.items():
             if isinstance(item, SmartSpan):
+                p1_is_existing = getattr(item.p1, 'is_existing', False)
+                p2_is_existing = getattr(item.p2, 'is_existing', False)
+                if p1_is_existing and p2_is_existing:
+                    continue
+                
                 length_km = item.length / 1000.0
 
                 if item.is_service_drop:
@@ -868,7 +894,6 @@ class EstimateAppV9(QMainWindow):
             QMessageBox.warning(self, "Empty", "Canvas is empty.")
             return
 
-        # Auto-set orientation
         if source_rect.width() > source_rect.height():
             printer.setPageOrientation(QPageLayout.Orientation.Landscape)
         else:
@@ -876,60 +901,134 @@ class EstimateAppV9(QMainWindow):
 
         painter = QPainter(printer)
         page_rect_px = printer.pageRect(QPrinter.Unit.DevicePixel)
-        dpi = printer.resolution()
         margin_px = 10
 
-        # 1. Define content area
         border_rect = page_rect_px.adjusted(margin_px, margin_px, -margin_px, -margin_px)
 
-        # 2. Draw Title
         painter.setPen(Qt.GlobalColor.black)
-        title_font = QFont("Arial", 12)
-        title_font.setBold(True)
-        title_font.setUnderline(True)
+        title_font = QFont("Arial", 12, QFont.Weight.Bold); title_font.setUnderline(True)
         painter.setFont(title_font)
-        
         title_text = self.subject_input.text() or 'ERP PROJECT BLUEPRINT'
         text_flags = Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap
-
-        # Calculate the required rect for the wrapped title
-        # Add some padding to the width for calculation to avoid issues at the edges
         title_rect_calc = QRectF(border_rect.x() + 5, border_rect.y(), border_rect.width() - 10, 9999)
         required_rect = painter.boundingRect(title_rect_calc, text_flags, title_text)
-
-        # Use the calculated height for the final title rect
         title_height = required_rect.height()
         title_rect = QRectF(border_rect.x(), border_rect.y(), border_rect.width(), title_height)
         painter.drawText(title_rect, text_flags, title_text)
         
-        # 4. Render Scene
         scene_target_rect = QRectF(border_rect)
-        scene_target_rect.setTop(border_rect.top() + title_height)
+        scene_target_rect.setTop(border_rect.top() + title_height + 10)
         source_rect.adjust(-50, -50, 50, 50)
         self.scene.render(painter, scene_target_rect, source_rect, Qt.AspectRatioMode.KeepAspectRatio)
         
-        # 5. Draw Legend (on top)
-        legend_font = QFont("Arial", 7)
-        legend_font.setBold(False)
-        legend_font.setUnderline(False)
-        painter.setFont(legend_font)
-        legend_text = "LEGEND:\n\n🔵 Blue = LT Pole | 🔴 Red = HT Pole\n🟩 Green = DP/Substation | 🟡 Yellow = Home\n〰〰 (Black) = AB Cable / Service Drop\n〰〰 (Green, Dashed) = PVC Cable\n── Straight Line = ACSR Conductor\n[+CG] = Cattle Guard Installed"
-        legend_flags = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
-        
-        legend_bounds = painter.boundingRect(border_rect, legend_flags, legend_text)
-        pad = 5
-        box_width = legend_bounds.width() + (pad * 2)
-        box_height = legend_bounds.height() + (pad * 2)
-        
-        legend_rect = QRectF(border_rect.left(), border_rect.bottom() - box_height, box_width, box_height)
-        
-        painter.setBrush(QBrush(QColor(255, 255, 255, 230)))
-        painter.setPen(QPen(QColor(220, 220, 220), 0.5))
-        painter.drawRect(legend_rect)
-        
-        painter.setPen(Qt.GlobalColor.black)
-        painter.drawText(legend_rect.adjusted(pad, pad, -pad, -pad), legend_flags, legend_text)
+        painter.setFont(QFont("Arial", 8)); painter.setPen(Qt.GlobalColor.black)
 
+        legend_data = {
+            'New Poles': {'LT Pole': {'s': '🔵', 'q': 0}, 'HT Pole': {'s': '🔴', 'q': 0}, 'DP/DTR': {'s': '🟩', 'q': 0}},
+            'Existing Poles': {'Ex. Pole': {'s': '⚪', 'q': 0}, 'Ex. DP/DTR': {'s': '⚪', 'q': 0}},
+            'Ancillary': {'Consumer Home': {'s': '🏠', 'q': 0}, 'Earth': {'s': '⏚', 'q': 0}, 'Stay': {'s': 'S', 'q': 0}},
+            'New Spans': {'New ACSR': {'s': '---', 'l': 0}, 'New ABC': {'s': '~--~', 'l': 0}, 'New PVC': {'s': '~~~', 'l': 0}},
+            'Existing Spans': {'Ex. ACSR': {'s': '———', 'l': 0}, 'Ex. ABC': {'s': '~~~~~', 'l': 0}, 'Ex. PVC': {'s': '~~~~~', 'l': 0}}
+        }
+        
+        for item in self.scene.items():
+            if isinstance(item, SmartPole):
+                legend_data['Ancillary']['Earth']['q'] += item.earth_count
+                legend_data['Ancillary']['Stay']['q'] += item.stay_count
+                if item.is_existing:
+                    if item.pole_type == 'DTR': legend_data['Existing Poles']['Ex. DP/DTR']['q'] += 1
+                    else: legend_data['Existing Poles']['Ex. Pole']['q'] += 1
+                else:
+                    if item.pole_type == 'LT': legend_data['New Poles']['LT Pole']['q'] += 1
+                    elif item.pole_type == 'HT': legend_data['New Poles']['HT Pole']['q'] += 1
+                    elif item.pole_type == 'DTR': legend_data['New Poles']['DP/DTR']['q'] += 1
+            elif isinstance(item, SmartHome):
+                legend_data['Ancillary']['Consumer Home']['q'] += 1
+            elif isinstance(item, SmartSpan):
+                span_len = item.length
+                if item.is_existing_span:
+                    if item.conductor == 'ACSR': legend_data['Existing Spans']['Ex. ACSR']['l'] += span_len
+                    elif item.conductor == 'AB Cable': legend_data['Existing Spans']['Ex. ABC']['l'] += span_len
+                    elif item.conductor == 'PVC Cable': legend_data['Existing Spans']['Ex. PVC']['l'] += span_len
+                else:
+                    if item.conductor == 'ACSR': legend_data['New Spans']['New ACSR']['l'] += span_len
+                    elif item.conductor == 'AB Cable': legend_data['New Spans']['New ABC']['l'] += span_len
+                    elif item.conductor == 'PVC Cable': legend_data['New Spans']['New PVC']['l'] += span_len
+
+        used_items = []
+        for category, items in legend_data.items():
+            for desc, data in items.items():
+                qty = data.get('q')
+                length = data.get('l')
+                if (qty and qty > 0) or (length and length > 0):
+                    val = str(qty) if qty is not None else f"{length}m"
+                    used_items.append({'desc': desc, 'sym': data['s'], 'val': val})
+
+        if used_items:
+            col_widths = {'sl': 30, 'sym': 50, 'desc': 130, 'qty': 50}
+            table_width = sum(col_widths.values())
+            row_height = 18
+            
+            table_height = (len(used_items) + 1) * row_height
+            latlong_box_height = 25
+            total_legend_height = table_height + latlong_box_height
+            
+            legend_block_rect = QRectF(border_rect.left() + 5, border_rect.bottom() - total_legend_height - 5, table_width, total_legend_height)
+            
+            painter.setBrush(QBrush(QColor(255, 255, 255, 220)))
+            painter.setPen(QPen(QColor(200, 200, 200), 0.5))
+            painter.drawRect(legend_block_rect)
+            painter.setPen(QPen(Qt.GlobalColor.black))
+
+            current_y = legend_block_rect.top()
+            
+            # Header
+            painter.setFont(QFont("Arial", 8, QFont.Weight.Bold))
+            current_x = legend_block_rect.left()
+            headers = {'sl': ' Sl No. ', 'sym': ' Symbol ', 'desc': ' Description ', 'qty': ' Qty/Len '}
+            for key, width in col_widths.items():
+                painter.drawText(QRectF(current_x, current_y, width, row_height), Qt.AlignmentFlag.AlignCenter, headers[key])
+                current_x += width
+            
+            current_y += row_height
+            
+            # Rows
+            for i, item in enumerate(used_items):
+                sl_no = str(i + 1)
+                current_x = legend_block_rect.left()
+                painter.setFont(QFont("Arial", 8))
+
+                # Draw cell content
+                painter.drawText(QRectF(current_x, current_y, col_widths['sl'], row_height), Qt.AlignmentFlag.AlignCenter, sl_no)
+                current_x += col_widths['sl']
+                painter.drawText(QRectF(current_x, current_y, col_widths['sym'], row_height), Qt.AlignmentFlag.AlignCenter, item['sym'])
+                current_x += col_widths['sym']
+                painter.drawText(QRectF(current_x + 5, current_y, col_widths['desc'] - 5, row_height), Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, item['desc'])
+                current_x += col_widths['desc']
+                painter.drawText(QRectF(current_x, current_y, col_widths['qty'], row_height), Qt.AlignmentFlag.AlignCenter, item['val'])
+                
+                current_y += row_height
+
+            # Draw Grid Lines
+            painter.setPen(QPen(QColor(220, 220, 220), 1))
+            # -- Horizontal lines
+            for i in range(len(used_items) + 2):
+                 y = legend_block_rect.top() + (i * row_height)
+                 painter.drawLine(int(legend_block_rect.left()), int(y), int(legend_block_rect.right()), int(y))
+            # -- Vertical lines
+            current_x = legend_block_rect.left()
+            for width in col_widths.values():
+                current_x += width
+                painter.drawLine(int(current_x), int(legend_block_rect.top()), int(current_x), int(current_y - row_height))
+
+            painter.setPen(QPen(Qt.GlobalColor.black))
+
+            # Draw Lat/Long at the bottom
+            painter.setFont(QFont("Arial", 7, QFont.Weight.Normal, italic=True))
+            lat_long_text = f"Lat: {self.lat_input.text()}   Long: {self.long_input.text()}"
+            lat_long_rect = QRectF(legend_block_rect.left(), current_y, table_width, latlong_box_height)
+            painter.drawText(lat_long_rect, Qt.AlignmentFlag.AlignCenter, lat_long_text)
+        
         painter.end()
         QMessageBox.information(self, "Success", f"Blueprint PDF exported to:\n{filename}")
 
@@ -939,7 +1038,7 @@ class EstimateAppV9(QMainWindow):
             self.refresh_live_estimate()
             
     def compile_save_data(self):
-        state = {'subject': self.subject_input.text(), 'uh_toggle': self.uh_checkbox.isChecked(), 'overrides': self.bom_overrides, 'nodes': [], 'spans': []}; node_map = {}
+        state = {'subject': self.subject_input.text(), 'lat': self.lat_input.text(), 'long': self.long_input.text(), 'uh_toggle': self.uh_checkbox.isChecked(), 'overrides': self.bom_overrides, 'nodes': [], 'spans': []}; node_map = {}
         for i, item in enumerate(self.scene.items()):
             if isinstance(item, (SmartPole, SmartHome)):
                 item._temp_id = i; node_map[i] = item
@@ -951,7 +1050,11 @@ class EstimateAppV9(QMainWindow):
         return state
 
     def parse_load_data(self, state):
-        self.scene.clear(); self.subject_input.setText(state.get('subject', '')); self.uh_checkbox.setChecked(state.get('uh_toggle', False)); self.bom_overrides = state.get('overrides', {}); node_map = {}
+        self.scene.clear()
+        self.subject_input.setText(state.get('subject', ''))
+        self.lat_input.setText(state.get('lat', ''))
+        self.long_input.setText(state.get('long', ''))
+        self.uh_checkbox.setChecked(state.get('uh_toggle', False)); self.bom_overrides = state.get('overrides', {}); node_map = {}
         for n_data in state.get('nodes', []):
             if n_data['type'] == 'Pole':
                 pole = SmartPole(n_data['x'], n_data['y'], n_data['pole_type'], n_data.get('is_existing', False)); pole.height = n_data['height']; pole.dtr_size = n_data['dtr_size']; pole.earth_count = n_data['earth_count']; pole.stay_count = n_data['stay_count']; pole.stay_type = n_data.get('stay_type', 'HT'); pole.update_visuals(); pole.label.setPos(n_data['label_x'], n_data['label_y']); pole.label.setPlainText(n_data['label_text']); self.scene.addItem(pole); node_map[n_data['id']] = pole
