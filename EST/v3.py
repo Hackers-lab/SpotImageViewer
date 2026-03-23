@@ -712,7 +712,7 @@ class EstimateAppV9(QMainWindow):
                     raw_bom["Caution Board-11KVA"] = raw_bom.get("Caution Board-11KVA", 0) + boards
                     total_lab_tasks["Fixing of Caution Board"] = total_lab_tasks.get("Fixing of Caution Board", 0) + boards
 
-                if item.height == "8MTR" and item.pole_type in ["HT", "DTR"]:
+                if item.has_extension and item.height == "8MTR" and item.pole_type in ["HT", "DTR"]:
                     raw_bom["M.S Channel 75X40 mm"] = raw_bom.get("M.S Channel 75X40 mm", 0) + (6.0 * 7.5 / 1000) * pole_count
                     raw_bom["M.S Flat 65X6 mm"] = raw_bom.get("M.S Flat 65X6 mm", 0) + (3.0 * 3.5 / 1000) * pole_count
                     total_lab_tasks["Extension of 8 mtr PCC Pole (Without Painted)HT"] = total_lab_tasks.get("Extension of 8 mtr PCC Pole (Without Painted)HT", 0) + pole_count
