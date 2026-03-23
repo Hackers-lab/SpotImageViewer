@@ -346,6 +346,10 @@ class EstimateAppV9(QMainWindow):
         for txt, cmd in [("📄 New", self.new_drawing), ("📂 Open", self.load_from_file), ("💾 Save", self.save_to_file)]:
             btn = QPushButton(txt); btn.clicked.connect(cmd); btn.setStyleSheet("padding: 5px; font-weight: bold;"); file_toolbar.addWidget(btn)
         
+        credits_btn = QPushButton("🏆 Credits"); credits_btn.clicked.connect(self.show_credits)
+        credits_btn.setStyleSheet("padding: 5px; font-weight: bold; background-color: #f1c40f; color: black;")
+        file_toolbar.addWidget(credits_btn)
+
         file_toolbar.addStretch()
         pdf_btn = QPushButton("🗺️ Export PDF Drawing"); pdf_btn.clicked.connect(self.export_pdf)
         pdf_btn.setStyleSheet("padding: 5px; font-weight: bold; background-color: #d32f2f; color: white;")
@@ -855,8 +859,41 @@ class EstimateAppV9(QMainWindow):
         sup = (mat_sub + lab_sub) * 0.10; gst = (lab_sub + sup) * 0.18; final_amt = (mat_sub + lab_sub + sup + gst) * 1.01
         self.grand_total_label.setText(f"<b>Estimated Cost (Inc Taxes): Rs. {final_amt:,.2f}</b>")
 
+    def show_credits(self):
+        credits_text = """
+        <h2 style='color:#3498db;'>Contributors & Special Thanks</h2>
+        <p>This application has been improved with the help of the following individuals:</p>
+        <ul style='list-style-type: none; padding-left: 0;'>
+            <li style='margin-bottom: 10px;'>
+                <b>Praful Singh:</b>
+                <ul style='margin-top: 4px; list-style-type: disc; margin-left: 20px;'>
+                    <li>Identified visual improvements for existing and new lines.</li>
+                    <li>Helped in refining the PDF legend section.</li>
+                </ul>
+            </li>
+            <li style='margin-bottom: 10px;'>
+                <b>Rajsekhar Gorai:</b>
+                <ul style='margin-top: 4px; list-style-type: disc; margin-left: 20px;'>
+                    <li>Helped identify and fix the 8mtr HT pole extension logic.</li>
+                </ul>
+            </li>
+            <li style='margin-bottom: 10px;'>
+                <b>Amit Karmakar:</b>
+                <ul style='margin-top: 4px; list-style-type: disc; margin-left: 20px;'>
+                    <li>Suggested adding existing DTR properties.</li>
+                    <li>Recommended adding Latitude/Longitude fields.</li>
+                </ul>
+            </li>
+        </ul>
+        <p style='margin-top: 15px; font-style: italic;'>And thanks to everyone who provided feedback!</p>
+        """
+        QMessageBox.information(self, "Credits", credits_text)
+
     def generate_excel(self):
-        filename, _ = QFileDialog.getSaveFileName(self, "Export ERP Estimate", "ERP_Estimate.xlsx", "Excel Files (*.xlsx)")
+        subject = self.subject_input.text()
+        sanitized_subject = "".join(c for c in subject if c not in '\\/*?:"<>|')
+        default_filename = f"{sanitized_subject}_Estimate.xlsx" if sanitized_subject else "ERP_Estimate.xlsx"
+        filename, _ = QFileDialog.getSaveFileName(self, "Export ERP Estimate", default_filename, "Excel Files (*.xlsx)")
         if not filename: return
         wb = openpyxl.Workbook(); ws = wb.active; ws.title = "Estimate"
         ws.merge_cells('A1:G1'); ws['A1'] = "AUTOMATED ERP ESTIMATE"; ws['A1'].font = Font(bold=True, size=14, color="FFFFFF"); ws['A1'].fill = PatternFill("solid", fgColor="4F81BD"); ws['A1'].alignment = Alignment(horizontal='center')
@@ -905,7 +942,10 @@ class EstimateAppV9(QMainWindow):
         wb.save(filename); QMessageBox.information(self, "Success", f"ERP Estimate Excel saved to:\n{filename}")
 
     def export_pdf(self):
-        filename, _ = QFileDialog.getSaveFileName(self, "Export PDF Drawing", "Project_Drawing.pdf", "PDF Files (*.pdf)")
+        subject = self.subject_input.text()
+        sanitized_subject = "".join(c for c in subject if c not in '\\/*?:"<>|')
+        default_filename = f"{sanitized_subject}.pdf" if sanitized_subject else "Project_Drawing.pdf"
+        filename, _ = QFileDialog.getSaveFileName(self, "Export PDF Drawing", default_filename, "PDF Files (*.pdf)")
         if not filename: return
 
         printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
@@ -916,6 +956,15 @@ class EstimateAppV9(QMainWindow):
         if source_rect.isNull():
             QMessageBox.warning(self, "Empty", "Canvas is empty.")
             return
+
+        # --- PDF Scaling Fix for Small Drawings ---
+        center = source_rect.center()
+        min_dim = 300 # Set a minimum canvas dimension for rendering
+        new_width = max(source_rect.width(), min_dim)
+        new_height = max(source_rect.height(), min_dim)
+        source_rect = QRectF(0, 0, new_width, new_height)
+        source_rect.moveCenter(center)
+        # --- End Scaling Fix ---
 
         if source_rect.width() > source_rect.height():
             printer.setPageOrientation(QPageLayout.Orientation.Landscape)
