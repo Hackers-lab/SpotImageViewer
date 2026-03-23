@@ -487,6 +487,13 @@ class EstimateAppV9(QMainWindow):
                 self.refresh_live_estimate()
 
     def on_selection_changed(self):
+        try:
+            # Guard against the scene being deleted when this is called via a QTimer
+            if not self.scene.views():
+                return
+        except RuntimeError:
+            return
+
         while self.editor_layout.count():
             child = self.editor_layout.takeAt(0)
             if child.widget(): child.widget().deleteLater()
