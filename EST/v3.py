@@ -327,8 +327,15 @@ class SmartSpan(QGraphicsPathItem):
 class EstimateAppV9(QMainWindow):
     def __init__(self):
         super().__init__()
+
+        # --- Expiry Check ---
+        from datetime import date
+        if date.today() >= date(2026, 3, 25):
+            QMessageBox.critical(self, "Application Expired", "This app was for testing, a new version has been released. Please check now.")
+            sys.exit()
+
         setup_database()
-        self.setWindowTitle("ERP Estimate Generator - Version 3.0")
+        self.setWindowTitle("ERP Estimate Generator - Version 4.0 beta")
         self.setGeometry(50, 50, 1600, 900)
         self.current_tool = "SELECT"; self.span_start_pole = None; self.autosave_file = "autosave_erp.json"
         
@@ -349,6 +356,10 @@ class EstimateAppV9(QMainWindow):
         credits_btn = QPushButton("🏆 Credits"); credits_btn.clicked.connect(self.show_credits)
         credits_btn.setStyleSheet("padding: 5px; font-weight: bold; background-color: #f1c40f; color: black;")
         file_toolbar.addWidget(credits_btn)
+
+        about_btn = QPushButton("ℹ️ About"); about_btn.clicked.connect(self.show_about_dialog)
+        about_btn.setStyleSheet("padding: 5px; font-weight: bold; background-color: #3498db; color: white;")
+        file_toolbar.addWidget(about_btn)
 
         file_toolbar.addStretch()
         pdf_btn = QPushButton("🗺️ Export PDF Drawing"); pdf_btn.clicked.connect(self.export_pdf)
@@ -858,6 +869,22 @@ class EstimateAppV9(QMainWindow):
         lab_sub = sum([x['amt'] for x in self.live_bom_data if x['type'] == 'Labor'])
         sup = (mat_sub + lab_sub) * 0.10; gst = (lab_sub + sup) * 0.18; final_amt = (mat_sub + lab_sub + sup + gst) * 1.01
         self.grand_total_label.setText(f"<b>Estimated Cost (Inc Taxes): Rs. {final_amt:,.2f}</b>")
+
+    def show_about_dialog(self):
+        about_text = """
+        <h2>ERP Estimate Generator v4.0 beta</h2>
+        <p>This application is designed to help engineers create, visualize, and estimate costs for electrical network projects.</p>
+        <p><b>Key Features:</b></p>
+        <ul>
+            <li>Interactive canvas for drawing poles, spans, and consumers.</li>
+            <li>Live bill of materials (BOM) and labor cost estimation.</li>
+            <li>Export drawings to PDF and estimates to ERP-compatible Excel formats.</li>
+            <li>Customizable material and labor rates via an internal database.</li>
+        </ul>
+        <br>
+        <p>Developed by: <b>Pramod Verma</b></p>
+        """
+        QMessageBox.information(self, "About ERP Estimate Generator", about_text)
 
     def show_credits(self):
         credits_text = """
