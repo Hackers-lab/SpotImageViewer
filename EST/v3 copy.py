@@ -1028,16 +1028,19 @@ class EstimateAppV9(QMainWindow):
         file_toolbar.addWidget(about_btn)
 
         file_toolbar.addStretch()
-
-        settings_btn = QPushButton("⚙️ Settings")
-        settings_btn.clicked.connect(self.open_settings_dialog)
-        file_toolbar.addWidget(settings_btn)
         
         pdf_btn = QPushButton("🗺️ Export PDF Drawing"); pdf_btn.clicked.connect(self.export_pdf)
         pdf_btn.setStyleSheet("padding: 5px; font-weight: bold; background-color: #d32f2f; color: white;")
+        file_toolbar.addWidget(pdf_btn)
+
         xl_btn = QPushButton("📊 Generate ERP Excel"); xl_btn.clicked.connect(self.generate_excel)
         xl_btn.setStyleSheet("padding: 5px; font-weight: bold; background-color: #107C41; color: white;")
-        file_toolbar.addWidget(pdf_btn); file_toolbar.addWidget(xl_btn)
+        file_toolbar.addWidget(xl_btn)
+
+        settings_btn = QPushButton("⚙️")
+        settings_btn.clicked.connect(self.open_settings_dialog)
+        settings_btn.setFixedWidth(40)
+        file_toolbar.addWidget(settings_btn)
         left_layout.addLayout(file_toolbar)
 
         draw_toolbar = QHBoxLayout(); self.tools_btns = {}
