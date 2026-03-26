@@ -8,10 +8,11 @@ import json
 import re
 import openpyxl
 
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QLineEdit, QListWidget, QPushButton, 
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QLineEdit, QListWidget, QPushButton,
                              QCheckBox, QTabWidget, QTableWidget, QTableWidgetItem, QHBoxLayout, 
                              QFileDialog, QMessageBox, QGroupBox, QFormLayout, QComboBox, 
-                             QSpinBox, QHeaderView, QInputDialog, QWidget)
+                             QSpinBox, QHeaderView, QInputDialog, QWidget, QSplitter, 
+                             QTreeWidget, QTreeWidgetItem, QLabel)
 from PyQt6.QtCore import Qt
 
 # Import shared constants
@@ -221,95 +222,169 @@ class RulesetManagerDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Advanced Ruleset Manager")
-        self.setGeometry(150, 150, 1100, 800)
+        self.setGeometry(150, 150, 1200, 700)
         
-        self.main_layout = QVBoxLayout(self)
+        # Main layout
+        self.main_layout = QHBoxLayout(self)
+        
+        # Data
         self.rules = []
-        self.selected_item = None
+        self.selected_rule_index = -1
+        self.selected_result_item = None # To hold item from DB search
         self.condition_widgets = []
+
 
         # Use the imported constant data
         self.property_data = PROPERTY_DATA
         self.formula_vars = FORMULA_VARS
 
-        # --- UI: Rule Builder ---
-        builder_group = QGroupBox("Rule Builder")
-        builder_layout = QFormLayout(builder_group)
+        # --- UI Components ---
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        
+        # Left Panel: Rule Explorer
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        
+        explorer_tools = QHBoxLayout()
+        self.search_bar = QLineEdit()
+        self.search_bar.setPlaceholderText("🔍 Search rules...")
+        self.search_bar.textChanged.connect(self.filter_tree)
+        add_rule_btn = QPushButton("➕ New")
+        add_rule_btn.clicked.connect(self.create_new_rule)
+        del_rule_btn = QPushButton("🗑️ Delete")
+        del_rule_btn.clicked.connect(self.delete_selected_rule)
+        
+        explorer_tools.addWidget(self.search_bar)
+        explorer_tools.addWidget(add_rule_btn)
+        explorer_tools.addWidget(del_rule_btn)
+        
+        self.rule_tree = QTreeWidget()
+        self.rule_tree.setHeaderLabels(["Rules"])
+        self.rule_tree.itemClicked.connect(self.on_rule_selected)
 
-        self.obj_combo = QComboBox()
-        self.obj_combo.addItems(self.property_data.keys())
-        self.obj_combo.currentTextChanged.connect(self.on_object_change)
-        builder_layout.addRow("Canvas Object:", self.obj_combo)
+        left_layout.addLayout(explorer_tools)
+        left_layout.addWidget(self.rule_tree)
+        
+        # Right Panel: Rule Editor
+        self.editor_panel = QGroupBox("Select a rule to edit")
+        self.editor_panel.setDisabled(True) # Disabled until a rule is selected
+        
+        # Add panels to splitter
+        self.splitter.addWidget(left_panel)
+        self.splitter.addWidget(self.editor_panel)
+        self.splitter.setSizes([350, 850])
 
-        cond_group = QGroupBox("Conditions (IF)")
+        self.main_layout.addWidget(self.splitter)
+        
+        self.load_rules()
+
+    def on_rule_selected(self, item, column):
+        """Handles the selection of a rule in the tree."""
+        rule_index = item.data(0, Qt.ItemDataRole.UserRole)
+        
+        if rule_index is not None:
+            self.selected_rule_index = rule_index
+            rule = self.rules[self.selected_rule_index]
+            self.selected_result_item = rule 
+            
+            self.editor_panel.setDisabled(False)
+            self.editor_panel.setTitle(f"Editing Rule: {rule.get('item_name', 'Unnamed Rule')}")
+            
+            self.build_editor_ui(rule)
+        else:
+            self.selected_rule_index = -1
+            self.editor_panel.setTitle("Select a rule to edit")
+            self.editor_panel.setDisabled(True)
+            if self.editor_panel.layout() is not None:
+                while self.editor_panel.layout().count():
+                    child = self.editor_panel.layout().takeAt(0)
+                    if child.widget():
+                        child.widget().deleteLater()
+                self.editor_panel.layout().deleteLater()
+                
+    def build_editor_ui(self, rule):
+        """Dynamically builds the UI for editing the given rule."""
+        if self.editor_panel.layout() is not None:
+            while self.editor_panel.layout().count():
+                child = self.editor_panel.layout().takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
+            self.editor_panel.layout().deleteLater()
+
+        editor_layout = QVBoxLayout(self.editor_panel)
+        
+        details_group = QGroupBox("Rule Details")
+        details_layout = QFormLayout(details_group)
+        
+        self.rule_name_input = QLineEdit(rule.get("item_name", ""))
+        obj_type_label = QLabel(f"<b>{rule.get('object', 'N/A')}</b>")
+        
+        details_layout.addRow("Rule Display Name:", self.rule_name_input)
+        details_layout.addRow("Applies To:", obj_type_label)
+        editor_layout.addWidget(details_group)
+
+        cond_group = QGroupBox("Conditions (IF all are true)")
         self.cond_layout = QVBoxLayout(cond_group)
+        
         self.conditions_container = QWidget()
         self.cond_rows_layout = QVBoxLayout(self.conditions_container)
         self.cond_rows_layout.setContentsMargins(0, 0, 0, 0)
         self.cond_layout.addWidget(self.conditions_container)
+        
         add_cond_btn = QPushButton("➕ Add Condition")
         add_cond_btn.clicked.connect(self.add_condition_row)
         self.cond_layout.addWidget(add_cond_btn)
         self.cond_layout.addStretch()
-        builder_layout.addRow(cond_group)
-
-        item_group = QGroupBox("Result (THEN)")
-        item_layout = QFormLayout(item_group)
-        item_select_layout = QHBoxLayout()
-        self.item_label = QLineEdit()
-        self.item_label.setPlaceholderText("Select an item from the database...")
+        editor_layout.addWidget(cond_group)
+        
+        actions_group = QGroupBox("Action (THEN)")
+        actions_layout = QFormLayout(actions_group)
+        
+        self.item_label = QLineEdit(f"({rule.get('type')}) {rule.get('item_name')}")
         self.item_label.setReadOnly(True)
         search_btn = QPushButton("🔍 Search DB")
         search_btn.clicked.connect(self.search_database)
+        
+        item_select_layout = QHBoxLayout()
         item_select_layout.addWidget(self.item_label)
         item_select_layout.addWidget(search_btn)
-        item_layout.addRow("Item:", item_select_layout)
+        
+        self.formula_input = QLineEdit(rule.get("formula", "1"))
 
-        formula_group_widget = QWidget()
-        formula_layout = QHBoxLayout(formula_group_widget)
-        formula_layout.setContentsMargins(0,0,0,0)
-        self.formula_chips_layout = QHBoxLayout()
-        self.formula_input = QLineEdit("1")
-        self.formula_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        chips_widget = QWidget()
-        chips_widget.setLayout(self.formula_chips_layout)
-        formula_layout.addWidget(chips_widget)
-        formula_layout.addWidget(self.formula_input)
-        item_layout.addRow("Quantity Formula:", formula_group_widget)
-        builder_layout.addRow(item_group)
+        actions_layout.addRow("Add Item:", item_select_layout)
+        actions_layout.addRow("Quantity Formula:", self.formula_input)
+        editor_layout.addWidget(actions_group)
 
-        self.add_update_btn = QPushButton("💾 Add Rule")
-        self.add_update_btn.setStyleSheet("background-color: #27ae60; color: white; font-weight: bold; padding: 8px;")
-        self.add_update_btn.clicked.connect(self.add_rule)
-        builder_layout.addRow(self.add_update_btn)
-        self.main_layout.addWidget(builder_group)
+        save_btn = QPushButton("💾 Save Changes")
+        save_btn.setStyleSheet("background-color: #27ae60; color: white; font-weight: bold; padding: 8px;")
+        save_btn.clicked.connect(self.save_current_rule)
+        editor_layout.addWidget(save_btn, 0, Qt.AlignmentFlag.AlignRight)
+        
+        editor_layout.addStretch()
 
-        # --- UI: Rules Table ---
-        table_group = QGroupBox("Current Ruleset")
-        table_layout = QVBoxLayout(table_group)
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["Object", "Condition", "Item Code", "Item Name", "Qty Formula"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.selectionModel().selectionChanged.connect(self.on_rule_selected)
-        table_layout.addWidget(self.table)
-        delete_rule_btn = QPushButton("🗑️ Delete Selected Rule")
-        delete_rule_btn.setStyleSheet("background-color: #c0392b; color: white; padding: 5px;")
-        delete_rule_btn.clicked.connect(self.delete_rule)
-        table_layout.addWidget(delete_rule_btn)
-        self.main_layout.addWidget(table_group)
+        self.condition_widgets = []
+        self.parse_and_display_conditions(rule)
+        
+    def parse_and_display_conditions(self, rule):
+        """Parses a rule's condition string and populates the UI."""
+        for widget_map in self.condition_widgets:
+            widget_map['widget'].deleteLater()
+        self.condition_widgets.clear()
+        
+        condition_str = rule.get('condition', 'True')
+        if not condition_str or condition_str == 'True':
+            self.add_condition_row()
+            return
 
-        self.load_rules()
-        self.on_object_change(self.obj_combo.currentText())
+        tokens = re.split(r'\s+(and|or)\s+', condition_str, flags=re.IGNORECASE)
+        
+        self.add_condition_row(expression=tokens[0])
+        
+        if len(tokens) > 1:
+            for i in range(1, len(tokens), 2):
+                self.add_condition_row(logical_op=tokens[i].upper(), expression=tokens[i+1])
 
-    def on_object_change(self, obj_name):
-        """Resets the condition builder when the target object type changes."""
-        self.clear_condition_rows()
-        self.add_condition_row()
-        self.update_formula_chips(obj_name)
-
-    def add_condition_row(self, condition=None):
+    def add_condition_row(self, logical_op=None, expression=None):
         """Adds a new row of widgets for building a rule condition."""
         cond_row_widget = QWidget()
         row_layout = QHBoxLayout(cond_row_widget)
@@ -317,23 +392,27 @@ class RulesetManagerDialog(QDialog):
         logical_op_combo = QComboBox()
         logical_op_combo.addItems(["AND", "OR"])
         logical_op_combo.setVisible(len(self.condition_widgets) > 0)
-
-        prop_combo = QComboBox()
-        prop_combo.addItems(list(self.property_data[self.obj_combo.currentText()].keys()))
-        
-        op_combo = QComboBox()
-        op_combo.addItems(['==', '!=', '>', '<', '>=', '<='])
-
-        value_widget = QLineEdit() # Default placeholder
         
         rem_button = QPushButton("➖")
         rem_button.setFixedWidth(30)
         
-        row_layout.addWidget(logical_op_combo)
-        row_layout.addWidget(prop_combo)
-        row_layout.addWidget(op_combo)
-        row_layout.addWidget(value_widget)
-        row_layout.addWidget(rem_button)
+        rule = self.rules[self.selected_rule_index]
+        obj_name = rule.get('object')
+        
+        prop_combo = QComboBox()
+        if obj_name and obj_name in self.property_data:
+            prop_combo.addItems(list(self.property_data[obj_name].keys()))
+        
+        op_combo = QComboBox()
+        op_combo.addItems(['==', '!=', '>', '<', '>=', '<=', 'in', 'not in'])
+
+        value_widget = QLineEdit()
+        
+        row_layout.addWidget(logical_op_combo, 1)
+        row_layout.addWidget(prop_combo, 3)
+        row_layout.addWidget(op_combo, 2)
+        row_layout.addWidget(value_widget, 4)
+        row_layout.addWidget(rem_button, 0)
 
         widget_map = {
             'widget': cond_row_widget, 'logical_op': logical_op_combo,
@@ -346,110 +425,87 @@ class RulesetManagerDialog(QDialog):
         prop_combo.currentTextChanged.connect(lambda text, w=widget_map: self.on_property_change(text, w))
         rem_button.clicked.connect(lambda ch, w=cond_row_widget: self.remove_condition_row(w))
         
-        self.on_property_change(prop_combo.currentText(), widget_map)
+        if logical_op:
+            logical_op_combo.setCurrentText(logical_op)
+            
+        if expression:
+            match = re.match(r"(\S+)\s*([<>=!in\s]+)\s*(.*)", expression.strip())
+            if match:
+                prop, op, val = match.groups()
+                prop = prop.strip(); op = op.strip(); val = val.strip().strip("'\"")
+                
+                prop_combo.setCurrentText(prop)
+                self.on_property_change(prop, widget_map)
+                
+                value_widget_after = widget_map['value']
+                op_combo.setCurrentText(op)
 
-        if condition:
-            if 'logical' in condition: logical_op_combo.setCurrentText(condition['logical'])
-            prop_combo.setCurrentText(condition['prop'])
-            op_combo.setCurrentText(condition['op'])
-
-            value_widget = widget_map['value']
-            val_str = str(condition['val'])
-            if isinstance(value_widget, QComboBox): value_widget.setCurrentText(val_str)
-            elif isinstance(value_widget, QSpinBox):
-                try: value_widget.setValue(int(float(val_str)))
-                except (ValueError, TypeError): pass
-            elif isinstance(value_widget, QLineEdit): value_widget.setText(val_str)
+                if isinstance(value_widget_after, QComboBox): value_widget_after.setCurrentText(val)
+                elif isinstance(value_widget_after, QSpinBox): value_widget_after.setValue(int(float(val)))
+                else: value_widget_after.setText(val)
+        else:
+            self.on_property_change(prop_combo.currentText(), widget_map)
 
     def remove_condition_row(self, widget_to_remove):
         """Removes a condition row from the UI."""
-        if len(self.condition_widgets) <= 1: return
+        if len(self.condition_widgets) <= 1: 
+            QMessageBox.warning(self, "Cannot Remove", "A rule must have at least one condition.")
+            return
+
         for i, w_map in enumerate(self.condition_widgets):
             if w_map['widget'] == widget_to_remove:
                 self.condition_widgets.pop(i)
                 break
         widget_to_remove.deleteLater()
+
         if len(self.condition_widgets) > 0:
             self.condition_widgets[0]['logical_op'].setVisible(False)
-    
-    def clear_condition_rows(self):
-        """Removes all condition rows from the UI."""
-        for w_map in self.condition_widgets:
-            w_map['widget'].deleteLater()
-        self.condition_widgets.clear()
-
+            
     def on_property_change(self, prop_name, widget_map):
-        """
-        Updates the value input widget (e.g., to a QComboBox or QSpinBox)
-        based on the selected property.
-        """
-        obj_name = self.obj_combo.currentText()
-        if not obj_name or not prop_name:
+        """Updates the value input widget based on the selected property."""
+        if self.selected_rule_index == -1: return
+        rule = self.rules[self.selected_rule_index]
+        obj_name = rule.get('object')
+        
+        if not obj_name or not prop_name or obj_name not in self.property_data or prop_name not in self.property_data[obj_name]:
             return
 
         prop_info = self.property_data[obj_name].get(prop_name)
         current_widget = widget_map['value']
         
-        # Determine the target widget type
         target_class = QLineEdit
-        if isinstance(prop_info, list):
-            target_class = QComboBox
-        elif prop_info == 'int':
-            target_class = QSpinBox
+        if isinstance(prop_info, list): target_class = QComboBox
+        elif prop_info == 'int': target_class = QSpinBox
 
-        # If the widget is not of the correct type, replace it
         if not isinstance(current_widget, target_class):
             new_widget = target_class()
-            if isinstance(new_widget, QSpinBox):
-                new_widget.setRange(-10000, 10000)
+            if isinstance(new_widget, QSpinBox): new_widget.setRange(-10000, 10000)
             
             layout = widget_map['widget'].layout()
-            # The value widget is at index 3 in the row's layout
             layout.replaceWidget(current_widget, new_widget)
             current_widget.deleteLater()
             widget_map['value'] = new_widget
             current_widget = new_widget
 
-        # Now that we have the correct widget type, update its contents
         if isinstance(current_widget, QComboBox):
             current_widget.clear()
-            if isinstance(prop_info, list):
-                current_widget.addItems([str(p) for p in prop_info])
-
-    def update_formula_chips(self, obj_name):
-        """Updates the formula helper chips based on the selected object type."""
-        while self.formula_chips_layout.count():
-            child = self.formula_chips_layout.takeAt(0)
-            if child.widget(): child.widget().deleteLater()
-        
-        for var in self.formula_vars.get(obj_name, []) + ['+', '-', '*', '/', '(', ')', ' ']:
-            btn = QPushButton(var)
-            btn.setFixedWidth(40)
-            btn.clicked.connect(lambda ch, v=var: self.add_to_formula(v))
-            self.formula_chips_layout.addWidget(btn)
-        self.formula_chips_layout.addStretch()
-
-    def add_to_formula(self, text):
-        """Appends text to the formula input field."""
-        current_text = self.formula_input.text()
-        if current_text == "1" and text not in ['+', '-', '*', '/', '(', ')', ' ']:
-            self.formula_input.setText(text)
-        else:
-            self.formula_input.setText(current_text + text)
-
+            if isinstance(prop_info, list): current_widget.addItems([str(p) for p in prop_info])
+    
     def search_database(self):
         """Opens the search dialog to select a result item for the rule."""
         db_type, ok = QInputDialog.getItem(self, "Select Database", "Source:", ["Material", "Labor"], 0, False)
         if ok and db_type:
             dialog = SearchDialog(db_type, self)
             if dialog.exec():
-                self.selected_item = dialog.get_selected()
-                if self.selected_item:
-                    self.item_label.setText(f"({self.selected_item['type']}) {self.selected_item['name']}")
+                self.selected_result_item = dialog.get_selected()
+                if self.selected_result_item:
+                    self.item_label.setText(f"({self.selected_result_item['type']}) {self.selected_result_item['name']}")
 
-    def add_rule(self):
+    def save_current_rule(self):
         """Compiles the UI fields into a rule dictionary and saves it."""
-        if not self.selected_item:
+        if self.selected_rule_index == -1: return
+        
+        if not self.selected_result_item:
             QMessageBox.warning(self, "Incomplete Rule", "Please select a result item from the database first.")
             return
 
@@ -468,95 +524,128 @@ class RulesetManagerDialog(QDialog):
             elif isinstance(value_widget, QSpinBox): val = value_widget.value()
             else: val = value_widget.text()
             
-            if str(val).lower() == 'true': val = True
-            elif str(val).lower() == 'false': val = False
+            val_str = str(val)
+            if val_str.lower() == 'true': val = True
+            elif val_str.lower() == 'false': val = False
             
-            if isinstance(val, str) and not val.isnumeric():
-                val = f"'{val}'"
+            if isinstance(val, str):
+                try:
+                    float(val) # Check if it can be a number
+                except ValueError:
+                    val = f"'{val}'" # Add quotes if it's a non-numeric string
 
             condition_parts.append(f"{prop} {op} {val}")
         
-        condition_str = " ".join(condition_parts) if condition_parts else "True"
+        condition_str = " ".join(condition_parts) if any(p.strip() for p in condition_parts) else "True"
 
-        new_rule = {
-            "object": self.obj_combo.currentText(),
-            "condition": condition_str,
-            "type": self.selected_item['type'],
-            "item_code": self.selected_item['code'],
-            "item_name": self.selected_item.get('name') or self.selected_item.get('item_name'),
-            "formula": self.formula_input.text()
-        }
+        rule = self.rules[self.selected_rule_index]
+        rule['item_name'] = self.rule_name_input.text()
+        rule['condition'] = condition_str
+        rule['formula'] = self.formula_input.text()
+        rule['type'] = self.selected_result_item['type']
+        rule['item_code'] = self.selected_result_item['code']
+        # Also update the name from the selected item, as it's the canonical one
+        rule['item_name'] = self.selected_result_item.get('name') or self.selected_result_item.get('item_name')
+        self.rule_name_input.setText(rule['item_name']) # Sync UI
 
-        selected_rows = self.table.selectionModel().selectedRows()
-        if selected_rows:
-            self.rules[selected_rows[0].row()] = new_rule
-        else:
-            self.rules.append(new_rule)
-        
-        self.populate_table()
         self.save_rules()
-        self.clear_builder()
+        self.populate_tree()
+        QMessageBox.information(self, "Success", "Rule saved successfully.")
 
-    def delete_rule(self):
-        """Deletes the selected rule from the table and `rules.json`."""
-        selected_rows = self.table.selectionModel().selectedRows()
-        if not selected_rows:
+    def create_new_rule(self):
+        """Creates a new, blank rule."""
+        obj_types = list(self.property_data.keys())
+        obj_type, ok = QInputDialog.getItem(self, "Create New Rule", "Select object type:", obj_types, 0, False)
+        
+        if ok and obj_type:
+            new_rule = {
+                "object": obj_type,
+                "item_name": "New Unnamed Rule",
+                "condition": "",
+                "type": "Material",
+                "item_code": "NEW-ITEM",
+                "formula": "1"
+            }
+            self.rules.append(new_rule)
+            self.populate_tree()
+            self.save_rules()
+            
+            for i in range(self.rule_tree.topLevelItemCount()):
+                parent = self.rule_tree.topLevelItem(i)
+                if parent.text(0) == obj_type:
+                    child = parent.child(parent.childCount() - 1)
+                    if child:
+                        self.rule_tree.setCurrentItem(child)
+                        self.on_rule_selected(child, 0)
+                    break
+    
+    def delete_selected_rule(self):
+        """Deletes the selected rule."""
+        if self.selected_rule_index == -1:
             QMessageBox.warning(self, "No Selection", "Please select a rule to delete.")
             return
         
-        del self.rules[selected_rows[0].row()]
-        self.populate_table()
-        self.save_rules()
+        rule = self.rules[self.selected_rule_index]
+        reply = QMessageBox.question(self, 'Delete Rule', f"Are you sure you want to delete the rule:\n'{rule.get('item_name')}'?",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            del self.rules[self.selected_rule_index]
+            self.selected_rule_index = -1
+            self.save_rules()
+            self.populate_tree()
+            self.editor_panel.setDisabled(True)
+            self.editor_panel.setTitle("Select a rule to edit")
     
-    def on_rule_selected(self, selected, deselected):
-        """Populates the rule builder with the data from the selected rule."""
-        selected_rows = self.table.selectionModel().selectedRows()
-        if not selected_rows:
-            self.clear_builder()
-            return
-        
-        rule = self.rules[selected_rows[0].row()]
-        self.clear_builder()
-        self.obj_combo.setCurrentText(rule['object'])
+    def filter_tree(self, text):
+        """Filters the rule tree based on the search bar text."""
+        for i in range(self.rule_tree.topLevelItemCount()):
+            parent = self.rule_tree.topLevelItem(i)
+            has_visible_child = False
+            for j in range(parent.childCount()):
+                child = parent.child(j)
+                is_match = text.lower() in child.text(0).lower()
+                child.setHidden(not is_match)
+                if is_match:
+                    has_visible_child = True
+            parent.setHidden(not has_visible_child)
 
-        self.clear_condition_rows()
-        conditions = re.split(r'\s+(?:and|or)\s+', rule['condition'], flags=re.IGNORECASE)
-        logicals = re.findall(r'\s+(and|or)\s+', rule['condition'], flags=re.IGNORECASE)
+    def populate_tree(self):
+        """Populates the rule tree from the loaded self.rules list."""
+        current_selection = self.selected_rule_index
+        self.rule_tree.clear()
         
-        for i, cond_str in enumerate(conditions):
-            parts = cond_str.strip().split(' ', 2)
-            if len(parts) != 3: continue
+        parent_items = {}
+        item_to_select = None
+        for i, rule in enumerate(self.rules):
+            obj_type = rule.get("object", "Uncategorized")
             
-            condition_data = {
-                'prop': parts[0], 'op': parts[1], 'val': parts[2].strip("'\"")
-            }
-            if i > 0: condition_data['logical'] = logicals[i-1].upper()
+            if obj_type not in parent_items:
+                parent = QTreeWidgetItem(self.rule_tree, [obj_type])
+                parent_items[obj_type] = parent
+            else:
+                parent = parent_items[obj_type]
+            
+            rule_name = rule.get("item_name", "Unnamed Rule")
+            display_text = f"{rule_name}"
+            child = QTreeWidgetItem(parent, [display_text])
+            child.setData(0, Qt.ItemDataRole.UserRole, i)
+            
+            if i == current_selection:
+                item_to_select = child
 
-            self.add_condition_row(condition_data)
-
-        self.selected_item = rule
-        self.item_label.setText(f"({rule.get('type', '')}) {rule.get('item_name', '')}")
-        self.formula_input.setText(rule['formula'])
-        self.add_update_btn.setText("💾 Update Rule")
-
-    def clear_builder(self):
-        """Resets the rule builder fields to their default state."""
-        self.table.clearSelection()
-        self.clear_condition_rows()
-        self.add_condition_row()
-        self.item_label.clear()
-        self.selected_item = None
-        self.formula_input.setText("1")
-        self.add_update_btn.setText("💾 Add Rule")
+        self.rule_tree.expandAll()
+        if item_to_select:
+            self.rule_tree.setCurrentItem(item_to_select)
 
     def load_rules(self):
-        """Loads rules from `rules.json` into memory."""
+        """Loads rules from `rules.json` into memory and populates the tree."""
         try:
             with open('rules.json', 'r') as f:
                 self.rules = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
             self.rules = []
-        self.populate_table()
+        self.populate_tree()
 
     def save_rules(self):
         """Saves the current set of rules to `rules.json`."""
@@ -565,14 +654,3 @@ class RulesetManagerDialog(QDialog):
                 json.dump(self.rules, f, indent=2)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save rules.json: {e}")
-
-    def populate_table(self):
-        """Fills the rules table with the current rules."""
-        self.table.setRowCount(0)
-        for i, rule in enumerate(self.rules):
-            self.table.insertRow(i)
-            self.table.setItem(i, 0, QTableWidgetItem(rule.get('object', '')))
-            self.table.setItem(i, 1, QTableWidgetItem(rule.get('condition', '')))
-            self.table.setItem(i, 2, QTableWidgetItem(rule.get('item_code', '')))
-            self.table.setItem(i, 3, QTableWidgetItem(rule.get('item_name', 'MISSING_NAME')))
-            self.table.setItem(i, 4, QTableWidgetItem(rule.get('formula', '')))
