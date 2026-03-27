@@ -1019,6 +1019,7 @@ class EstimateAppV9(QMainWindow):
         
         lab_sub = sum([x['amt'] for x in self.live_bom_data if x['type'] == 'Labor'])
         sup = (mat_sub + lab_sub) * 0.10; gst = (lab_sub + sup) * 0.18; final_amt = (mat_sub + lab_sub + sup + gst) * 1.01
+        sup = (mat_sub + lab_sub) * 0.10; gst = lab_sub * 0.18; cess = (mat_sub + lab_sub + sup) * 0.01; final_amt = mat_sub + lab_sub + sup + gst + cess
         self.grand_total_label.setText(f"<b>Estimated Cost (Inc Taxes): Rs. {final_amt:,.2f}</b>")
 
     def show_about_dialog(self):
@@ -1109,11 +1110,14 @@ class EstimateAppV9(QMainWindow):
         ws.cell(row, 3).font = Font(bold=True); ws.cell(row, 7).font = Font(bold=True); row += 2
 
         sup = (mat_subtotal + total_lab) * 0.10; gst = (total_lab + sup) * 0.18; sub_c = mat_subtotal + total_lab + sup + gst; g_tot = sub_c * 1.01
+        sup = (mat_subtotal + total_lab) * 0.10; gst = total_lab * 0.18; cess = (mat_subtotal + total_lab + sup) * 0.01; sub_c = mat_subtotal + total_lab + sup + gst; g_tot = sub_c + cess
         ws.append(["", "", "C. OVERHEADS & TAXES"]); ws.cell(row, 3).font = Font(bold=True); row += 1
         ws.append(["", "", "Supervision @ 10% on (A+B)", "", "", "", round(sup, 2)]); row += 1
         ws.append(["", "", "GST @ 18% on (Labor + Sup)", "", "", "", round(gst, 2)]); row += 1
+        ws.append(["", "", "GST @ 18% on (Labor Only)", "", "", "", round(gst, 2)]); row += 1
         ws.append(["", "", "Sub-Total", "", "", "", round(sub_c, 2)]); row += 1
         ws.append(["", "", "Add: Cess @ 1%", "", "", "", round(sub_c * 0.01, 2)]); row += 1
+        ws.append(["", "", "Add: Cess @ 1% on (Mat+Lab+Sup)", "", "", "", round(cess, 2)]); row += 1
         ws.append(["", "", "GRAND TOTAL", "", "", "", round(g_tot, 2)])
         ws.cell(row, 3).font = Font(bold=True, size=12); ws.cell(row, 7).font = Font(bold=True, size=12, color="FF0000")
         

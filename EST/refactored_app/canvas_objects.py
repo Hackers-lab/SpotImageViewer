@@ -27,6 +27,7 @@ class SmartPole(QGraphicsPathItem):
         self.height = "8MTR" if pole_type == "LT" else "9MTR"
         self.has_extension = False
         self.override_auto_stay = False
+        self.structure_type = "DP/DTR"
         self.custom_note = ""
         self.dynamic_props = {}
 
@@ -62,7 +63,15 @@ class SmartPole(QGraphicsPathItem):
             path.lineTo(0, 4)
             self.label.setPos(-40, 20) 
         else:
-            path.addEllipse(-10, -10, 20, 20)
+            if self.structure_type == "4P":
+                path.addRect(-10, -10, 20, 20)
+            elif self.structure_type == "TP":
+                path.moveTo(-10, -10)
+                path.lineTo(10, -10)
+                path.lineTo(0, 10)
+                path.addEllipse(-10, -10, 20, 20)
+            else: # Default shape for LT/HT poles if structure_type is not 4P or TP
+                path.addEllipse(-8, -8, 16, 16) # A simple circle
             self.label.setPos(-40, 12) 
         self.setPath(path)
 

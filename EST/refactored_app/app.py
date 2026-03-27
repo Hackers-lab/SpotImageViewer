@@ -31,6 +31,7 @@ from rule_engine import DynamicRuleEngine
 from ui_components import InteractiveView, DraggableLabel
 from canvas_objects import SmartPole, SmartHome, SmartSpan
 from ui_dialogs import SearchDialog, SettingsDialog, DatabaseManagerDialog, RulesetManagerDialog
+from PyQt6.QtWidgets import QMessageBox
 
 
 # --- 4. THE MASTER APPLICATION ---
@@ -211,7 +212,10 @@ class EstimateAppV9(QMainWindow):
             elif self.span_start_pole != item_clicked: 
                 span = SmartSpan(self.span_start_pole, item_clicked)
                 self.span_start_pole.connected_spans.append(span); item_clicked.connected_spans.append(span)
-                self.scene.addItem(span); self.scene.addItem(span.label) 
+                if (isinstance(self.span_start_pole, SmartPole) and isinstance(item_clicked, SmartPole)) and (self.span_start_pole.pole_type == "HT" and item_clicked.pole_type == "LT" or self.span_start_pole.pole_type == "LT" and item_clicked.pole_type == "HT"):
+                    choice = QMessageBox.question(self, 'Warning', "Are you sure you want to connect HT pole to LT pole?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                    if choice == QMessageBox.StandardButton.No: return
+                self.scene.addItem(span); self.scene.addItem(span.label)
                 self.span_start_pole.setPen(QPen(Qt.GlobalColor.black, 1)); self.span_start_pole = None
                 self.refresh_live_estimate()
 
@@ -270,6 +274,10 @@ class EstimateAppV9(QMainWindow):
                 ext_check.setChecked(item.has_extension)
                 ext_check.stateChanged.connect(lambda v, i=item: self.update_pole_extension(i, v == 2))
                 self.editor_layout.addRow(ext_check)
+            if item.height == "9MTR" and item.pole_type in ["HT", "DTR"]:
+                ext_check = QCheckBox("Add 9MTR Extension")
+                ext_check.stateChanged.connect(lambda v, i=item: self.update_pole_extension(i, v == 2))
+                self.editor_layout.addRow(ext_check)
 
             if item.pole_type == "DTR":
                 dtr_cb = QComboBox(); dtr_cb.addItems(["None", "16 KVA", "25KVA", "63KVA", "100KVA", "160KVA"])
@@ -285,6 +293,10 @@ class EstimateAppV9(QMainWindow):
             note_edit.setPlaceholderText("Add a custom note...")
             note_edit.textChanged.connect(lambda t, i=item: self.update_item_note(i, t))
             self.editor_layout.addRow("Custom Note:", note_edit)
+            if item.height == "8MTR" and item.pole_type in ["LT", "HT", "DTR"]:
+                ext_check = QCheckBox("Add Extension");
+                ext_check.setChecked(item.has_extension);
+                ext_check.stateChanged.connect(lambda v, i=item:self.update_pole_extension(i, v==2)); self.editor_layout.addRow(ext_check)
 
         elif isinstance(item, SmartSpan):
             length_spin = QSpinBox(); length_spin.setRange(1, 150); length_spin.setValue(int(item.length))
@@ -566,8 +578,9 @@ class EstimateAppV9(QMainWindow):
         
         lab_sub = sum([x['amt'] for x in self.live_bom_data if x['type'] == 'Labor'])
         sup = (mat_sub + lab_sub) * 0.10
-        gst = (lab_sub + sup) * 0.18
-        final_amt = (mat_sub + lab_sub + sup + gst) * 1.01
+        gst = lab_sub * 0.18
+        cess = (mat_sub + lab_sub + sup) * 0.01
+        final_amt = mat_sub + lab_sub + sup + gst + cess
         self.grand_total_label.setText(f"<b>Estimated Cost (Inc Taxes): Rs. {final_amt:,.2f}</b>")
 
     def show_about_dialog(self):
@@ -657,12 +670,12 @@ class EstimateAppV9(QMainWindow):
         ws.append(["", "", "TOTAL LABOR COST (B)", "", "", "", round(total_lab, 2)])
         ws.cell(row, 3).font = Font(bold=True); ws.cell(row, 7).font = Font(bold=True); row += 2
 
-        sup = (mat_subtotal + total_lab) * 0.10; gst = (total_lab + sup) * 0.18; sub_c = mat_subtotal + total_lab + sup + gst; g_tot = sub_c * 1.01
+        sup = (mat_subtotal + total_lab) * 0.10; gst = total_lab * 0.18; cess = (mat_subtotal + total_lab + sup) * 0.01; sub_c = mat_subtotal + total_lab + sup + gst; g_tot = sub_c + cess
         ws.append(["", "", "C. OVERHEADS & TAXES"]); ws.cell(row, 3).font = Font(bold=True); row += 1
         ws.append(["", "", "Supervision @ 10% on (A+B)", "", "", "", round(sup, 2)]); row += 1
-        ws.append(["", "", "GST @ 18% on (Labor + Sup)", "", "", "", round(gst, 2)]); row += 1
+        ws.append(["", "", "GST @ 18% on (Labor Only)", "", "", "", round(gst, 2)]); row += 1
         ws.append(["", "", "Sub-Total", "", "", "", round(sub_c, 2)]); row += 1
-        ws.append(["", "", "Add: Cess @ 1%", "", "", "", round(sub_c * 0.01, 2)]); row += 1
+        ws.append(["", "", "Add: Cess @ 1% on (Mat+Lab+Sup)", "", "", "", round(cess, 2)]); row += 1
         ws.append(["", "", "GRAND TOTAL", "", "", "", round(g_tot, 2)])
         ws.cell(row, 3).font = Font(bold=True, size=12); ws.cell(row, 7).font = Font(bold=True, size=12, color="FF0000")
         
