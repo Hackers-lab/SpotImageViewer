@@ -11,6 +11,7 @@ PROPERTY_DATA = {
         'dtr_size': ["None", "16 KVA", "25KVA", "63KVA", "100KVA", "160KVA"],
         'is_existing': [True, False],
         'has_extension': [True, False],
+        'has_cg': [True, False],
         'earth_count': 'int',
         'stay_count': 'int'
     },

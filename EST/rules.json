@@ -878,13 +878,5 @@
     "item_code": "110030141",
     "item_name": "P C C POLE:8 Mtrs.Long",
     "formula": "1"
-  },
-  {
-    "object": "SmartPole",
-    "condition": "pole_type == 'LT' and earth_count == 10",
-    "type": "Material",
-    "item_code": "912011441",
-    "item_name": "G.I. Turn Buckle",
-    "formula": "earth_count"
   }
 ]
