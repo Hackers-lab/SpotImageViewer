@@ -26,7 +26,7 @@ class SmartPole(QGraphicsPathItem):
         self.is_existing = is_existing
         self.height = "8MTR" if pole_type == "LT" else "9MTR"
         self.has_extension = False
-        self.override_auto_stay = False
+        self.override_auto_stay = False        
         self.structure_type = "DP/DTR"
         self.custom_note = ""
         self.dynamic_props = {}
@@ -105,6 +105,7 @@ class SmartPole(QGraphicsPathItem):
                 span.update_position()
             if self.refresh_signal:
                 self.refresh_signal.emit()
+
         return super().itemChange(change, value)
 
 

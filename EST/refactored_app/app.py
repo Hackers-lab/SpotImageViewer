@@ -280,6 +280,11 @@ class EstimateAppV9(QMainWindow):
                 self.editor_layout.addRow(ext_check)
 
             if item.pole_type == "DTR":
+                structure_type_cb = QComboBox()
+                structure_type_cb.addItems(["DP/DTR", "TP", "4P"])
+                structure_type_cb.setCurrentText(item.structure_type)
+                structure_type_cb.currentTextChanged.connect(lambda t: self.update_pole(item, "structure_type", t))
+                self.editor_layout.addRow("Structure Type:", structure_type_cb)
                 dtr_cb = QComboBox(); dtr_cb.addItems(["None", "16 KVA", "25KVA", "63KVA", "100KVA", "160KVA"])
                 dtr_cb.setCurrentText(item.dtr_size); dtr_cb.currentTextChanged.connect(lambda t: self.update_dtr_logic(item, t)); self.editor_layout.addRow("DTR Size:", dtr_cb)
             
@@ -348,7 +353,7 @@ class EstimateAppV9(QMainWindow):
         item.update_visuals()
         self.refresh_live_estimate()
         QTimer.singleShot(10, self.on_selection_changed) 
-
+    
     def update_pole_extension(self, item, value):
         item.has_extension = value
         item.update_visuals()

@@ -1,0 +1,176 @@
+here are my codes. in this project i want to change some architecture..
+
+when app opens it should ask for project types-
+
+
+
+
+
+NSC 
+
+
+
+FDS, TURNKEY
+
+
+
+MAINTENANCE
+
+
+
+SHIFTING
+
+
+
+AUGMENTATION
+
+By this my project will save a variable (will be used specifically for estimate calculations as my supervision charges are 10% on mat+lab, 15% for shifting, maintenance, augmentation, fds and turnkey.
+
+
+
+then i will have 4 smart objects
+
+
+
+
+
+POLE
+
+
+
+STRUCTURE
+
+
+
+SPAN
+
+
+
+CONSUMER (PREVIOUSLY HOME)
+
+
+
+THEN EACH WILL HAVE PROPERTY
+
+  POLE WILL HAVE (LT/HT) AS PER MY CANVAS SELECTION THEN
+
+
+
+
+
+POLE TYPE2 SELECTION(STP -STEEL TUBULAR POLE, PCC, H BEAM) BY DEFAULT IT WILL BE PCC
+
+
+
+HEIGHT SELECTION (FOR PCC 8MTR AND 9MTR, FOR STP 9MTR, 9.5MTR, 11MTR, H BEAM 13MTR)
+
+
+
+EXTENSION REQUIRED (YES/NO)
+
+
+
+IF EXTENSION IS YES THEN HEIGHT LENGTH (DEFAULT 3MTR)
+
+
+
+EARTH COUNT (DEFAULT 1)
+
+
+
+STAY COUNT (DEFAULT AS PER CURRENT VECTOR CALCULATIONS)
+
+POLE WILL BE DEFAULT 8 MTR FOR LT AND 9MTR FOR HT
+
+
+
+FOR STRUCTURE IT WILL BE HT BY DEFAULT SO 9MTR POLE WILL BE SEELCTED BY DEFAULT ITS PROPERTY WILL BE
+
+
+
+
+
+STRCTURE TYPE (DP, TP, 4P, DTR) 
+
+
+
+POLE TYPE SELECTION(STP -STEEL TUBULAR POLE, PCC, H BEAM) BY DEFAULT IT WILL BE PCC)
+
+
+
+THEN HEIGHT SELECTION ACCORDING TO THE POLE TYPE SELECTION)
+
+
+
+EXTENSION REQUIRED (YES/NO)
+
+
+
+IF EXTENSION IS YES THEN HEIGHT LENGTH (DEFAULT 3MTR)
+
+
+
+EARTH COUNT (DEFAULT 2 FOR DP, 3 FOR TP, 4 FOR 4P AND 5 FOR DTR)
+
+
+
+EARTH COUNT (DEFAULT 4 FOR EVERY STRUCTURE)
+
+
+
+FOR SMART SPAN
+
+
+
+
+
+CONDUCTOR TYPE (ACSR, ABC, UG, PVC) BY DEFAULT ACSR FOR HT, ABC FOR LT
+
+
+
+CONDUCTOR SIZE (FOR ACSR 30SQMM AND 50 SQMM, FOR ABC CABLE (LT AERIAL BUNCHED 1.1 KV ) 3CX50 +1CX35 sq mm 
+
+CABLE (LT AERIAL BUNCHED 1.1 KV ) 3CX50 +1cx16+1CX35 sq mm 
+
+CABLE (LT AERIAL BUNCHED 1.1 KV ) 3CX70+1CX16+1CX50 sq mm 
+
+CABLE (HT AERIAL BUNCHED 11 KV ) 3CX50+1CX150 sq mm 
+
+CABLE (HT AERIAL BUNCHED 11 KV ) 3CX95+1CX70 sq mm, FOR UG 
+
+
+
+
+
+SMART HOME WILL HAVE PROPERTY 
+
+
+
+
+
+1PH
+
+
+
+3PH
+
+
+
+CABLE SIZE DROPDOWN
+
+
+
+
+Project: ERP Estimate Generator — a PyQt6 desktop application for electrical network project estimation used in WBSEDCL (West Bengal electricity utility) projects. The app has an interactive canvas for drawing network diagrams and generates live Bills of Materials (BOM) and labor cost estimates, exportable to PDF drawings and ERP-compatible Excel files.
+Architecture: Multi-module Python app — app.py (main window), canvas_objects.py (SmartPole, SmartSpan, SmartHome as QGraphicsPathItem subclasses), rule_engine.py (JSON-driven dynamic BOM calculator using safe eval), database.py (SQLite with materials and labor tables), ui_components.py (InteractiveView, DraggableLabel), ui_dialogs.py (SearchDialog, SettingsDialog, DatabaseManagerDialog, RulesetManagerDialog), constants.py (TOOLS, PROPERTY_DATA, FORMULA_VARS), rules.json (all BOM rules).
+Planned Redesign — implement in phases, do not break existing functionality:
+Phase 1 — Project Setup Wizard: On app launch, show a setup dialog capturing: Project Name, Lat/Long, Project Type (NSC / FDS+TURNKEY / MAINTENANCE / SHIFTING / AUGMENTATION), UH Material Toggle (yes/no, project-level, not per-estimate), Division/Circle info. Project type determines supervision rate: 10% for NSC, 15% for all others. GST is fixed at 18% on labour only. UH toggle flows into rule engine context as use_uh global variable (already exists, just move to project level). Store all project metadata in a project_meta dict on the main app object. Make it editable via a "Project Settings" button after initial setup.
+Phase 2 — SmartPole property updates: Keep LT/HT distinction from canvas tool selection. Add pole_type2 property: PCC (default), STP (Steel Tubular Pole), H-BEAM. Add cascading height selection — PCC: 8MTR/9MTR, STP: 9MTR/9.5MTR/11MTR, H-BEAM: 13MTR. Default height: 8MTR for LT, 9MTR for HT. Add extension_required boolean and extension_height numeric (default 3MTR, only visible when extension checked). Keep earth count (default 1) and stay count (auto from vector angle calculation with manual override — show "🔒 Manual" indicator when overridden, add "Reset to Auto" button). The auto-stay logic: 1 span connected = 1 stay, 2 spans with turning angle >20° = 1 stay, all else = 0.
+Phase 3 — SmartStructure as new separate canvas object: Separate from SmartPole entirely. Always HT-side. Properties: Structure Type (DP/DTR/TP/4P), Pole Type (PCC/STP/H-BEAM, default PCC), Height (cascading per pole type, default 9MTR), Extension (yes/no + height in metres), Earth Count (editable, defaults: DP=2, TP=3, 4P=4, DTR=5), Stay Count (editable, default 4 for all structure types), DTR Size dropdown (10KVA/16KVA/25KVA/63KVA/100KVA/160KVA — only visible when Structure Type = DTR). Canvas symbol: DP=2 circles, TP=3 circles, 4P=4 circles, DTR=2 circles with transformer symbol. Earth and stay symbols drawn attached to the structure symbol on canvas.
+Phase 4 — SmartSpan property updates: Voltage level auto-detected from connected pole types (LT pole connected = LT span, HT pole = HT span). Conductor type: ACSR (HT default), ABC (LT default), UG (underground, future), PVC. Conductor sizes — ACSR: 30SQMM/50SQMM. ABC LT: 3CX50+1CX35, 3CX50+1CX16+1CX35, 3CX70+1CX16+1CX50. ABC HT: 3CX50+1CX150, 3CX95+1CX70. PVC: 10/16/25/50/95/120 SQMM. Wire count for ACSR: 2/3/4. CG (Cattle Guard) remains a span property (yes/no). Length default 40m. CG symbol drawn as small crosshatch below span midpoint on canvas.
+Phase 5 — SmartConsumer (previously SmartHome): Simplified. Properties: Phase (1PH/3PH), Cable Size dropdown (context-aware per phase), Agency Supply checkbox (WBSEDCL-supplied vs Agency-supplied material — reflected in Excel output as a note).
+Phase 6 — Canvas symbol improvements: Stay wire = diagonal line at 45° from pole base with anchor point. Earth = 3 decreasing horizontal lines below pole (standard ⏚ symbol). CG = small crosshatch bracket below span midpoint. TP = 3 circles in triangle arrangement, 4P = 4 circles in square arrangement. Add "Detail View" toggle in toolbar to show/hide ancillary symbols (stay, earth, CG) for clean navigation vs detailed PDF export view.
+Phase 7 — Iron Breakup Excel Sheet: Add a second sheet "Iron Breakup" to the generated Excel. Structure matches the provided breakup format with sections: B (MS Channel 75×40mm), C (MS Angle 65×65×6mm), D (MS Angle 50×50×6mm), E (MS Flat 65×6mm). Each section lists component sources with No. × Length = Total columns, plus kg total (Total metres × unit weight: Channel=7.14kg/m, Angle 65×65=6.5kg/m, Angle 50×50=5.0kg/m, Flat=3.5kg/m). Iron quantities are derived from the rule engine — each iron-related rule should tag its output with a source_component string (e.g., "Single Pole Extension", "DP Structure", "CG Bracket on SP") so the Excel generator can aggregate by component type into the breakup table. Component standard lengths: Channel — SP V-bracket=1.8m, Extension=6m, DP structure=5m (×2 poles), Sub-stn top/isolator/transformer base=4.5m each, I-bolt=1m. Angle 65×65 — CG on SP=1.9m, CG on DP=2.75m, Cross arm=6.36m, DTR components=4.5m. Flat — HT clamp sub-stn=14m, DP line=2m per DP, HT SP=1m (×2), Extension=3m, CG bracket=0.5m, Cross arm=2m, LT pole=1-2m.
+Rule Engine: Keep DynamicRuleEngine architecture unchanged. Add to every item's context: project_type, supervision_rate, use_uh (project-level), pole_type2, extension_height (numeric), conductor_size (unified variable replacing split wire_size/cable_size), structure_type (for SmartStructure), is_ug (for underground cables). Rules are stored in rules.json and fully editable via the RulesetManagerDialog UI. Existing rules continue to work for existing object types.
+Backward Compatibility: All saved JSON project files must continue to load correctly — new fields absent in old files default to safe values (PCC pole type, standard heights, etc.). The SQLite database schema is additive only. The main estimate sheet format and tax calculation logic (escalation at 5% per FY from 2024, sundries 5%, supervision at project-type rate, GST 18% on labour, cess 1%) remain unchanged.
+

@@ -886,5 +886,13 @@
     "type": "Material",
     "item_code": "102010611",
     "formula": "3*6.8/1000"
+  },
+  {
+    "object": "SmartPole",
+    "item_name": "New Rule \u2014 edit me",
+    "condition": "",
+    "type": "Material",
+    "item_code": "N/A",
+    "formula": "1"
   }
 ]
