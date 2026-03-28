@@ -35,9 +35,6 @@ TOOLS = {
 PROJECT_TYPES = [
     "NSC",
     "FDS / TURNKEY",
-    "MAINTENANCE",
-    "SHIFTING",
-    "AUGMENTATION",
 ]
 
 # Supervision charge rate keyed by project type string
@@ -124,11 +121,16 @@ PROPERTY_DATA = {
         "pole_type2":       ["PCC", "STP", "H-BEAM"],
         "height":           [8, 9],           # numeric metres for rule conditions
         "is_existing":      [True, False],
+        "existing_subtype": ["LT", "HT", "DP", "TP", "4P", "DTR"],
+        "existing_dtr_size": ["None", "10KVA", "16KVA", "25KVA", "63KVA", "100KVA", "160KVA"],
         "has_extension":    [True, False],
         "extension_height": "int",
         "earth_count":      "int",
         "stay_count":       "int",
         "has_cg":           [True, False],
+        "ht_spans_count":   "int",
+        "use_uh":           [True, False],
+        "project_type":     PROJECT_TYPES,
     },
     "SmartStructure": {
         "structure_type":   ["DP", "TP", "4P", "DTR"],
@@ -142,6 +144,8 @@ PROPERTY_DATA = {
             "None", "10KVA", "16KVA", "25KVA",
             "63KVA", "100KVA", "160KVA"
         ],
+        "use_uh":           [True, False],
+        "project_type":     PROJECT_TYPES,
     },
     "SmartSpan": {
         "conductor":        ["ACSR", "AB Cable", "PVC Cable", "Service Drop"],
@@ -155,6 +159,8 @@ PROPERTY_DATA = {
         "consider_cable":   [True, False],
         "length":           "int",
         "wire_count":       "int",
+        "use_uh":           [True, False],
+        "project_type":     PROJECT_TYPES,
     },
     "SmartConsumer": {
         "phase":            ["1 Phase", "3 Phase"],
@@ -162,6 +168,8 @@ PROPERTY_DATA = {
             "10 SQMM", "16 SQMM", "25 SQMM", "50 SQMM"
         ],
         "agency_supply":    [True, False],
+        "use_uh":           [True, False],
+        "project_type":     PROJECT_TYPES,
     },
 }
 

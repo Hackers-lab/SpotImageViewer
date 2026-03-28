@@ -143,6 +143,7 @@ _SEED_MATERIALS = [
 
     # ══ MISCELLANEOUS ═════════════════════════════════════════════════════════
     ("0504070441", "LT Spacer 3 Phase 4 Wire",                           60.11,  "NOS"),
+    ("0504070341", "LT Spacer 1 PHASE 2 WIRE",                           35.51,  "NOS"),
     ("0912011441", "G.I. Turn Buckle 18x5/8\"",                         182.36,  "NOS"),
     ("0910010241", "Caution Board 11KV",                                 143.95,  "NOS"),
     ("0504060941", "LT Distribution Box 3Ph with Steel Strap & Buckle ABC", 1632.58, "NOS"),
@@ -206,6 +207,7 @@ _SEED_LABOUR = [
     # CED/13 Sl.8
     ("LAB-22", "Extension of PCC Pole upto 3MTR Without Painted HT",  1506.00, "NOS"),
     ("LAB-23", "Extension of Rail Pole upto 3MTR",                    1862.95, "NOS"),
+    ("LAB-73", "Extension of PCC Pole upto 3MTR Without Painted LT",  1506.00, "NOS"),
 
     # ══ TRANSFORMER ERECTION ══════════════════════════════════════════════════
     # CED/13 Sl.11 & ESTIMATE_FORMAT_2023
@@ -256,6 +258,7 @@ _SEED_LABOUR = [
     ("LAB-46", "Fixing of 11KV Disc Insulator with Strain Hardware",     65.00, "NOS"),
     ("LAB-47", "Fixing of LT Shackle Insulator with N/B",                52.00, "NOS"),
     ("LAB-48", "Fixing of LT Spacer",                                    56.00, "NOS"),
+    ("LAB-72", "Fixing of LT Spacer 1ph Unit",                           37.00, "NOS"),
 
     # ══ SUB-STATION FITTINGS ══════════════════════════════════════════════════
     # CED/13 Sl.22, 25, 26, 29
@@ -282,6 +285,7 @@ _SEED_LABOUR = [
     ("LAB-61", "Erection of Anchor/Dead End Clamp LT ABC",              154.00, "NOS"),
     ("LAB-62", "Erection of Suspension Clamp LT ABC",                   154.00, "NOS"),
     ("LAB-63", "Erection of Distribution Box LT ABC",                   507.00, "NOS"),
+    ("LAB-71", "Fixing of IPC Connector LT ABC",                         75.00, "NOS"),
 
     # ══ PVC CABLE LAYING ══════════════════════════════════════════════════════
     # CED/UG Cable Rate Contract Sl.10(e-g) — per metre × 1000
@@ -310,6 +314,7 @@ _NEW_MATERIALS = [
                          "0301010541", "0301011041", "0301018341", "0301018741",
                          "0301019041", "0301019141", "0301019341",
                          "0407010741", "0407010541",
+                         "0504070341",
                          "LOCAL-"))
 ]
 
@@ -324,7 +329,7 @@ _NEW_LABOUR = [
         "LAB-23", "LAB-24", "LAB-26", "LAB-27", "LAB-28", "LAB-29",
         "LAB-32", "LAB-33", "LAB-34", "LAB-35",
         "LAB-36", "LAB-37", "LAB-38", "LAB-39",
-        "LAB-61", "LAB-62", "LAB-63",
+        "LAB-61", "LAB-62", "LAB-63", "LAB-71", "LAB-72", "LAB-73",
         "LAB-64", "LAB-65", "LAB-66",
         "LAB-67", "LAB-68", "LAB-69", "LAB-70",
     }

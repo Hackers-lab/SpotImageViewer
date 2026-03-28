@@ -94,7 +94,16 @@ class DynamicRuleEngine:
             result = eval(
                 formula_str,
                 {"__builtins__": {"int": int, "round": round, "abs": abs},
-                 "math": math},
+                 "math": math,
+                 # Named iron weight constants (kg/m)
+                 "CH_75X40":    6.8,
+                 "CH_100X50":   9.8,
+                 "ANG_65X65X6": 5.8,
+                 "ANG_50X50X6": 4.5,
+                 "FLAT_65X6":   3.1,
+                 "FLAT_50X6":   2.5,
+                 "GIWIRE_5MM":  0.123,
+                 "GIWIRE_4MM":  0.100},
                 item_context,
             )
             return float(result)
@@ -121,9 +130,15 @@ class DynamicRuleEngine:
         self, item: SmartPole,
         use_uh: bool, project_type: str
     ) -> dict:
+        # For existing poles use existing_subtype (e.g. "HT") as the
+        # effective pole_type so stay/insulator rules fire correctly.
+        eff_pole_type = (
+            getattr(item, "existing_subtype", item.pole_type)
+            if item.is_existing else item.pole_type
+        )
         ctx: dict = {
             "object_type":      "SmartPole",
-            "pole_type":        item.pole_type,
+            "pole_type":        eff_pole_type,
             "pole_type2":       item.pole_type2,
             "is_existing":      item.is_existing,
             "existing_subtype": getattr(item, "existing_subtype", item.pole_type),
@@ -135,7 +150,8 @@ class DynamicRuleEngine:
             "stay_count":       item.stay_count,
             "use_uh":           use_uh,
             "project_type":     project_type,
-        }
+            "work_mode":        getattr(item, "work_mode", "new"),
+            "reuse_material":   getattr(item, "reuse_material", False)        }
 
         # has_cg — True if any connected span has cattle guard
         ctx["has_cg"] = any(
@@ -143,14 +159,59 @@ class DynamicRuleEngine:
             for s in item.connected_spans
         )
 
-        # ht_spans_count — number of ACSR spans between HT poles
-        # (used by insulator / hardware fitting rules)
+        # ht_spans_count — number of NEW (non-existing) ACSR spans connected.
+        # Used to classify end pole (==1 → disc) vs through pole (>=2 → pin).
+        # Includes spans to/from existing poles so a DTR or new pole adjacent
+        # to an existing HT pole is still treated as an end point.
         ctx["ht_spans_count"] = sum(
             1 for s in item.connected_spans
             if s.conductor == "ACSR"
-            and getattr(s.p1, "pole_type", "LT") != "LT"
-            and getattr(s.p2, "pole_type", "LT") != "LT"
+            and not getattr(s, "is_existing_span", False)
         )
+
+        # lt_acsr_count — number of LT ACSR spans connected to this pole
+        # (used by LT bracket iron rules on SmartPole)
+        ctx["lt_acsr_count"] = sum(
+            1 for s in item.connected_spans
+            if s.conductor == "ACSR" and getattr(s, "is_lt_span", False)
+        )
+
+        # AB cable context — distribution box / clamp / IPC rules
+        ab_spans = [
+            s for s in item.connected_spans
+            if s.conductor == "AB Cable"
+            and not getattr(s, "is_service_drop", False)
+        ]
+        ab_cable_count = len(ab_spans)
+        if ab_cable_count == 0:
+            ab_needs_dead_end   = False
+            ab_needs_suspension = False
+        elif ab_cable_count == 1:
+            ab_needs_dead_end   = True
+            ab_needs_suspension = False
+        else:
+            my_x, my_y = item.x(), item.y()
+            span_angles = []
+            for s in ab_spans:
+                other = s.p1 if s.p2 is item else s.p2
+                dx = other.x() - my_x
+                dy = other.y() - my_y
+                mag = math.hypot(dx, dy)
+                if mag > 0:
+                    span_angles.append(math.atan2(dy, dx))
+            max_dev = 0.0
+            for i in range(len(span_angles)):
+                for j in range(i + 1, len(span_angles)):
+                    diff = abs(span_angles[i] - span_angles[j])
+                    if diff > math.pi:
+                        diff = 2 * math.pi - diff
+                    deviation = abs(math.pi - diff)
+                    max_dev = max(max_dev, math.degrees(deviation))
+            ab_needs_dead_end   = max_dev > 65
+            ab_needs_suspension = not ab_needs_dead_end
+        ctx["ab_cable_count"]     = ab_cable_count
+        ctx["ab_needs_dead_end"]  = ab_needs_dead_end
+        ctx["ab_needs_suspension"] = ab_needs_suspension
 
         # Merge any dynamic props attached to the item
         ctx.update(getattr(item, "dynamic_props", {}))
@@ -160,6 +221,11 @@ class DynamicRuleEngine:
         self, item: SmartStructure,
         use_uh: bool, project_type: str
     ) -> dict:
+        ht_spans_count = sum(
+            1 for s in getattr(item, "connected_spans", [])
+            if s.conductor == "ACSR"
+            and not getattr(s, "is_existing_span", False)
+        )
         ctx: dict = {
             "object_type":      "SmartStructure",
             "structure_type":   item.structure_type,
@@ -170,6 +236,7 @@ class DynamicRuleEngine:
             "earth_count":      item.earth_count,
             "stay_count":       item.stay_count,
             "dtr_size":         item.dtr_size,
+            "ht_spans_count":   ht_spans_count,
             "use_uh":           use_uh,
             "project_type":     project_type,
         }
@@ -212,15 +279,23 @@ class DynamicRuleEngine:
         self, item: SmartConsumer,
         use_uh: bool, project_type: str
     ) -> dict:
+        service_span = next(
+            (s for s in getattr(item, "connected_spans", [])
+             if getattr(s, "is_service_drop", False)),
+            None,
+        )
+        service_length = service_span.length if service_span else 20
         ctx: dict = {
-            "object_type":   "SmartConsumer",
+            "object_type":       "SmartConsumer",
             # Keep SmartHome alias so any legacy rules survive
             "object_type_alias": "SmartHome",
-            "phase":         item.phase,
-            "cable_size":    item.cable_size,
-            "agency_supply": item.agency_supply,
-            "use_uh":        use_uh,
-            "project_type":  project_type,
+            "phase":             item.phase,
+            "cable_size":        item.cable_size,
+            "agency_supply":     item.agency_supply,
+            "consider_cable":    getattr(item, "consider_cable", False),
+            "service_length":    service_length,
+            "use_uh":            use_uh,
+            "project_type":      project_type,
         }
         ctx.update(getattr(item, "dynamic_props", {}))
         return ctx

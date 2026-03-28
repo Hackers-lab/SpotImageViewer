@@ -392,7 +392,7 @@ class SmartPole(_NodeMixin, QGraphicsPathItem):
             txt = f"Ex. {_sub}{_sfx}"
         else:
             ht_m = self.height.replace("MTR", "m")
-            txt  = f"{self.pole_type} Pole\n{self.pole_type2} {ht_m}"
+            txt  = f"{self.pole_type2} {ht_m} ({self.pole_type})"
             if self.has_extension:
                 txt += f"\n+Ext {self.extension_height:.1f}m"
 
@@ -632,9 +632,10 @@ class SmartConsumer(_NodeMixin, QGraphicsPathItem):
         QGraphicsPathItem.__init__(self)
         self._init_node(x, y, refresh_signal, detail_view)
 
-        self.phase         = "3 Phase"
-        self.cable_size    = "10 SQMM"
-        self.agency_supply = False
+        self.phase          = "3 Phase"
+        self.cable_size     = "10 SQMM"
+        self.agency_supply  = False
+        self.consider_cable = False
 
         # Build house path (static — does not change)
         house = QPainterPath()
@@ -750,10 +751,10 @@ class SmartSpan(QGraphicsPathItem):
             self.wire_count     = "3"
         else:
             self.conductor      = "AB Cable" if self.is_lt_span else "ACSR"
-            self.conductor_size = "3CX50+1CX35" if self.is_lt_span else "50SQMM"
+            self.conductor_size = "3CX50+1CX16+1CX35" if self.is_lt_span else "50SQMM"
             self.length         = 40
             self.aug_type       = "New"
-            self.wire_count     = "3"
+            self.wire_count     = "4" if self.is_lt_span else "3"
             self.has_cg         = False
             self.consider_cable = False
             self.phase          = "3 Phase"
@@ -823,20 +824,39 @@ class SmartSpan(QGraphicsPathItem):
             
             if isinstance(item, SmartStructure):
                 st = getattr(item, 'structure_type', None)
-                # For TP and 4P, connect to the midpoint of one of the interconnecting lines
+                r   = 8
+                gap = 6
+
                 if st == "TP":
-                    # Use the bottom edge (between bottom-left and bottom-right)
-                    r = 8
-                    gap = 6
-                    left = item_pos + QPointF(-(r + gap), (r + gap // 2))
-                    right = item_pos + QPointF((r + gap), (r + gap // 2))
-                    return (left + right) / 2
+                    # 3 circles: top, bottom-left, bottom-right
+                    top = (0,           -(r + gap // 2))
+                    bl  = (-(r + gap),   (r + gap // 2))
+                    br  = ( (r + gap),   (r + gap // 2))
+                    # midpoints of the three connecting edges
+                    edge_mids = [
+                        ((top[0] + bl[0]) / 2, (top[1] + bl[1]) / 2),   # top — BL (left edge)
+                        ((top[0] + br[0]) / 2, (top[1] + br[1]) / 2),   # top — BR (right edge)
+                        ((bl[0]  + br[0]) / 2, (bl[1]  + br[1]) / 2),   # BL — BR  (bottom edge)
+                    ]
                 elif st == "4P":
-                    # Use the bottom edge (between bottom-left and bottom-right)
-                    d = 8 + 6 // 2
-                    left = item_pos + QPointF(-d, d)
-                    right = item_pos + QPointF(d, d)
-                    return (left + right) / 2
+                    # 4 circles in 2×2 grid; edge midpoints are at cardinal directions
+                    d = r + gap // 2
+                    edge_mids = [
+                        ( 0, -d),   # top edge
+                        ( d,  0),   # right edge
+                        ( 0,  d),   # bottom edge
+                        (-d,  0),   # left edge
+                    ]
+                else:
+                    edge_mids = None
+
+                if edge_mids is not None:
+                    # Pick the edge midpoint whose direction best matches other_item_pos
+                    rel = other_item_pos - item_pos   # vector from structure to other pole
+                    ox, oy = rel.x(), rel.y()
+                    best = min(edge_mids,
+                               key=lambda m: (m[0] - ox) ** 2 + (m[1] - oy) ** 2)
+                    return item_pos + QPointF(best[0], best[1])
                 else:
                     # For DP, DTR, fallback to bounding rect edge
                     brect = item.boundingRect()
@@ -905,7 +925,10 @@ class SmartSpan(QGraphicsPathItem):
 
         # ── Label text ────────────────────────────────────────────────────
         if self.is_existing_span:
-            txt = f"Existing\n{self.conductor}"
+            if self.conductor == "ACSR":
+                txt = f"{self.length}m {self.wire_count}w\nEx ACSR"
+            else:
+                txt = f"Existing\n{self.conductor}"
         elif self.is_service_drop:
             phase_s = "1φ" if self.phase == "1 Phase" else "3φ"
             txt = f"Service {self.length}m\n{phase_s}"
@@ -914,11 +937,11 @@ class SmartSpan(QGraphicsPathItem):
         else:
             size_s = self.conductor_size or ""
             if self.conductor == "ACSR":
-                txt = f"{self.length}m\n{self.wire_count}W ACSR {size_s}"
+                txt = f"{self.length}m {self.wire_count}w\nACSR"
             elif self.conductor == "AB Cable":
-                txt = f"{self.length}m\nABC {size_s}"
+                txt = f"{self.length}m ABC"
             else:
-                txt = f"{self.length}m\nPVC {size_s}"
+                txt = f"{self.length}m PVC"
             if self.aug_type != "New":
                 txt += f"\n({self.aug_type})"
             if self.has_cg:

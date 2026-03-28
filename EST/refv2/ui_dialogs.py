@@ -133,12 +133,14 @@ class ProjectSetupDialog(QDialog):
         sep.setStyleSheet("color:#ccc;")
         form.addRow(sep)
 
-        # Project type
+        # Project type (Shifting / Maintenance / Augmentation disabled — NSC only)
         self._proj_type = QComboBox()
         self._proj_type.addItems(PROJECT_TYPES)
         current_type = self._meta.get("project_type", "NSC")
         if current_type in PROJECT_TYPES:
             self._proj_type.setCurrentText(current_type)
+        else:
+            self._proj_type.setCurrentText("NSC")
         self._proj_type.currentTextChanged.connect(self._on_type_changed)
         form.addRow("Project Type:", self._proj_type)
 

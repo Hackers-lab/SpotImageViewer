@@ -745,30 +745,6 @@ class EstimateApp(QMainWindow):
         )
         self.editor_layout.addRow("Length (m):", len_sp)
 
-        phase_cb = QComboBox()
-        phase_cb.addItems(["1 Phase", "3 Phase"])
-        phase_cb.setCurrentText(item.phase)
-        phase_cb.currentTextChanged.connect(
-            lambda t, i=item: self._update_span(i, "phase", t)
-        )
-        self.editor_layout.addRow("Phase:", phase_cb)
-
-        cons_chk = QCheckBox("Include cable in estimate")
-        cons_chk.setChecked(item.consider_cable)
-        cons_chk.stateChanged.connect(
-            lambda v, i=item: self._update_span_refresh(i, "consider_cable", v == 2)
-        )
-        self.editor_layout.addRow(cons_chk)
-
-        if item.consider_cable:
-            sz_cb = QComboBox()
-            sz_cb.addItems(["10 SQMM", "16 SQMM", "25 SQMM", "50 SQMM"])
-            sz_cb.setCurrentText(item.conductor_size)
-            sz_cb.currentTextChanged.connect(
-                lambda t, i=item: self._update_span(i, "conductor_size", t)
-            )
-            self.editor_layout.addRow("Cable Size:", sz_cb)
-
     def _build_line_span_editor(self, item):
         # Voltage level (read-only, auto-detected)
         vl_lbl = QLabel(
@@ -857,6 +833,13 @@ class EstimateApp(QMainWindow):
             lambda v, i=item: self._update_consumer(i, "agency_supply", v == 2)
         )
         self.editor_layout.addRow(agency_chk)
+
+        cons_chk = QCheckBox("Include cable in estimate (FDS only)")
+        cons_chk.setChecked(getattr(item, "consider_cable", False))
+        cons_chk.stateChanged.connect(
+            lambda v, i=item: self._update_consumer(i, "consider_cable", v == 2)
+        )
+        self.editor_layout.addRow(cons_chk)
 
         note = QLineEdit(getattr(item, "custom_note", ""))
         note.setPlaceholderText("Custom note...")
@@ -1194,6 +1177,9 @@ class EstimateApp(QMainWindow):
             new_val = both_existing and not span.is_service_drop
             if span.is_existing_span != new_val:
                 span.is_existing_span = new_val
+                # When a HT ACSR span first becomes existing, default wire_count to 3
+                if new_val and not span.is_lt_span and span.conductor == "ACSR":
+                    span.wire_count = "3"
                 span.update_visuals()
 
     def _auto_stay_update(self):
@@ -1259,6 +1245,17 @@ class EstimateApp(QMainWindow):
         raw_bom, raw_lab = self.rule_engine.process(
             canvas_items, rules, use_uh, project_type
         )
+
+        # Apply 3% wastage + sag to steel material quantities
+        _STEEL_CODES = {
+            "M.S Channel 75X40 mm", "M.S Angle 65X65X6mm",
+            "M.S Angle 50X50X6mm", "M.S Flat 65X6 mm",
+            "M.S Channel 100X50 mm",
+            "G.I. Wire 5 MM (6 SWG)", "G.I. Wire 4 MM (8 SWG)",
+        }
+        for name in list(raw_bom):
+            if name in _STEEL_CODES:
+                raw_bom[name] = raw_bom[name] * 1.03
 
         # Build live_bom_data
         self.live_bom_data = []
@@ -1529,199 +1526,314 @@ class EstimateApp(QMainWindow):
 
     def _write_iron_breakup_sheet(self, wb):
         """
-        Generates the Iron Breakup sheet mirroring the standard format:
-        Section B — MS Channel 75×40mm
-        Section C — MS Angle 65×65×6mm
-        Section D — MS Angle 50×50×6mm
-        Section E — MS Flat 65×6mm
+        Generates a detailed Iron Breakup sheet showing where each steel
+        item comes from (HT bracket, extension, DTR structure, CG, tee-off
+        etc.) with per-source metre/kg rows, plus 3% wastage + sag.
+        Quantities are derived from the same rule-engine that drives the
+        Estimate sheet so the two sheets always agree.
         """
         ws = wb.create_sheet("Iron Breakup")
 
-        # Unit weights kg/m
-        UW = {
-            "B": 7.14,   # MS Channel 75x40
-            "C": 6.50,   # MS Angle 65x65x6
-            "D": 5.00,   # MS Angle 50x50x6
-            "E": 3.50,   # MS Flat 65x6
-        }
+        wastage_sag_pct = 0.03
 
-        # Collect counts from canvas
-        counts = self._collect_iron_counts()
+        # Section definitions — same unit-weights as rule_engine formulas
+        #   kg_m > 0  →  steel section (metres / kg display)
+        #   kg_m == 0 →  wire section  (kg-only display, formula already gives MT)
+        sections = [
+            ("B", "M.S. Channel (75X40mm)",   "0102010611", 6.8),
+            ("B2","M.S. Channel (100X50mm)",  "0102010911", 9.8),
+            ("C", "M.S. Angle (65X65X6mm)",   "0101011311", 5.8),
+            ("D", "M.S. Angle (50X50X6mm)",   "0101011011", 4.5),
+            ("E", "M.S. Flat (65X6mm)",       "0103011511", 3.1),
+            ("F", "G.I. Wire 5 MM (6 SWG)",   "0503010811", 0),
+            ("G", "G.I. Wire 4 MM (8 SWG)",   "0503010711", 0),
+        ]
 
-        # Component tables — each row: (description, length_per_unit, count_key)
-        sections = {
-            "B": {
-                "title": "M.S. Channel (75X40mm)",
-                "rows": [
-                    ("Single Pole (V-Bracket & Top Adaptor)", 1.8,  "ht_sp"),
-                    ("Single Pole Extension",                  6.0,  "extensions"),
-                    ("Double Pole Structure (2× No of D.P.)", 5.0,  "dp_struct"),
-                    ("Line D.P. Cradle Guard Bracket",        2.75, "dp_cg"),
-                    ("Triple Pole Structure",                 12.0,  "tp_struct"),
-                    ("Four-Pole Structure",                   16.0,  "fp_struct"),
-                    ("Tee Off Bracket",                        2.0,  "tee_off"),
-                    ("Sub-Stn Top",                            4.5,  "dtr"),
-                    ("Isolator Support",                       4.5,  "dtr"),
-                    ("Transformer Base",                       4.5,  "dtr"),
-                    ("I-Bolt & Handle",                        1.0,  "dtr"),
-                ],
-            },
-            "C": {
-                "title": "M.S. Angle (65X65X6mm)",
-                "rows": [
-                    ("Tee Off Tie (Tapping)",                 2.0,  "tee_off"),
-                    ("Tee Off Bracket (Tapping)",             2.0,  "tee_off"),
-                    ("C.G. Bracket on Single Pole",           1.9,  "cg_sp"),
-                    ("C.G. Bracket on Double Pole",           2.75, "cg_dp"),
-                    ("H.T. Bracket on Single Pole",           1.8,  "ht_sp"),
-                    ("L.T. Bracket on Single Pole (4 wire)",  1.0,  "lt_sp"),
-                    ("Cross Arm",                             6.36, "cross_arm"),
-                    ("H.T. Fuse Unit",                        4.5,  "dtr"),
-                    ("Sub-Stn Main Switch Angle",             4.5,  "dtr"),
-                    ("Angle Support on Sub-Stn",              1.0,  "dtr"),
-                    ("Foot Rest",                             2.25, "dtr"),
-                ],
-            },
-            "D": {
-                "title": "M.S. Angle (50X50X6mm)",
-                "rows": [
-                    ("Tee Off Tie (Tapping)",                 2.5,  "tee_off"),
-                    ("D.P. Basing",                           2.5,  "dp_struct"),
-                    ("T.P. Basing",                           2.5,  "tp_struct"),
-                    ("L.T. Fuse Unit",                        5.0,  "lt_sp"),
-                    ("Sub-Stn Main Switch Angle",             5.0,  "dtr"),
-                    ("Service Angle Fittings",                2.0,  "consumers"),
-                ],
-            },
-            "E": {
-                "title": "M.S. Flat (65X6mm)",
-                "rows": [
-                    ("No. of H.T. Clamp Sub-Stn",            14.0, "dtr"),
-                    ("Line D.P. (6× No of D.P.)",             2.0,  "dp_struct"),
-                    ("Tee off Tie (Tapping 3-5 Nos)",         0.5,  "tee_off"),
-                    ("HT Single Pole (2 nos)",                 1.0,  "ht_sp"),
-                    ("Extension of Pole upto 3 Mtr (6 nos)",  3.0,  "extensions"),
-                    ("Triple Pole Structure (6+12 nos)",       7.0,  "tp_struct"),
-                    ("Cross Arm",                             2.0,  "cross_arm"),
-                    ("No. of L.T. Pole",                      1.0,  "lt_sp"),
-                    ("CG Bracket",                            0.5,  "cg_sp"),
-                ],
-            },
-        }
+        detail = self._collect_iron_detail()
 
         ws.column_dimensions["A"].width = 5
-        ws.column_dimensions["B"].width = 38
+        ws.column_dimensions["B"].width = 42
         ws.column_dimensions["C"].width = 8
         ws.column_dimensions["D"].width = 10
         ws.column_dimensions["E"].width = 10
         ws.column_dimensions["F"].width = 12
 
-        header_fill = PatternFill("solid", fgColor="4F81BD")
+        header_fill  = PatternFill("solid", fgColor="4F81BD")
         section_fill = PatternFill("solid", fgColor="D9E1F2")
-        thin = Side(border_style="thin", color="AAAAAA")
+        total_fill   = PatternFill("solid", fgColor="EBF1DE")
+        thin   = Side(border_style="thin", color="AAAAAA")
         border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
-        current_row = 1
-        ws.cell(current_row, 1, "IRON CALCULATION BREAKUP").font = Font(bold=True, size=13)
-        ws.merge_cells(
-            start_row=current_row, start_column=1,
-            end_row=current_row, end_column=6
-        )
-        ws.cell(current_row, 1).fill = header_fill
-        ws.cell(current_row, 1).font = Font(bold=True, size=13, color="FFFFFF")
-        ws.cell(current_row, 1).alignment = Alignment(horizontal="center")
-        current_row += 1
+        cr = 1
+        ws.cell(cr, 1, "IRON CALCULATION BREAKUP").font = Font(bold=True, size=13)
+        ws.merge_cells(start_row=cr, start_column=1, end_row=cr, end_column=6)
+        ws.cell(cr, 1).fill = header_fill
+        ws.cell(cr, 1).font = Font(bold=True, size=13, color="FFFFFF")
+        ws.cell(cr, 1).alignment = Alignment(horizontal="center")
+        cr += 1
 
-        for sec_key, sec_data in sections.items():
-            # Section header row
-            ws.cell(current_row, 1, sec_key).font = Font(bold=True)
-            ws.cell(current_row, 2, sec_data["title"]).font = Font(bold=True)
-            ws.cell(current_row, 3, "No").font = Font(bold=True)
-            ws.cell(current_row, 4, "Length (m)").font = Font(bold=True)
-            ws.cell(current_row, 5, "Total (m)").font = Font(bold=True)
-            ws.cell(current_row, 6, "Wt (kg)").font = Font(bold=True)
+        ws.merge_cells(start_row=cr, start_column=1, end_row=cr, end_column=6)
+        ws.cell(cr, 1, "Steel quantities from rule-engine + 3% wastage & sag")
+        ws.cell(cr, 1).alignment = Alignment(horizontal="center")
+        ws.cell(cr, 1).font = Font(bold=True, color="2F5597")
+        cr += 1
+
+        for sec_key, sec_title, item_code, kg_m in sections:
+            rows = detail.get(item_code, [])
+            if not rows:
+                continue   # skip sections with zero quantity
+
+            # Section header
+            ws.cell(cr, 1, sec_key).font = Font(bold=True)
+            ws.cell(cr, 2, sec_title).font = Font(bold=True)
+            ws.cell(cr, 3, "No").font = Font(bold=True)
+            if kg_m:
+                ws.cell(cr, 4, "Lgth(m)").font = Font(bold=True)
+                ws.cell(cr, 5, "Total(m)").font = Font(bold=True)
+            else:
+                ws.cell(cr, 4, ""); ws.cell(cr, 5, "")
+            ws.cell(cr, 6, "Wt(kg)").font = Font(bold=True)
             for col in range(1, 7):
-                ws.cell(current_row, col).fill = section_fill
-                ws.cell(current_row, col).border = border
-            current_row += 1
+                ws.cell(cr, col).fill = section_fill
+                ws.cell(cr, col).border = border
+            cr += 1
 
-            section_total_m = 0
-            for i, (desc, length, count_key) in enumerate(sec_data["rows"], 1):
-                count = counts.get(count_key, 0)
-                total_m = count * length if count else 0
-                section_total_m += total_m
+            is_wire = (kg_m == 0)  # wire sections show kg only
 
-                ws.cell(current_row, 1, i)
-                ws.cell(current_row, 2, desc)
-                ws.cell(current_row, 3, count if count else "")
-                ws.cell(current_row, 4, length)
-                ws.cell(current_row, 5, round(total_m, 3) if total_m else 0)
-                for col in range(1, 6):
-                    ws.cell(current_row, col).border = border
-                current_row += 1
+            subtotal_m  = 0.0
+            subtotal_kg = 0.0
+            for i, (desc, count, length_each, total_m, wt_kg) in enumerate(rows, 1):
+                ws.cell(cr, 1, i)
+                ws.cell(cr, 2, desc)
+                ws.cell(cr, 3, count if count else "")
+                if is_wire:
+                    ws.cell(cr, 4, "")
+                    ws.cell(cr, 5, "")
+                else:
+                    ws.cell(cr, 4, round(length_each, 2) if length_each else "")
+                    ws.cell(cr, 5, round(total_m, 3))
+                ws.cell(cr, 6, round(wt_kg, 2))
+                for col in range(1, 7):
+                    ws.cell(cr, col).border = border
+                subtotal_m  += total_m
+                subtotal_kg += wt_kg
+                cr += 1
 
-            # Section total row
-            total_kg = round(section_total_m * UW[sec_key], 2)
-            ws.cell(current_row, 2, "Total").font = Font(bold=True)
-            ws.cell(current_row, 5, round(section_total_m, 3)).font = Font(bold=True)
-            ws.cell(current_row, 6, total_kg).font = Font(bold=True)
+            if is_wire:
+                extra_kg = subtotal_kg * wastage_sag_pct
+                # Wastage row
+                ws.cell(cr, 1, len(rows) + 1)
+                ws.cell(cr, 2, "Add: Wastage + Sag @ 3%")
+                ws.cell(cr, 3, ""); ws.cell(cr, 4, ""); ws.cell(cr, 5, "")
+                ws.cell(cr, 6, round(extra_kg, 2))
+                for col in range(1, 7):
+                    ws.cell(cr, col).border = border
+                cr += 1
+                # Total row
+                ws.cell(cr, 2, "Total (incl. 3% wastage & sag)").font = Font(bold=True)
+                ws.cell(cr, 5, "")
+                ws.cell(cr, 6, round(subtotal_kg + extra_kg, 2)).font = Font(bold=True)
+            else:
+                base_kg  = subtotal_m * kg_m
+                extra_m  = subtotal_m * wastage_sag_pct
+                extra_kg = base_kg * wastage_sag_pct
+                # Wastage row
+                ws.cell(cr, 1, len(rows) + 1)
+                ws.cell(cr, 2, "Add: Wastage + Sag @ 3%")
+                ws.cell(cr, 3, ""); ws.cell(cr, 4, "")
+                ws.cell(cr, 5, round(extra_m, 3))
+                ws.cell(cr, 6, round(extra_kg, 2))
+                for col in range(1, 7):
+                    ws.cell(cr, col).border = border
+                cr += 1
+                # Total row
+                ws.cell(cr, 2, "Total (incl. 3% wastage & sag)").font = Font(bold=True)
+                ws.cell(cr, 5, round(subtotal_m + extra_m, 3)).font = Font(bold=True)
+                ws.cell(cr, 6, round(base_kg + extra_kg, 2)).font = Font(bold=True)
+
             for col in range(1, 7):
-                ws.cell(current_row, col).border = border
-                ws.cell(current_row, col).fill = PatternFill("solid", fgColor="EBF1DE")
-            current_row += 2  # gap between sections
+                ws.cell(cr, col).border = border
+                ws.cell(cr, col).fill = total_fill
+            cr += 2
 
-    def _collect_iron_counts(self):
+    def _collect_iron_detail(self):
         """
-        Walk the canvas and build count dict used by the Iron Breakup sheet.
+        Re-evaluate each steel rule per canvas item and return a
+        per-item_code list of (description, count, length_each, total_m, wt_kg)
+        rows suitable for the detailed Iron Breakup sheet.
+
+        Returns dict  { item_code: [(desc, count, len_each, tot_m, wt_kg), ...] }
         """
-        counts = {
-            "lt_sp": 0, "ht_sp": 0, "extensions": 0,
-            "dp_struct": 0, "tp_struct": 0, "fp_struct": 0,
-            "dtr": 0, "tee_off": 0, "cg_sp": 0, "cg_dp": 0,
-            "lt_sp_4w": 0, "cross_arm": 0, "consumers": 0,
+        import json as _json
+
+        # unit weights — same as rule_engine.calculate_qty
+        # 0 = wire (formula already gives MT, no m→kg conversion)
+        UW = {
+            "0102010611": 6.8,   # CH_75X40
+            "0102010911": 9.8,   # CH_100X50
+            "0101011311": 5.8,   # ANG_65X65X6
+            "0101011011": 4.5,   # ANG_50X50X6
+            "0103011511": 3.1,   # FLAT_65X6
+            "0503010811": 0,     # GI Wire 5mm (qty already MT)
+            "0503010711": 0,     # GI Wire 4mm (qty already MT)
         }
+
+        # Load rules
+        try:
+            with open("rules.json", "r") as f:
+                rules = _json.load(f)
+        except (FileNotFoundError, _json.JSONDecodeError):
+            rules = []
+
+        steel_rules = [
+            r for r in rules
+            if r.get("type") == "Material" and r.get("item_code") in UW
+        ]
+
+        use_uh       = self.project_meta.get("use_uh", False)
+        project_type = self.project_meta.get("project_type", "NSC")
+
+        # Accum: item_code → { (source_label, len_each) → [count, total_m, total_kg] }
+        accum: dict[str, dict[tuple, list]] = {code: {} for code in UW}
 
         for item in self.scene.items():
             if isinstance(item, SmartPole):
-                if item.is_existing:
-                    continue
-                if item.pole_type == "LT":
-                    counts["lt_sp"] += 1
-                elif item.pole_type == "HT":
-                    counts["ht_sp"] += 1
-                if item.has_extension:
-                    counts["extensions"] += 1
-
+                ctx = self.rule_engine._build_pole_context(item, use_uh, project_type)
             elif isinstance(item, SmartStructure):
-                if item.structure_type == "DP":
-                    counts["dp_struct"] += 1
-                elif item.structure_type == "TP":
-                    counts["tp_struct"] += 1
-                elif item.structure_type == "4P":
-                    counts["fp_struct"] += 1
-                elif item.structure_type == "DTR":
-                    counts["dtr"] += 1
-                if item.has_extension:
-                    counts["extensions"] += 1
-
+                ctx = self.rule_engine._build_structure_context(item, use_uh, project_type)
             elif isinstance(item, SmartSpan):
-                if item.is_existing_span:
-                    continue
-                if item.has_cg:
-                    # Determine if SP or DP based on connected structure
-                    is_dp = (
-                        isinstance(item.p1, SmartStructure) or
-                        isinstance(item.p2, SmartStructure)
-                    )
-                    if is_dp:
-                        counts["cg_dp"] += 1
-                    else:
-                        counts["cg_sp"] += 1
-
+                ctx = self.rule_engine._build_span_context(item, use_uh, project_type)
             elif isinstance(item, SmartConsumer):
-                counts["consumers"] += 1
+                ctx = self.rule_engine._build_consumer_context(item, use_uh, project_type)
+            else:
+                continue
 
-        return counts
+            obj_type = ctx.get("object_type", "")
+
+            for rule in steel_rules:
+                target = rule.get("object", "")
+                if target == "SmartHome" and obj_type == "SmartConsumer":
+                    pass
+                elif target != obj_type:
+                    continue
+
+                if not self.rule_engine.evaluate_rule(ctx, rule.get("condition", "")):
+                    continue
+
+                qty_mt = self.rule_engine.calculate_qty(ctx, rule.get("formula", "1"))
+                if qty_mt <= 0:
+                    continue
+
+                code = rule["item_code"]
+                kg_m  = UW[code]
+                wt_kg = qty_mt * 1000.0
+                tot_m = wt_kg / kg_m if kg_m else 0.0  # 0 for wire
+
+                # Build a human-readable source label
+                label, len_each = self._iron_source_label(ctx, rule, tot_m)
+
+                key = (label, len_each)
+                if key not in accum[code]:
+                    accum[code][key] = [0, 0.0, 0.0]
+                accum[code][key][0] += 1
+                accum[code][key][1] += tot_m
+                accum[code][key][2] += wt_kg
+
+        # Flatten to sorted list
+        result: dict[str, list] = {}
+        for code, entries in accum.items():
+            rows = []
+            for (label, len_each), (cnt, tot_m, wt_kg) in sorted(entries.items()):
+                rows.append((label, cnt, len_each, round(tot_m, 4), round(wt_kg, 4)))
+            if rows:
+                result[code] = rows
+
+        return result
+
+    @staticmethod
+    def _iron_source_label(ctx, rule, total_m):
+        """
+        Return (description_string, length_per_unit) for iron breakup row.
+        """
+        obj = ctx.get("object_type", "")
+        cond = rule.get("condition", "")
+
+        if obj == "SmartPole":
+            pole_type = ctx.get("pole_type", "")
+            is_existing = ctx.get("is_existing", False)
+            prefix = "Existing" if is_existing else "New"
+
+            if "has_extension" in cond:
+                ext_h = ctx.get("extension_height", 3.0)
+                formula = rule.get("formula", "")
+                if "FLAT" in formula:
+                    return (f"{prefix} {pole_type} Pole Extension Flat ({ext_h}m)", round(total_m, 2))
+                return (f"{prefix} {pole_type} Pole Extension ({ext_h}m)", round(total_m, 2))
+            elif "has_cg" in cond:
+                return ("Cradle Guard (CG) Bracket on Pole", 1.9 if "ANG" in rule.get("formula", "") else 0.5)
+            elif "lt_acsr_count" in cond:
+                return (f"LT Bracket on {prefix} LT Pole", 1.0)
+            elif "ht_spans_count" in cond:
+                return (f"Tee-off Bracket on {prefix} HT Pole", round(total_m, 2))
+            elif "earth_count" in cond:
+                ec = ctx.get("earth_count", 1)
+                return (f"Earthing on {prefix} {pole_type} Pole ({ec} nos)", round(total_m, 2))
+            else:
+                return (f"{prefix} {pole_type} Pole Iron", round(total_m, 2))
+
+        elif obj == "SmartStructure":
+            st = ctx.get("structure_type", "")
+            # Check earth_count first — applies to any structure type
+            if "earth_count" in cond:
+                ec = ctx.get("earth_count", 1)
+                return (f"Earthing on {st} Structure ({ec} nos)", round(total_m, 2))
+
+            if st == "DTR":
+                # Identify specific DTR component from formula
+                formula = rule.get("formula", "")
+                if "CH_75X40" in formula or "CH_100X50" in formula:
+                    return ("DTR Sub-Stn (Channel — Top + Isolator + Base + Bolt)", round(total_m, 2))
+                elif "ANG_65X65X6" in formula:
+                    return ("DTR Sub-Stn (Angle — Fuse + Switch + Support + FootRest)", round(total_m, 2))
+                elif "ANG_50X50X6" in formula:
+                    return ("DTR Sub-Stn (Angle 50 — Main Switch)", round(total_m, 2))
+                elif "FLAT_65X6" in formula:
+                    return ("DTR Sub-Stn (Flat — HT Clamp)", round(total_m, 2))
+                else:
+                    return (f"DTR Sub-Stn Iron", round(total_m, 2))
+            elif st == "DP":
+                formula = rule.get("formula", "")
+                if "CH_75X40" in formula:
+                    return ("DP Structure (Channel)", round(total_m, 2))
+                else:
+                    return ("DP Structure (Flat)", round(total_m, 2))
+            elif st == "TP":
+                formula = rule.get("formula", "")
+                if "CH_75X40" in formula:
+                    return ("TP Structure (Channel)", round(total_m, 2))
+                elif "ANG_65X65X6" in formula:
+                    return ("TP Structure (Angle)", round(total_m, 2))
+                else:
+                    return ("TP Structure (Flat)", round(total_m, 2))
+            elif st == "4P":
+                formula = rule.get("formula", "")
+                if "CH_75X40" in formula:
+                    return ("4P Structure (Channel)", round(total_m, 2))
+                elif "ANG_65X65X6" in formula:
+                    return ("4P Structure (Angle)", round(total_m, 2))
+                else:
+                    return ("4P Structure (Flat)", round(total_m, 2))
+            else:
+                return (f"{st} Structure Iron", round(total_m, 2))
+
+        elif obj == "SmartSpan":
+            formula = rule.get("formula", "")
+            if "0503010811" == rule.get("item_code") or "0503010711" == rule.get("item_code"):
+                length = ctx.get("length", 0)
+                return (f"CG Earthing Wire on Span ({length}m)", round(total_m, 2))
+            return ("AB Cable Span (Flat)", 0.5)
+
+        return ("Other Iron", round(total_m, 2))
 
     # =========================================================================
     #  PDF EXPORT
@@ -1791,31 +1903,17 @@ class EstimateApp(QMainWindow):
             Qt.AlignmentFlag.AlignTop |
             Qt.TextFlag.TextWordWrap
         )
-        calc_rect = QRectF(border.x() + 5, border.y(), border.width() - 10, 9999)
+        calc_rect = QRectF(border.x() + 5, border.y() + 4, border.width() - 10, 9999)
         req = painter.boundingRect(calc_rect, text_flags, title_text)
         title_h = req.height()
         painter.drawText(
-            QRectF(border.x(), border.y(), border.width(), title_h),
+            QRectF(border.x(), border.y() + 4, border.width(), title_h),
             text_flags, title_text
         )
 
-        # Project info line
-        painter.setFont(QFont("Arial", 8))
-        info_text = (
-            f"Type: {m.get('project_type','')}   |   "
-            f"Lat: {m.get('lat','')}   Long: {m.get('long','')}   |   "
-            f"Date: {datetime.now().strftime('%d-%m-%Y')}"
-        )
-        info_rect = QRectF(
-            border.x(), border.y() + title_h + 2,
-            border.width(), 14
-        )
-        painter.drawText(info_rect, Qt.AlignmentFlag.AlignCenter, info_text)
-        info_h = 16
-
         # Canvas render
         scene_target = QRectF(border)
-        scene_target.setTop(border.top() + title_h + info_h + 10)
+        scene_target.setTop(border.top() + title_h + 4 + 10)
         source_rect.adjust(-50, -50, 50, 50)
         self.scene.render(
             painter, scene_target, source_rect,
@@ -2074,9 +2172,10 @@ class EstimateApp(QMainWindow):
                     })
                 elif isinstance(item, SmartConsumer):
                     nd.update({
-                        "phase":         item.phase,
-                        "cable_size":    item.cable_size,
-                        "agency_supply": item.agency_supply,
+                        "phase":           item.phase,
+                        "cable_size":      item.cable_size,
+                        "agency_supply":   item.agency_supply,
+                        "consider_cable":  getattr(item, "consider_cable", False),
                     })
                 state["nodes"].append(nd)
 
@@ -2192,9 +2291,10 @@ class EstimateApp(QMainWindow):
                 consumer = SmartConsumer(
                     x, y, self.refresh_signal, detail_view=self.detail_view
                 )
-                consumer.phase         = nd.get("phase", "3 Phase")
-                consumer.cable_size    = nd.get("cable_size", "10 SQMM")
-                consumer.agency_supply = nd.get("agency_supply", False)
+                consumer.phase          = nd.get("phase", "3 Phase")
+                consumer.cable_size     = nd.get("cable_size", "10 SQMM")
+                consumer.agency_supply  = nd.get("agency_supply", False)
+                consumer.consider_cable = nd.get("consider_cable", False)
                 consumer.custom_note   = nd.get("custom_note", "")
                 consumer.update_visuals()
                 consumer.label.setPos(nd["label_x"], nd["label_y"])
