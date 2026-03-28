@@ -193,15 +193,7 @@
   },
   {
     "object": "SmartPole",
-    "condition": "earth_count > 0 and pole_type == 'LT'",
-    "type": "Material",
-    "item_code": "0503010711",
-    "item_name": "G.I. Wire 4 MM (8 SWG)",
-    "formula": "earth_count * 0.003"
-  },
-  {
-    "object": "SmartPole",
-    "condition": "earth_count > 0 and pole_type != 'LT'",
+    "condition": "earth_count > 0",
     "type": "Material",
     "item_code": "0503010811",
     "item_name": "G.I. Wire 5 MM (6 SWG)",
@@ -989,7 +981,7 @@
     "type": "Material",
     "item_code": "0503010811",
     "item_name": "G.I. Wire 5 MM (6 SWG)",
-    "formula": "(length * 2) / 1000"
+    "formula": "(length * 2 * 0.123) / 1000"
   },
   {
     "object": "SmartSpan",
@@ -997,7 +989,7 @@
     "type": "Material",
     "item_code": "0503010711",
     "item_name": "G.I. Wire 4 MM (8 SWG)",
-    "formula": "length / 1000"
+    "formula": "(length * 0.1) / 1000"
   },
   {
     "object": "SmartSpan",
@@ -1465,7 +1457,7 @@
   },
   {
     "object": "SmartPole",
-    "condition": "is_existing and existing_subtype == 'HT' and ht_spans_count > 0",
+    "condition": "is_existing and existing_subtype in ('HT', 'DTR', 'TP', '4P') and ht_spans_count > 0",
     "type": "Material",
     "item_code": "0508030541",
     "item_name": "11 KV Polymer Composite Disc Insulator 45KN",
@@ -1473,7 +1465,7 @@
   },
   {
     "object": "SmartPole",
-    "condition": "is_existing and existing_subtype == 'HT' and ht_spans_count > 0",
+    "condition": "is_existing and existing_subtype in ('HT', 'DTR', 'TP', '4P') and ht_spans_count > 0",
     "type": "Material",
     "item_code": "0504010132",
     "item_name": "Composite Hardware Fittings for ACSR Weasel/Rabbit (30/50SQMM)",
@@ -1481,7 +1473,7 @@
   },
   {
     "object": "SmartPole",
-    "condition": "is_existing and existing_subtype == 'HT' and ht_spans_count > 0",
+    "condition": "is_existing and existing_subtype in ('HT', 'DTR', 'TP', '4P') and ht_spans_count > 0",
     "type": "Labor",
     "item_code": "LAB-46",
     "item_name": "Fixing of 11KV Disc Insulator with Strain Hardware",

@@ -199,7 +199,7 @@ _SEED_LABOUR = [
 
     # ══ SUB-STATION STRUCTURE (DTR DP) ════════════════════════════════════════
     # CED/13 Sl.9 & ESTIMATE_FORMAT_2023
-    ("LAB-19", "Erection of S/S DP Structure 8MTR PCC Pole Without Painted", 10735.00, "NOS"),
+    ("LAB-19", "Erection of S/S DP Structure 8MTR PCC Pole Without Painted",  9875.00, "NOS"),
     ("LAB-20", "Erection of S/S DP Structure 9MTR PCC Pole Without Painted", 13169.00, "NOS"),
     ("LAB-21", "Erection of S/S 4P Structure 8MTR PCC Pole",         19872.00, "NOS"),
 
@@ -269,7 +269,7 @@ _SEED_LABOUR = [
     ("LAB-53", "Fixing of Solid Tee-off Bracket on Double Pole",       1483.00, "NOS"),
 
     # ══ KIOSK / DTR MISC ══════════════════════════════════════════════════════
-    ("LAB-54", "Fixing of LT Distribution KIOSK Single Switch",        2238.00, "NOS"),
+    ("LAB-54", "Fixing of LT Distribution KIOSK Single Switch",        2155.00, "NOS"),
     ("LAB-55", "Fixing of Neutral Earthing of DTR with G",             3816.00, "NOS"),
     ("LAB-56", "DTR Code Painting",                                       65.00, "NOS"),
 
