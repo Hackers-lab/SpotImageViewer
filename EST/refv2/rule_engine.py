@@ -171,9 +171,16 @@ class DynamicRuleEngine:
 
         # lt_acsr_count — number of LT ACSR spans connected to this pole
         # (used by LT bracket iron rules on SmartPole)
-        ctx["lt_acsr_count"] = sum(
-            1 for s in item.connected_spans
+        lt_acsr_spans = [
+            s for s in item.connected_spans
             if s.conductor == "ACSR" and getattr(s, "is_lt_span", False)
+        ]
+        ctx["lt_acsr_count"] = len(lt_acsr_spans)
+
+        # lt_wire_count — max wire count across LT ACSR spans (for UH D-Iron rule)
+        ctx["lt_wire_count"] = max(
+            (int(getattr(s, "wire_count", 0)) for s in lt_acsr_spans),
+            default=0
         )
 
         # AB cable context — distribution box / clamp / IPC rules

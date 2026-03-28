@@ -321,6 +321,46 @@
   },
   {
     "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'LT' and lt_acsr_count > 0 and use_uh",
+    "type": "Material",
+    "item_code": "195021741",
+    "item_name": "UH-LT BKT 4 WAY",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'LT' and lt_acsr_count > 0 and use_uh",
+    "type": "Material",
+    "item_code": "597011541",
+    "item_name": "UH-CLAMP FOR 8 MTR PCC POLE",
+    "formula": "4"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'LT' and lt_acsr_count > 0 and use_uh",
+    "type": "Material",
+    "item_code": "597011741",
+    "item_name": "UH-Diron Clump",
+    "formula": "int(lt_wire_count)"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'LT' and lt_acsr_count > 0 and use_uh",
+    "type": "Labor",
+    "item_code": "LAB-51",
+    "item_name": "Fixing of LT Bracket Without Painted",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'LT' and ab_cable_count > 0 and use_uh",
+    "type": "Material",
+    "item_code": "597011541",
+    "item_name": "UH-CLAMP FOR 8 MTR PCC POLE",
+    "formula": "2"
+  },
+  {
+    "object": "SmartPole",
     "condition": "is_existing and pole_type == 'HT' and ht_spans_count >= 3",
     "type": "Material",
     "item_code": "0102010611",
@@ -1137,55 +1177,15 @@
   },
   {
     "object": "SmartSpan",
-    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span and use_uh",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span",
     "type": "Material",
-    "item_code": "LOCAL-UH01",
-    "item_name": "UH-LT BKT 4 WAY",
-    "formula": "1"
-  },
-  {
-    "object": "SmartSpan",
-    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span and use_uh",
-    "type": "Material",
-    "item_code": "LOCAL-UH02",
-    "item_name": "UH-CLAMP FOR 8 MTR PCC POLE",
-    "formula": "4"
-  },
-  {
-    "object": "SmartSpan",
-    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span and use_uh",
-    "type": "Material",
-    "item_code": "LOCAL-UH03",
-    "item_name": "UH-Diron Clump",
+    "item_code": "0508040441",
+    "item_name": "Porcelain Shackle Insulator",
     "formula": "int(wire_count)"
   },
   {
     "object": "SmartSpan",
-    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span and use_uh",
-    "type": "Material",
-    "item_code": "LOCAL-UH04",
-    "item_name": "Porcelain Shackle Insulator 3x3.5\" (Shakle Insulator)",
-    "formula": "int(wire_count)"
-  },
-  {
-    "object": "SmartSpan",
-    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span and use_uh",
-    "type": "Labor",
-    "item_code": "LAB-47",
-    "item_name": "Fixing of LT Shackle Insulator with N/B",
-    "formula": "int(wire_count)"
-  },
-  {
-    "object": "SmartSpan",
-    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span and not use_uh",
-    "type": "Material",
-    "item_code": "LOCAL-SHK",
-    "item_name": "Porcelain Shackle Insulator 3x3.5\" (Shakle Insulator)",
-    "formula": "int(wire_count)"
-  },
-  {
-    "object": "SmartSpan",
-    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span and not use_uh",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span",
     "type": "Labor",
     "item_code": "LAB-47",
     "item_name": "Fixing of LT Shackle Insulator with N/B",

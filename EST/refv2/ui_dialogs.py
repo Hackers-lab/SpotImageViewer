@@ -156,13 +156,14 @@ class ProjectSetupDialog(QDialog):
         sep2.setStyleSheet("color:#ccc;")
         form.addRow(sep2)
 
-        # UH toggle
+        # UH toggle (NSC projects only)
         self._uh = QCheckBox(
             "Use UH (Readymade) Materials instead of Raw Steel"
         )
         self._uh.setStyleSheet("font-weight:bold; color:#107C41;")
         self._uh.setChecked(self._meta.get("use_uh", False))
         form.addRow(self._uh)
+        self._sync_uh_visibility(self._proj_type.currentText())
 
         root.addLayout(form)
 
@@ -187,6 +188,13 @@ class ProjectSetupDialog(QDialog):
         self._sup_lbl.setText(f"{int(rate * 100)}%")
         self._meta["project_type"]     = proj_type
         self._meta["supervision_rate"] = rate
+        self._sync_uh_visibility(proj_type)
+
+    def _sync_uh_visibility(self, proj_type: str):
+        is_nsc = proj_type == "NSC"
+        self._uh.setEnabled(is_nsc)
+        if not is_nsc:
+            self._uh.setChecked(False)
 
     def _on_accept(self):
         subj = self._subject.text().strip()

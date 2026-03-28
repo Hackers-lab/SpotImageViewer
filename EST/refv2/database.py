@@ -152,11 +152,13 @@ _SEED_MATERIALS = [
     ("0505030841", "Eye Hook for Anchor/Suspension Clamp",               100.67,  "NOS"),
     ("0504027141", "IPC for ABC to ABC TEE Joint",                       149.17,  "NOS"),
 
-    # ══ UH (READYMADE) MATERIALS — local codes, update when official available
-    ("LOCAL-UH01", "UH-LT BKT 4 WAY",                                   500.00,  "NOS"),
-    ("LOCAL-UH02", "UH-CLAMP FOR 8 MTR PCC POLE",                       150.00,  "NOS"),
-    ("LOCAL-UH03", "UH-Diron Clump",                                      40.00,  "NOS"),
-    ("LOCAL-UH04", "Porcelain Shackle Insulator 3x3.5\" (Shakle Insulator)", 19.41, "NOS"),
+    # ══ UH (READYMADE) MATERIALS ═══════════════════════════════════════════
+    ("195021741",  "UH-LT BKT 4 WAY",                                      0.00,  "NOS"),
+    ("597011541",  "UH-CLAMP FOR 8 MTR PCC POLE",                          0.00,  "NOS"),
+    ("597011741",  "UH-Diron Clump",                                        0.00,  "NOS"),
+
+    # ══ SHACKLE INSULATOR ═════════════════════════════════════════════════
+    ("0508040441", "Porcelain Shackle Insulator",                          23.34,  "NOS"),
 ]
 
 _SEED_LABOUR = [
@@ -315,7 +317,8 @@ _NEW_MATERIALS = [
                          "0301019041", "0301019141", "0301019341",
                          "0407010741", "0407010541",
                          "0504070341",
-                         "LOCAL-"))
+                         "195021741", "597011541", "597011741",
+                         "0508040441"))
 ]
 
 _NEW_LABOUR = [
