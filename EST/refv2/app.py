@@ -67,7 +67,7 @@ class EstimateApp(QMainWindow):
         super().__init__()
 
         # Expiry guard
-        if date.today() >= date(2027, 3, 31):
+        if date.today() >= date(2026, 4, 30):
             QMessageBox.critical(
                 self, "Application Expired",
                 "This version has expired. Please obtain the latest release."
@@ -1246,15 +1246,21 @@ class EstimateApp(QMainWindow):
             canvas_items, rules, use_uh, project_type
         )
 
-        # Apply 3% wastage + sag to steel material quantities
-        _STEEL_CODES = {
+        # Apply 3% wastage + sag to steel & conductor material quantities
+        _SAG_ITEMS = {
             "M.S Channel 75X40 mm", "M.S Angle 65X65X6mm",
             "M.S Angle 50X50X6mm", "M.S Flat 65X6 mm",
             "M.S Channel 100X50 mm",
             "G.I. Wire 5 MM (6 SWG)", "G.I. Wire 4 MM (8 SWG)",
+            "ACSR Conductor 50SQMM (Rabbit)",
+            "ACSR Conductor 30SQMM (Weasel)",
+            "CABLE (PVC 1.1KV GRADE) 4CORE X10SQMM",
+            "CABLE (PVC 1.1KV GRADE) 4CX16SQMM",
+            "CABLE (PVC 1.1KV GRADE) 4CX25SQMM",
+            "LT AB CABLE 1.1KV 3CX50+1CX16+1CX35SQMM",
         }
         for name in list(raw_bom):
-            if name in _STEEL_CODES:
+            if name in _SAG_ITEMS:
                 raw_bom[name] = raw_bom[name] * 1.03
 
         # Build live_bom_data
@@ -2404,6 +2410,8 @@ class EstimateApp(QMainWindow):
             <li><b>Praful Singh</b> — Visual improvements, PDF legend</li>
             <li><b>Rajsekhar Gorai</b> — 8mtr HT pole extension logic</li>
             <li><b>Amit Karmakar</b> — DTR properties, Lat/Long fields</li>
+            <li><b>Santanu Das</b> — Providing data, manuals, circulars for proper integration</li>
+            <li><b>Sourabh Jaiswal</b> — Suggesting HT LT restrictions</li>
         </ul>
         <p style='font-style:italic;'>Thanks to all who provided feedback!</p>
         """)
