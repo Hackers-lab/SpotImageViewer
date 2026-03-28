@@ -127,16 +127,6 @@ class ProjectSetupDialog(QDialog):
         ll_l.addWidget(self._long)
         form.addRow("Lat / Long:", ll_w)
 
-        # Division
-        self._division = QLineEdit(self._meta.get("division", ""))
-        self._division.setPlaceholderText("e.g. Bankura Division")
-        form.addRow("Division:", self._division)
-
-        # Circle
-        self._circle = QLineEdit(self._meta.get("circle", ""))
-        self._circle.setPlaceholderText("e.g. Bishnupur Circle")
-        form.addRow("Circle:", self._circle)
-
         # Separator
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
@@ -206,8 +196,6 @@ class ProjectSetupDialog(QDialog):
         self._meta["subject"]  = subj
         self._meta["lat"]      = self._lat.text().strip()
         self._meta["long"]     = self._long.text().strip()
-        self._meta["division"] = self._division.text().strip()
-        self._meta["circle"]   = self._circle.text().strip()
         self._meta["use_uh"]   = self._uh.isChecked()
         proj_type = self._proj_type.currentText()
         self._meta["project_type"]     = proj_type

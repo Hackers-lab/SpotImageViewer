@@ -30,7 +30,7 @@ from PyQt6.QtWidgets import (
     QFrame
 )
 from PyQt6.QtGui import QPen, QBrush, QColor, QPainter, QPageLayout, QFont
-from PyQt6.QtCore import Qt, QTimer, QRectF, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, QRectF, QPointF, pyqtSignal
 from PyQt6.QtPrintSupport import QPrinter
 
 from constants import TOOLS, PROJECT_TYPES, SUPERVISION_RATES
@@ -51,8 +51,6 @@ DEFAULT_PROJECT_META = {
     "subject":          "",
     "lat":              "",
     "long":             "",
-    "division":         "",
-    "circle":           "",
     "project_type":     "NSC",
     "use_uh":           False,
     "supervision_rate": 0.10,
@@ -100,9 +98,8 @@ class EstimateApp(QMainWindow):
         self.refresh_signal.connect(self.refresh_live_estimate)
         self.scene.selectionChanged.connect(self.on_selection_changed)
 
-        # ── Show project wizard, then load autosave ────────────────────────
+        # ── Load autosave ──────────────────────────────────────────────────
         self.set_tool("SELECT")
-        self._run_project_wizard(first_run=True)
         self.load_autosave()
 
     # =========================================================================
@@ -316,8 +313,7 @@ class EstimateApp(QMainWindow):
             f"📌 {m.get('subject','(no subject)')}   |   "
             f"Type: {m.get('project_type','NSC')}   |   "
             f"Sup: {sup_pct}%   |   "
-            f"Materials: {uh_txt}   |   "
-            f"Div: {m.get('division','-')}   Circle: {m.get('circle','-')}"
+            f"Materials: {uh_txt}"
         )
 
     # =========================================================================
@@ -416,7 +412,9 @@ class EstimateApp(QMainWindow):
                 # Warn on HT↔LT cross-connection
                 p1, p2 = self.span_start_pole, item_at
                 if (isinstance(p1, SmartPole) and isinstance(p2, SmartPole)):
-                    if (p1.pole_type == "HT") != (p2.pole_type == "HT"):
+                    eff1 = p1.existing_subtype if p1.is_existing else p1.pole_type
+                    eff2 = p2.existing_subtype if p2.is_existing else p2.pole_type
+                    if (eff1 == "HT") != (eff2 == "HT"):
                         ans = QMessageBox.question(
                             self, "Warning",
                             "Connect HT pole to LT pole?",
@@ -476,9 +474,32 @@ class EstimateApp(QMainWindow):
     # ── Pole editor ───────────────────────────────────────────────────────────
 
     def _build_pole_editor(self, item):
-        self.editor_group.setTitle(
-            f"{'Existing ' if item.is_existing else ''}{item.pole_type} Pole"
-        )
+        subtype = getattr(item, "existing_subtype", item.pole_type)
+        if item.is_existing:
+            self.editor_group.setTitle(f"Existing — {subtype}")
+        else:
+            self.editor_group.setTitle(f"{item.pole_type} Pole")
+
+        # Existing subtype picker — only shown for existing poles
+        if item.is_existing:
+            type_cb = QComboBox()
+            type_cb.addItems(["LT", "HT", "DP", "TP", "4P", "DTR"])
+            type_cb.setCurrentText(subtype)
+            type_cb.currentTextChanged.connect(
+                lambda t, i=item: self._update_existing_subtype(i, t)
+            )
+            self.editor_layout.addRow("Existing Type:", type_cb)
+
+            if subtype == "DTR":
+                dtr_cb = QComboBox()
+                dtr_cb.addItems(
+                    ["None", "10KVA", "16KVA", "25KVA", "63KVA", "100KVA", "160KVA"]
+                )
+                dtr_cb.setCurrentText(getattr(item, "existing_dtr_size", "None"))
+                dtr_cb.currentTextChanged.connect(
+                    lambda t, i=item: self._update_pole(i, "existing_dtr_size", t)
+                )
+                self.editor_layout.addRow("DTR Size:", dtr_cb)
 
         # Pole type 2 (material)
         pt2_cb = QComboBox()
@@ -549,6 +570,52 @@ class EstimateApp(QMainWindow):
         stay_w = QWidget()
         stay_w.setLayout(stay_row)
         self.editor_layout.addRow("Stay Sets:", stay_w)
+
+        # ── Stay angle rotation (manual override) ─────────────────────────
+        def _make_angle_row(label_text, angle_val, rotate_fn, reset_fn):
+            row_w   = QWidget()
+            row_lay = QHBoxLayout(row_w)
+            row_lay.setContentsMargins(0, 0, 0, 0)
+            row_lay.setSpacing(4)
+            angle_lbl = QLabel(f"{int(angle_val) if angle_val is not None else 'Auto'}°")
+            angle_lbl.setFixedWidth(40)
+            angle_lbl.setStyleSheet("color:#555; font-size:10px;")
+            ccw_btn = QPushButton("↺ −15°")
+            ccw_btn.setFixedWidth(55)
+            ccw_btn.setStyleSheet("font-size:10px; padding:2px;")
+            ccw_btn.clicked.connect(lambda _, fn=rotate_fn: fn(-15))
+            cw_btn  = QPushButton("↻ +15°")
+            cw_btn.setFixedWidth(55)
+            cw_btn.setStyleSheet("font-size:10px; padding:2px;")
+            cw_btn.clicked.connect(lambda _, fn=rotate_fn: fn(+15))
+            rst_btn = QPushButton("Auto")
+            rst_btn.setFixedWidth(40)
+            rst_btn.setStyleSheet("font-size:10px; padding:2px;")
+            rst_btn.clicked.connect(reset_fn)
+            row_lay.addWidget(angle_lbl)
+            row_lay.addWidget(ccw_btn)
+            row_lay.addWidget(cw_btn)
+            row_lay.addWidget(rst_btn)
+            return row_w
+
+        self.editor_layout.addRow(
+            "Stay dir.:",
+            _make_angle_row(
+                "Stay dir.",
+                item.stay_angle_override,
+                lambda delta, i=item: self._rotate_stay(i, delta),
+                lambda _, i=item: self._reset_stay_angle(i),
+            )
+        )
+        self.editor_layout.addRow(
+            "Earth dir.:",
+            _make_angle_row(
+                "Earth dir.",
+                item.earth_angle_override,
+                lambda delta, i=item: self._rotate_earth(i, delta),
+                lambda _, i=item: self._reset_earth_angle(i),
+            )
+        )
 
         # Note
         note = QLineEdit(getattr(item, "custom_note", ""))
@@ -843,6 +910,73 @@ class EstimateApp(QMainWindow):
     #  UPDATE CALLBACKS
     # =========================================================================
 
+    def _convert_node(self, item, target: str):
+        """Convert a SmartPole to a different type or to a SmartStructure."""
+        if target.startswith("—"):
+            return
+
+        x, y = item.x(), item.y()
+        spans = list(item.connected_spans)
+
+        structure_targets = {"DP Structure": "DP", "TP Structure": "TP",
+                             "4P Structure": "4P", "DTR": "DTR"}
+        pole_targets      = {"LT Pole": "LT", "HT Pole": "HT"}
+
+        if target in structure_targets:
+            # ── Pole → Structure ──────────────────────────────────────────
+            st = structure_targets[target]
+            new_item = SmartStructure(x, y, self.refresh_signal,
+                                     detail_view=self.detail_view)
+            new_item.structure_type = st
+            new_item.earth_count    = SmartStructure._EARTH_DEFAULTS.get(st, 2)
+            new_item.stay_count     = getattr(item, "stay_count", 4)
+            new_item.update_visuals()
+
+        elif target in pole_targets:
+            # ── Pole type change (LT↔HT or toggle existing) ───────────────
+            new_item = SmartPole(x, y, self.refresh_signal,
+                                 pole_type=pole_targets[target],
+                                 is_existing=item.is_existing,
+                                 detail_view=self.detail_view)
+            new_item.pole_type2       = item.pole_type2
+            new_item.height           = item.height
+            new_item.has_extension    = item.has_extension
+            new_item.extension_height = item.extension_height
+            new_item.earth_count      = item.earth_count
+            new_item.stay_count       = item.stay_count
+            new_item.override_auto_stay    = item.override_auto_stay
+            new_item.stay_angle_override   = item.stay_angle_override
+            new_item.earth_angle_override  = item.earth_angle_override
+            new_item.custom_note      = item.custom_note
+            new_item.update_visuals()
+        else:
+            return
+
+        # ── Re-wire spans ─────────────────────────────────────────────────
+        self.scene.addItem(new_item)
+        self.scene.addItem(new_item.label)
+        new_item.label.setPos(
+            -(new_item.label.boundingRect().width() / 2), 14
+        )
+
+        for span in spans:
+            if span.p1 is item:
+                span.p1 = new_item
+            if span.p2 is item:
+                span.p2 = new_item
+            new_item.connected_spans.append(span)
+            span.update_position()
+
+        # ── Remove old item ───────────────────────────────────────────────
+        self.scene.removeItem(item.label)
+        self.scene.removeItem(item)
+
+        # ── Select new item and refresh ───────────────────────────────────
+        self.scene.clearSelection()
+        new_item.setSelected(True)
+        self.refresh_live_estimate()
+        QTimer.singleShot(10, self.on_selection_changed)
+
     def _update_pole(self, item, prop, value):
         setattr(item, prop, value)
         item.update_visuals()
@@ -876,8 +1010,49 @@ class EstimateApp(QMainWindow):
         self.refresh_live_estimate()
         QTimer.singleShot(10, self.on_selection_changed)
 
+    def _rotate_stay(self, item, delta: float):
+        """Rotate stay symbol ±delta degrees; initialise from auto if not overridden."""
+        if item.stay_angle_override is None:
+            item.stay_angle_override = item._calc_stay_angle()
+        item.stay_angle_override = (item.stay_angle_override + delta) % 360
+        item.update_visuals()
+        self.refresh_live_estimate()
+        QTimer.singleShot(10, self.on_selection_changed)
+
+    def _reset_stay_angle(self, item):
+        """Clear stay angle override — revert to auto-calculated direction."""
+        item.stay_angle_override = None
+        item.update_visuals()
+        self.refresh_live_estimate()
+        QTimer.singleShot(10, self.on_selection_changed)
+
+    def _rotate_earth(self, item, delta: float):
+        """Rotate earth symbol ±delta degrees; initialise from auto if not overridden."""
+        if item.earth_angle_override is None:
+            auto_stay = (item.stay_angle_override
+                         if item.stay_angle_override is not None
+                         else item._calc_stay_angle())
+            item.earth_angle_override = (auto_stay + 180) % 360
+        item.earth_angle_override = (item.earth_angle_override + delta) % 360
+        item.update_visuals()
+        self.refresh_live_estimate()
+        QTimer.singleShot(10, self.on_selection_changed)
+
+    def _reset_earth_angle(self, item):
+        """Clear earth angle override — revert to auto (opposite of stay)."""
+        item.earth_angle_override = None
+        item.update_visuals()
+        self.refresh_live_estimate()
+        QTimer.singleShot(10, self.on_selection_changed)
+
     def _update_structure(self, item, prop, value):
         setattr(item, prop, value)
+        item.update_visuals()
+        self.refresh_live_estimate()
+        QTimer.singleShot(10, self.on_selection_changed)
+
+    def _update_existing_subtype(self, item, value):
+        item.existing_subtype = value
         item.update_visuals()
         self.refresh_live_estimate()
         QTimer.singleShot(10, self.on_selection_changed)
@@ -1262,7 +1437,6 @@ class EstimateApp(QMainWindow):
         ws["A2"] = (
             f"Subject: {m.get('subject','')}  |  "
             f"Type: {m.get('project_type','')}  |  "
-            f"Div: {m.get('division','')}  Circle: {m.get('circle','')}  |  "
             f"Date: {datetime.now().strftime('%d-%m-%Y')}"
         )
         ws.merge_cells("A3:G3")
@@ -1587,9 +1761,24 @@ class EstimateApp(QMainWindow):
             printer.setPageOrientation(QPageLayout.Orientation.Portrait)
 
         painter = QPainter(printer)
-        page_rect = printer.pageRect(QPrinter.Unit.DevicePixel)
-        margin    = 10
-        border    = page_rect.adjusted(margin, margin, -margin, -margin)
+        # Use paperRect (full sheet) with per-side manual margins.
+        # Adjust these four values until all sides look equal in the PDF.
+        paper_rect    = printer.paperRect(QPrinter.Unit.DevicePixel)
+        margin_top    = 7
+        margin_bottom = 28
+        margin_left   = 7
+        margin_right  = 28
+        border = QRectF(
+            paper_rect.left()   + margin_left,
+            paper_rect.top()    + margin_top,
+            paper_rect.width()  - margin_left  - margin_right,
+            paper_rect.height() - margin_top   - margin_bottom,
+        )
+
+        # Light page border — drawn first so everything sits on top
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(QColor(180, 180, 180), 1.0))
+        painter.drawRect(border)
 
         # Title
         title_font = QFont("Arial", 12, QFont.Weight.Bold)
@@ -1614,7 +1803,6 @@ class EstimateApp(QMainWindow):
         painter.setFont(QFont("Arial", 8))
         info_text = (
             f"Type: {m.get('project_type','')}   |   "
-            f"Div: {m.get('division','')}   Circle: {m.get('circle','')}   |   "
             f"Lat: {m.get('lat','')}   Long: {m.get('long','')}   |   "
             f"Date: {datetime.now().strftime('%d-%m-%Y')}"
         )
@@ -1644,14 +1832,20 @@ class EstimateApp(QMainWindow):
         legend_data = {
             "New LT Pole":      {"s": "🔵", "q": 0},
             "New HT Pole":      {"s": "🔴", "q": 0},
-            "New Structure":    {"s": "🟩", "q": 0},
+            "DP Structure":     {"s": "🟩", "q": 0},
+            "TP Structure":     {"s": "🟩", "q": 0},
+            "4P Structure":     {"s": "🟩", "q": 0},
+            "DTR":              {"s": "🟠", "q": 0},
             "Existing Pole":    {"s": "⚪", "q": 0},
+            "Extension":        {"s": "[E]", "q": 0},
             "Consumer":         {"s": "🏠", "q": 0},
             "Earthing":         {"s": "⏚",  "q": 0},
-            "Stay":             {"s": "S",   "q": 0},
+            "Stay":             {"s": "S→",  "q": 0},
+            "CG (SP)":          {"s": "[CG]", "q": 0},
+            "CG (DP)":          {"s": "[CG]", "q": 0},
             "New ACSR":         {"s": "---",  "l": 0},
-            "New ABC":          {"s": "~~~",  "l": 0},
-            "New PVC":          {"s": "...",  "l": 0},
+            "New AB Cable":     {"s": "~~~",  "l": 0},
+            "New PVC Cable":    {"s": "...",  "l": 0},
             "Existing Span":    {"s": "———",  "l": 0},
             "Service Drop":     {"s": "--s",  "l": 0},
         }
@@ -1660,6 +1854,8 @@ class EstimateApp(QMainWindow):
             if isinstance(item, SmartPole):
                 legend_data["Earthing"]["q"] += item.earth_count
                 legend_data["Stay"]["q"]     += item.stay_count
+                if item.has_extension:
+                    legend_data["Extension"]["q"] += 1
                 if item.is_existing:
                     legend_data["Existing Pole"]["q"] += 1
                 elif item.pole_type == "LT":
@@ -1667,12 +1863,19 @@ class EstimateApp(QMainWindow):
                 else:
                     legend_data["New HT Pole"]["q"] += 1
             elif isinstance(item, SmartStructure):
-                legend_data["New Structure"]["q"] += 1
+                st_key = item.structure_type if item.structure_type == "DTR" else f"{item.structure_type} Structure"
+                if st_key in legend_data:
+                    legend_data[st_key]["q"] += 1
                 legend_data["Earthing"]["q"]      += item.earth_count
                 legend_data["Stay"]["q"]          += item.stay_count
+                if item.has_extension:
+                    legend_data["Extension"]["q"] += 1
             elif isinstance(item, SmartConsumer):
                 legend_data["Consumer"]["q"] += 1
             elif isinstance(item, SmartSpan):
+                if item.has_cg:
+                    is_dp = isinstance(item.p1, SmartStructure) or isinstance(item.p2, SmartStructure)
+                    legend_data["CG (DP)" if is_dp else "CG (SP)"]["q"] += 1
                 key = "Service Drop" if item.is_service_drop else (
                     "Existing Span" if item.is_existing_span else
                     f"New {item.conductor}"
@@ -1688,56 +1891,128 @@ class EstimateApp(QMainWindow):
             q = d.get("q", 0)
             l = d.get("l", 0)
             if q > 0 or l > 0:
-                val = str(q) if "q" in d else f"{l}m"
+                val = str(q) if "q" in d else f"{int(l)}m"
                 used.append({"desc": desc, "sym": d["s"], "val": val})
 
         if not used:
             return
 
-        col_widths = {"sl": 30, "sym": 40, "desc": 120, "qty": 50}
-        table_w    = sum(col_widths.values())
-        row_h      = 18
-        table_h    = (len(used) + 1) * row_h
-        ll_h       = 22
+        # ── Layout constants ──────────────────────────────────────────────
+        # Two side-by-side mini-tables to halve the vertical footprint.
+        # Each half: sym(22) + desc(90) + qty(36) = 148px wide, plus sl(20)
+        cw  = {"sl": 18, "sym": 22, "desc": 90, "qty": 34}   # per-column widths
+        ckeys = list(cw.keys())
+        half_w  = sum(cw.values())          # width of one sub-table
+        gap     = 6                          # gap between the two sub-tables
+        total_w = half_w * 2 + gap
 
-        leg_rect = QRectF(
-            border.left() + 5,
-            border.bottom() - table_h - ll_h - 5,
-            table_w,
-            table_h + ll_h
-        )
-        painter.setBrush(QBrush(QColor(255, 255, 255, 220)))
-        painter.setPen(QPen(QColor(200, 200, 200), 0.5))
+        row_h  = 14
+        hdr_h  = 15
+        ll_h   = 16
+
+        # Split entries into two columns (left half / right half)
+        mid      = (len(used) + 1) // 2
+        left_col  = used[:mid]
+        right_col = used[mid:]
+        rows     = max(len(left_col), len(right_col))
+        total_h  = hdr_h + rows * row_h + ll_h
+
+        # Anchor bottom-right inside the page border
+        leg_left = border.right() - total_w - 5
+        leg_top  = border.bottom() - total_h - 5
+        leg_rect = QRectF(leg_left, leg_top, total_w, total_h)
+
+        painter.save()
+        painter.setOpacity(0.82)            # semi-transparent
+
+        # Background
+        painter.setBrush(QBrush(QColor(255, 255, 255, 210)))
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRect(leg_rect)
+        painter.setOpacity(1.0)             # restore for text/lines
+
+        grid_pen   = QPen(QColor(170, 170, 170), 0.4)
+        border_pen = QPen(Qt.GlobalColor.black, 0.7)
+
+        def _sub_table(entries, left_x, number_offset):
+            """Draw one half-table at left_x, starting index at number_offset."""
+            cy = leg_top
+
+            # Header
+            painter.setBrush(QBrush(QColor(200, 200, 200, 200)))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRect(QRectF(left_x, cy, half_w, hdr_h))
+            painter.setPen(QPen(Qt.GlobalColor.black))
+            painter.setFont(QFont("Arial", 6, QFont.Weight.Bold))
+            cx = left_x
+            for k in ckeys:
+                lbl = {"sl": "#", "sym": "Sym", "desc": "Description", "qty": "Qty"}[k]
+                painter.drawText(QRectF(cx, cy, cw[k], hdr_h),
+                                 Qt.AlignmentFlag.AlignCenter, lbl)
+                cx += cw[k]
+            cy += hdr_h
+
+            # Header bottom line
+            painter.setPen(border_pen)
+            painter.drawLine(QPointF(left_x, cy), QPointF(left_x + half_w, cy))
+
+            # Column separators (full height)
+            painter.setPen(grid_pen)
+            sx = left_x
+            for k in ckeys[:-1]:
+                sx += cw[k]
+                painter.drawLine(QPointF(sx, leg_top), QPointF(sx, leg_top + total_h - ll_h))
+
+            # Data rows
+            painter.setFont(QFont("Arial", 6))
+            for i, entry in enumerate(entries):
+                bg = QColor(248, 248, 248, 200) if i % 2 == 0 else QColor(255, 255, 255, 180)
+                painter.setBrush(QBrush(bg))
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.drawRect(QRectF(left_x, cy, half_w, row_h))
+                painter.setPen(QPen(Qt.GlobalColor.black))
+                cx = left_x
+                painter.drawText(QRectF(cx, cy, cw["sl"], row_h),
+                                 Qt.AlignmentFlag.AlignCenter, str(i + 1 + number_offset))
+                cx += cw["sl"]
+                painter.drawText(QRectF(cx, cy, cw["sym"], row_h),
+                                 Qt.AlignmentFlag.AlignCenter, entry["sym"])
+                cx += cw["sym"]
+                painter.drawText(QRectF(cx + 2, cy, cw["desc"] - 2, row_h),
+                                 Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+                                 entry["desc"])
+                cx += cw["desc"]
+                painter.drawText(QRectF(cx, cy, cw["qty"], row_h),
+                                 Qt.AlignmentFlag.AlignCenter, entry["val"])
+                cy += row_h
+                painter.setPen(grid_pen)
+                painter.drawLine(QPointF(left_x, cy), QPointF(left_x + half_w, cy))
+
+            # Outer border for this sub-table
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(border_pen)
+            painter.drawRect(QRectF(left_x, leg_top, half_w, total_h - ll_h))
+
+        _sub_table(left_col,  leg_left,            0)
+        _sub_table(right_col, leg_left + half_w + gap, len(left_col))
+
+        # ── Footer (coordinates) — full-width ────────────────────────────
+        cy = leg_top + total_h - ll_h
+        painter.setBrush(QBrush(QColor(220, 220, 220, 200)))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRect(QRectF(leg_left, cy, total_w, ll_h))
         painter.setPen(QPen(Qt.GlobalColor.black))
-
-        cy = leg_rect.top()
-        painter.setFont(QFont("Arial", 8, QFont.Weight.Bold))
-        cx = leg_rect.left()
-        for key, w in col_widths.items():
-            lbl = {"sl": "Sl", "sym": "Symbol", "desc": "Description", "qty": "Qty/Len"}[key]
-            painter.drawText(QRectF(cx, cy, w, row_h), Qt.AlignmentFlag.AlignCenter, lbl)
-            cx += w
-        cy += row_h
-
-        painter.setFont(QFont("Arial", 8))
-        for i, entry in enumerate(used):
-            cx = leg_rect.left()
-            painter.drawText(QRectF(cx, cy, col_widths["sl"], row_h), Qt.AlignmentFlag.AlignCenter, str(i+1))
-            cx += col_widths["sl"]
-            painter.drawText(QRectF(cx, cy, col_widths["sym"], row_h), Qt.AlignmentFlag.AlignCenter, entry["sym"])
-            cx += col_widths["sym"]
-            painter.drawText(QRectF(cx+3, cy, col_widths["desc"]-3, row_h), Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, entry["desc"])
-            cx += col_widths["desc"]
-            painter.drawText(QRectF(cx, cy, col_widths["qty"], row_h), Qt.AlignmentFlag.AlignCenter, entry["val"])
-            cy += row_h
-
-        painter.setFont(QFont("Arial", 7, QFont.Weight.Normal, True))
+        painter.setFont(QFont("Arial", 6, QFont.Weight.Normal, True))
         painter.drawText(
-            QRectF(leg_rect.left(), cy, table_w, ll_h),
+            QRectF(leg_left, cy, total_w, ll_h),
             Qt.AlignmentFlag.AlignCenter,
-            f"Lat: {self.project_meta.get('lat','')}   Long: {self.project_meta.get('long','')}"
+            f"Lat: {self.project_meta.get('lat', '')}   Long: {self.project_meta.get('long', '')}"
         )
+        # Final outer border
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(border_pen)
+        painter.drawRect(leg_rect)
+        painter.restore()
 
     # =========================================================================
     #  SAVE / LOAD / AUTOSAVE
@@ -1775,12 +2050,16 @@ class EstimateApp(QMainWindow):
                         "pole_type":         item.pole_type,
                         "pole_type2":        item.pole_type2,
                         "is_existing":       item.is_existing,
+                        "existing_subtype":   item.existing_subtype,
+                        "existing_dtr_size":  getattr(item, "existing_dtr_size", "None"),
                         "height":            item.height,
                         "has_extension":     item.has_extension,
                         "extension_height":  item.extension_height,
-                        "earth_count":       item.earth_count,
-                        "stay_count":        item.stay_count,
-                        "override_auto_stay": item.override_auto_stay,
+                        "earth_count":        item.earth_count,
+                        "stay_count":         item.stay_count,
+                        "override_auto_stay":  item.override_auto_stay,
+                        "stay_angle_override":  item.stay_angle_override,
+                        "earth_angle_override": item.earth_angle_override,
                     })
                 elif isinstance(item, SmartStructure):
                     nd.update({
@@ -1876,10 +2155,14 @@ class EstimateApp(QMainWindow):
                     pole.height           = nd.get("height", "8MTR")
                     pole.has_extension    = nd.get("has_extension", False)
                     pole.extension_height = nd.get("extension_height", 3.0)
-                    pole.earth_count      = nd.get("earth_count", 1)
-                    pole.stay_count       = nd.get("stay_count", 0)
-                    pole.override_auto_stay = nd.get("override_auto_stay", False)
-                    pole.custom_note      = nd.get("custom_note", "")
+                    pole.earth_count          = nd.get("earth_count", 1)
+                    pole.stay_count            = nd.get("stay_count", 0)
+                    pole.override_auto_stay    = nd.get("override_auto_stay", False)
+                    pole.stay_angle_override   = nd.get("stay_angle_override", None)
+                    pole.earth_angle_override  = nd.get("earth_angle_override", None)
+                    pole.custom_note           = nd.get("custom_note", "")
+                    pole.existing_subtype      = nd.get("existing_subtype", nd.get("pole_type", "LT"))
+                    pole.existing_dtr_size     = nd.get("existing_dtr_size", "None")
                     pole.update_visuals()
                     pole.label.setPos(nd["label_x"], nd["label_y"])
                     pole.label.setPlainText(nd["label_text"])
@@ -1958,7 +2241,7 @@ class EstimateApp(QMainWindow):
             self.scene.clear()
             self.span_start_pole = None
             self.bom_overrides.clear()
-            self._run_project_wizard(first_run=True)
+            self.refresh_live_estimate()
 
     def load_from_file(self):
         filename, _ = QFileDialog.getOpenFileName(
@@ -2033,5 +2316,5 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     win = EstimateApp()
-    win.show()
+    win.showMaximized()
     sys.exit(app.exec())

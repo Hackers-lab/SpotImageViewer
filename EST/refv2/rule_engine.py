@@ -126,6 +126,8 @@ class DynamicRuleEngine:
             "pole_type":        item.pole_type,
             "pole_type2":       item.pole_type2,
             "is_existing":      item.is_existing,
+            "existing_subtype": getattr(item, "existing_subtype", item.pole_type),
+            "existing_dtr_size": getattr(item, "existing_dtr_size", "None"),
             "height":           self._height_int(item.height),
             "has_extension":    item.has_extension,
             "extension_height": item.extension_height,
