@@ -141,14 +141,12 @@ class ProjectSetupDialog(QDialog):
             self._proj_type.setCurrentText(current_type)
         else:
             self._proj_type.setCurrentText("NSC")
-        self._proj_type.currentTextChanged.connect(self._on_type_changed)
         form.addRow("Project Type:", self._proj_type)
 
         # Supervision rate display (read-only)
         self._sup_lbl = QLabel()
         self._sup_lbl.setStyleSheet("color:#27ae60; font-weight:bold;")
         form.addRow("Supervision Rate:", self._sup_lbl)
-        self._on_type_changed(self._proj_type.currentText())
 
         # Separator
         sep2 = QFrame()
@@ -163,7 +161,10 @@ class ProjectSetupDialog(QDialog):
         self._uh.setStyleSheet("font-weight:bold; color:#107C41;")
         self._uh.setChecked(self._meta.get("use_uh", False))
         form.addRow(self._uh)
-        self._sync_uh_visibility(self._proj_type.currentText())
+
+        # Now connect signal & trigger initial sync (after _uh exists)
+        self._proj_type.currentTextChanged.connect(self._on_type_changed)
+        self._on_type_changed(self._proj_type.currentText())
 
         root.addLayout(form)
 
