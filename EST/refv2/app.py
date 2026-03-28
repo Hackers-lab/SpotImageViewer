@@ -31,7 +31,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import (
     QPen, QBrush, QColor, QPainter, QPageLayout, QFont,
-    QAction, QKeySequence
+    QAction, QKeySequence, QIcon, QPixmap
 )
 from PyQt6.QtCore import Qt, QTimer, QRectF, QPointF, pyqtSignal
 from PyQt6.QtPrintSupport import QPrinter
@@ -45,6 +45,18 @@ from ui_dialogs import (
     SearchDialog, SettingsDialog, DatabaseManagerDialog,
     RulesetManagerDialog, ProjectSetupDialog
 )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  RESOURCE PATH HELPER (PyInstaller-compatible)
+# ─────────────────────────────────────────────────────────────────────────────
+def resource_path(relative_path):
+    """Return absolute path to a bundled resource, works for dev and PyInstaller."""
+    if getattr(sys, 'frozen', False):
+        base = os.path.dirname(sys.executable)
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, relative_path)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -95,6 +107,9 @@ class EstimateApp(QMainWindow):
         # ── Build UI ───────────────────────────────────────────────────────
         self.setWindowTitle("ERP Estimate Generator — v5.0")
         self.setGeometry(50, 50, 1650, 930)
+        logo_path = resource_path("logo.svg")
+        if os.path.exists(logo_path):
+            self.setWindowIcon(QIcon(logo_path))
         self._build_menu_bar()
         self._build_ui()
 
@@ -2427,7 +2442,13 @@ class EstimateApp(QMainWindow):
     # =========================================================================
 
     def show_about_dialog(self):
-        QMessageBox.information(self, "About", """
+        dlg = QMessageBox(self)
+        dlg.setWindowTitle("About")
+        logo_path = resource_path("logo.svg")
+        if os.path.exists(logo_path):
+            pix = QPixmap(logo_path).scaled(96, 96, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            dlg.setIconPixmap(pix)
+        dlg.setText("""
         <h2>ERP Estimate Generator v5.0</h2>
         <p>Interactive electrical network estimation tool for WBSEDCL projects.</p>
         <ul>
@@ -2439,6 +2460,7 @@ class EstimateApp(QMainWindow):
         </ul>
         <p><b>Developed by: Pramod Verma</b></p>
         """)
+        dlg.exec()
 
     def show_credits(self):
         QMessageBox.information(self, "Credits", """
@@ -2454,7 +2476,7 @@ class EstimateApp(QMainWindow):
         """)
 
     def show_help(self):
-        help_path = os.path.join(os.path.dirname(__file__), "HELP.html")
+        help_path = resource_path("HELP.html")
         if os.path.exists(help_path):
             with open(help_path, "r", encoding="utf-8") as f:
                 html = f.read()

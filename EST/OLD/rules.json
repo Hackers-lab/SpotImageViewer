@@ -1,0 +1,882 @@
+[
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'LT'",
+    "type": "Material",
+    "item_code": "110030141",
+    "item_name": "P C C POLE:8 Mtrs.Long",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'LT'",
+    "type": "Labor",
+    "item_code": "LAB-01",
+    "item_name": "Erection of . 8mtr  PCC Pole ( LT)",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'LT'",
+    "type": "Labor",
+    "item_code": "LAB-24",
+    "item_name": "Pole GIS survey",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'HT' and height == 8",
+    "type": "Material",
+    "item_code": "110030141",
+    "item_name": "P C C POLE:8 Mtrs.Long",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'HT' and height == 8",
+    "type": "Labor",
+    "item_code": "LAB-02",
+    "item_name": "Erection of . 8mtr  PCC Pole (HT)",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'HT' and height == 9",
+    "type": "Material",
+    "item_code": "110030241",
+    "item_name": "P C C POLE:9 Mtrs.Long",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'HT' and height == 9",
+    "type": "Labor",
+    "item_code": "LAB-04",
+    "item_name": "Erection of . 9mtr  PCC Pole (HT) Without Painted",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'HT'",
+    "type": "Labor",
+    "item_code": "LAB-24",
+    "item_name": "Pole GIS survey",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'HT' and height == 8 and has_extension",
+    "type": "Material",
+    "item_code": "102010611",
+    "item_name": "M.S Channel 75X40 mm",
+    "formula": "6.0 * 7.5 / 1000"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'HT' and height == 8 and has_extension",
+    "type": "Material",
+    "item_code": "103011511",
+    "item_name": "M.S Flat 65X6 mm",
+    "formula": "3.0 * 3.5 / 1000"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'HT' and height == 8 and has_extension",
+    "type": "Labor",
+    "item_code": "LAB-19",
+    "item_name": "Extension of 8 mtr PCC Pole (Without Painted)HT",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type != 'LT'",
+    "type": "Material",
+    "item_code": "910010241",
+    "item_name": "Caution Board-11KVA",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type != 'LT'",
+    "type": "Labor",
+    "item_code": "LAB-22",
+    "item_name": "Fixing of Caution Board",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "earth_count > 0",
+    "type": "Material",
+    "item_code": "504110541",
+    "item_name": "G.I. Earth Spike 6*3.25ft",
+    "formula": "earth_count"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "earth_count > 0 and pole_type == 'LT'",
+    "type": "Material",
+    "item_code": "503010711",
+    "item_name": "G.I. 8 SWG Wire (4mm)",
+    "formula": "earth_count * 0.003"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "earth_count > 0 and pole_type != 'LT'",
+    "type": "Material",
+    "item_code": "503010811",
+    "item_name": "G.I. 6 SWG Wire (5mm)",
+    "formula": "earth_count * 0.003"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "earth_count > 0",
+    "type": "Labor",
+    "item_code": "LAB-16",
+    "item_name": "Earthing Complete",
+    "formula": "earth_count"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "stay_count > 0 and pole_type == 'LT'",
+    "type": "Material",
+    "item_code": "504130332",
+    "item_name": "LT Stay set",
+    "formula": "stay_count"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "stay_count > 0 and pole_type == 'LT'",
+    "type": "Material",
+    "item_code": "503050611",
+    "item_name": "GI STAY WIRE 7/12 SWG",
+    "formula": "stay_count * 0.004"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "stay_count > 0 and pole_type == 'LT'",
+    "type": "Material",
+    "item_code": "508040741",
+    "item_name": "LT Guy Insulator",
+    "formula": "stay_count"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "stay_count > 0 and pole_type == 'LT'",
+    "type": "Labor",
+    "item_code": "LAB-15",
+    "item_name": "LT Stay set complete",
+    "formula": "stay_count"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "stay_count > 0 and pole_type != 'LT'",
+    "type": "Material",
+    "item_code": "504130432",
+    "item_name": "H.T. Stay Set Complete",
+    "formula": "stay_count"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "stay_count > 0 and pole_type != 'LT'",
+    "type": "Material",
+    "item_code": "503050711",
+    "item_name": "G.I. Stay Wire 7/3..15MM 10 SWG(HT)",
+    "formula": "stay_count * 0.006"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "stay_count > 0 and pole_type != 'LT'",
+    "type": "Material",
+    "item_code": "508040841",
+    "item_name": "H.T. Guy Insulator 11KV",
+    "formula": "stay_count"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "stay_count > 0 and pole_type != 'LT'",
+    "type": "Labor",
+    "item_code": "LAB-14",
+    "item_name": "H.T. Stay Set Complete Labor",
+    "formula": "stay_count"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "has_cg and pole_type != 'DTR'",
+    "type": "Material",
+    "item_code": "101011311",
+    "item_name": "M.S Angle 65X65X6mm",
+    "formula": "(1.9 * 6.5) / 1000"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "has_cg and pole_type != 'DTR'",
+    "type": "Material",
+    "item_code": "103011511",
+    "item_name": "M.S Flat 65X6 mm",
+    "formula": "(0.5 * 3.5) / 1000"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "has_cg and pole_type != 'DTR'",
+    "type": "Labor",
+    "item_code": "LAB-17",
+    "item_name": "Fabrication & Fixing  of Cattle Guard Bracket (SP)",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'HT' and ht_spans_count <= 2",
+    "type": "Material",
+    "item_code": "508030541",
+    "item_name": "11 KV Polymer Disc Insulator 45KN",
+    "formula": "3"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'HT' and ht_spans_count <= 2",
+    "type": "Material",
+    "item_code": "504010132",
+    "item_name": "Hardware fittings 11KV",
+    "formula": "3"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'HT' and ht_spans_count <= 2",
+    "type": "Labor",
+    "item_code": "LAB-26",
+    "item_name": "Fixing of 11 KV Disc Insulator",
+    "formula": "3"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'HT' and ht_spans_count <= 2",
+    "type": "Material",
+    "item_code": "102010611",
+    "item_name": "M.S Channel 75X40 mm",
+    "formula": "1.8 * 7.5 / 1000"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'HT' and ht_spans_count >= 3",
+    "type": "Material",
+    "item_code": "508030541",
+    "item_name": "11 KV Polymer Disc Insulator 45KN",
+    "formula": "3"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'HT' and ht_spans_count >= 3",
+    "type": "Material",
+    "item_code": "504010132",
+    "item_name": "Hardware fittings 11KV",
+    "formula": "3"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'HT' and ht_spans_count >= 3",
+    "type": "Labor",
+    "item_code": "LAB-26",
+    "item_name": "Fixing of 11 KV Disc Insulator",
+    "formula": "3"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'HT' and ht_spans_count >= 3",
+    "type": "Material",
+    "item_code": "102010611",
+    "item_name": "M.S Channel 75X40 mm",
+    "formula": "2.0 * 7.5 / 1000"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'HT' and ht_spans_count >= 3",
+    "type": "Material",
+    "item_code": "103011511",
+    "item_name": "M.S Flat 65X6 mm",
+    "formula": "1.5 * 3.5 / 1000"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'HT' and ht_spans_count >= 3",
+    "type": "Labor",
+    "item_code": "LAB-36",
+    "item_name": "Fixing of Solid Tee-off Bracket on S.P",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size == '25KVA'",
+    "type": "Material",
+    "item_code": "301018141",
+    "item_name": "Dist. Transformer 25KVA",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Labor",
+    "item_code": "LAB-10",
+    "item_name": "Erection of 25 KVA Transformer",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Labor",
+    "item_code": "LAB-38",
+    "item_name": "DTR Code Painting",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None' and height == 8",
+    "type": "Labor",
+    "item_code": "LAB-05",
+    "item_name": "Erection of S/S D.P. Structure  (8 mtr without Painted)",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None' and height == 9",
+    "type": "Labor",
+    "item_code": "LAB-07",
+    "item_name": "Sub-Stationn Str with 9 Mtr PCC pole DP Without Painted",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Material",
+    "item_code": "102010611",
+    "item_name": "M.S Channel 75X40 mm",
+    "formula": "(14.5 * 7.5) / 1000"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Material",
+    "item_code": "101011311",
+    "item_name": "M.S Angle 65X65X6mm",
+    "formula": "(12.25 * 6.5) / 1000"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Material",
+    "item_code": "103011511",
+    "item_name": "M.S Flat 65X6 mm",
+    "formula": "(14.0 * 3.5) / 1000"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Material",
+    "item_code": "508030541",
+    "item_name": "11 KV Polymer Disc Insulator 45KN",
+    "formula": "3"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Material",
+    "item_code": "504010132",
+    "item_name": "Hardware fittings 11KV",
+    "formula": "3"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Labor",
+    "item_code": "LAB-26",
+    "item_name": "Fixing of 11 KV Disc Insulator",
+    "formula": "3"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Material",
+    "item_code": "508011141",
+    "item_name": "11 KV Polymer Pin Insulator 45KN",
+    "formula": "9"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Labor",
+    "item_code": "LAB-25",
+    "item_name": "Fixing of 11 KV Pin Insulator",
+    "formula": "9"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Material",
+    "item_code": "502010921",
+    "item_name": "ACSR Conductor 50SQMM",
+    "formula": "0.030"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Material",
+    "item_code": "309010841",
+    "item_name": "Lightning Arrestor 12 KV",
+    "formula": "3"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Labor",
+    "item_code": "LAB-31",
+    "item_name": "Fixing of 11 KV Lightning Arrestor",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Material",
+    "item_code": "304010532",
+    "item_name": "T.P.G.O. Isolator (200Amps) 11KV",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Labor",
+    "item_code": "LAB-29",
+    "item_name": "Fixing of  11 KV TGPO Isolator on S/Stn Structure",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Material",
+    "item_code": "912011441",
+    "item_name": "G.I. Turn Buckle",
+    "formula": "2"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Labor",
+    "item_code": "LAB-30",
+    "item_name": "Fixing of neutral earthing of DTR WITH G",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Material",
+    "item_code": "501017821",
+    "item_name": "PVC Cable 4 Core 25SQMM",
+    "formula": "0.010"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Material",
+    "item_code": "407010641",
+    "item_name": "LT Distribution KIOSK FOR 25 KVA DTR",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size != 'None'",
+    "type": "Labor",
+    "item_code": "LAB-32",
+    "item_name": "FIXING OF LT Distribution KIOSK FOR 25 KVA DTR",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size == 'None'",
+    "type": "Material",
+    "item_code": "110030141",
+    "item_name": "P C C POLE:8 Mtrs.Long",
+    "formula": "2"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size == 'None' and height == 8",
+    "type": "Labor",
+    "item_code": "LAB-08",
+    "item_name": "Erection of 8 mtr D.P structure (HT)",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size == 'None' and height == 9",
+    "type": "Material",
+    "item_code": "110030241",
+    "item_name": "P C C POLE:9 Mtrs.Long",
+    "formula": "2"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size == 'None' and height == 9",
+    "type": "Labor",
+    "item_code": "LAB-09",
+    "item_name": "Erection of 9 MTR Long PCC pole D/P for HTOH line",
+    "formula": "1"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size == 'None'",
+    "type": "Material",
+    "item_code": "102010611",
+    "item_name": "M.S Channel 75X40 mm",
+    "formula": "5.0 * 7.5 / 1000"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size == 'None'",
+    "type": "Material",
+    "item_code": "103011511",
+    "item_name": "M.S Flat 65X6 mm",
+    "formula": "3.0 * 3.5 / 1000"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size == 'None'",
+    "type": "Material",
+    "item_code": "508030541",
+    "item_name": "11 KV Polymer Disc Insulator 45KN",
+    "formula": "3"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size == 'None'",
+    "type": "Material",
+    "item_code": "504010132",
+    "item_name": "Hardware fittings 11KV",
+    "formula": "3"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size == 'None'",
+    "type": "Labor",
+    "item_code": "LAB-26",
+    "item_name": "Fixing of 11 KV Disc Insulator",
+    "formula": "3"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size == 'None'",
+    "type": "Material",
+    "item_code": "508011141",
+    "item_name": "11 KV Polymer Pin Insulator 45KN",
+    "formula": "3"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "not is_existing and pole_type == 'DTR' and dtr_size == 'None'",
+    "type": "Labor",
+    "item_code": "LAB-25",
+    "item_name": "Fixing of 11 KV Pin Insulator",
+    "formula": "3"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and is_service_drop and consider_cable and phase == '3 Phase'",
+    "type": "Labor",
+    "item_code": "LAB-39",
+    "item_name": "Fixing of 3ph Service Connection with cable",
+    "formula": "1"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and is_service_drop and consider_cable and phase == '1 Phase'",
+    "type": "Labor",
+    "item_code": "LAB-40",
+    "item_name": "Fixing of 1ph Service Connection with cable",
+    "formula": "1"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and is_service_drop and consider_cable and cable_size == '10 SQMM'",
+    "type": "Material",
+    "item_code": "501017421",
+    "item_name": "CABLE (PVC 1.1 KV GRADE) 4Core X10 sq mm",
+    "formula": "length / 1000"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and is_service_drop and consider_cable and cable_size == '16 SQMM'",
+    "type": "Material",
+    "item_code": "501017721",
+    "item_name": "CABLE (PVC 1.1 KV GRADE) 4CX16 sq mm",
+    "formula": "length / 1000"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and is_service_drop and consider_cable and cable_size == '25 SQMM'",
+    "type": "Material",
+    "item_code": "501017821",
+    "item_name": "CABLE (PVC 1.1 KV GRADE) 4CX25 sq mm",
+    "formula": "length / 1000"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and is_service_drop and consider_cable",
+    "type": "Labor",
+    "item_code": "LAB-44",
+    "item_name": "Laying & Dressing of 1.1 KV PVC/XLPE 2x10,4x10/16, 3.5/4x25 Sqmm Cable",
+    "formula": "length / 1000"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and is_service_drop and not consider_cable and phase == '3 Phase'",
+    "type": "Labor",
+    "item_code": "LAB-41",
+    "item_name": "Fixing of 3ph Service Connection",
+    "formula": "1"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and is_service_drop and not consider_cable and phase == '1 Phase'",
+    "type": "Labor",
+    "item_code": "LAB-42",
+    "item_name": "Fixing of 1ph Service Connection",
+    "formula": "1"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and length > 60",
+    "type": "Labor",
+    "item_code": "LAB-21",
+    "item_name": "Lead Wire above above 60 Mtrs (2 Wire)",
+    "formula": "1"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and has_cg",
+    "type": "Material",
+    "item_code": "503010711",
+    "item_name": "G.I. 8 SWG Wire (4mm)",
+    "formula": "length * 0.0001"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and has_cg",
+    "type": "Labor",
+    "item_code": "LAB-20",
+    "item_name": "Fixing Cross lacing",
+    "formula": "int(length / 2)"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'PVC Cable' and cable_size == '10 SQMM'",
+    "type": "Material",
+    "item_code": "501017421",
+    "item_name": "CABLE (PVC 1.1 KV GRADE) 4Core X10 sq mm",
+    "formula": "length / 1000"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'PVC Cable' and cable_size == '16 SQMM'",
+    "type": "Material",
+    "item_code": "501017721",
+    "item_name": "CABLE (PVC 1.1 KV GRADE) 4CX16 sq mm",
+    "formula": "length / 1000"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'PVC Cable' and cable_size == '25 SQMM'",
+    "type": "Material",
+    "item_code": "501017821",
+    "item_name": "CABLE (PVC 1.1 KV GRADE) 4CX25 sq mm",
+    "formula": "length / 1000"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'PVC Cable'",
+    "type": "Labor",
+    "item_code": "LAB-44",
+    "item_name": "Laying & Dressing of 1.1 KV PVC/XLPE 2x10,4x10/16, 3.5/4x25 Sqmm Cable",
+    "formula": "length / 1000"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'PVC Cable'",
+    "type": "Labor",
+    "item_code": "LAB-35",
+    "item_name": "Survey for L.T.O.H Line",
+    "formula": "length / 1000"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and (aug_type == 'New' or aug_type == 'Add-on 2W' or aug_type == 'Replace 2W->4W')",
+    "type": "Material",
+    "item_code": "502010921",
+    "item_name": "ACSR Conductor 50SQMM",
+    "formula": "(length / 1000) * int(wire_count)"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and (aug_type == 'New' or aug_type == 'Add-on 2W' or aug_type == 'Replace 2W->4W') and wire_count == 3",
+    "type": "Labor",
+    "item_code": "LAB-11",
+    "item_name": "Stringing & Sagging with 50 sq.mm A.C.S.R. 3 Wire",
+    "formula": "length / 1000"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and (aug_type == 'New' or aug_type == 'Add-on 2W' or aug_type == 'Replace 2W->4W') and wire_count == 4",
+    "type": "Labor",
+    "item_code": "LAB-12",
+    "item_name": "Strining& saging with ACSR 50sqmm 4wire",
+    "formula": "length / 1000"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and not is_lt_span",
+    "type": "Labor",
+    "item_code": "LAB-34",
+    "item_name": "Survey for H.T.O.H Line",
+    "formula": "length / 1000"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span",
+    "type": "Labor",
+    "item_code": "LAB-35",
+    "item_name": "Survey for L.T.O.H Line",
+    "formula": "length / 1000"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span",
+    "type": "Material",
+    "item_code": "504070441",
+    "item_name": "LT Spacer 3 PHASE 4 WIRE",
+    "formula": "4"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span",
+    "type": "Labor",
+    "item_code": "LAB-28",
+    "item_name": "Fixing of LT spacer",
+    "formula": "4"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span and use_uh",
+    "type": "Material",
+    "item_code": "195021741",
+    "item_name": "UH-LT BKT 4 WAY",
+    "formula": "1"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span and use_uh",
+    "type": "Material",
+    "item_code": "597011541",
+    "item_name": "UH-CLAMP FOR 8 MTR PCC POLE",
+    "formula": "4"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span and use_uh",
+    "type": "Material",
+    "item_code": "597011741",
+    "item_name": "UH-Diron Clump",
+    "formula": "int(wire_count)"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span and use_uh",
+    "type": "Material",
+    "item_code": "508040441",
+    "item_name": "Shakle Insulator",
+    "formula": "int(wire_count)"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span and use_uh",
+    "type": "Labor",
+    "item_code": "LAB-23",
+    "item_name": "Fixing of LT Bracket(Without Painted)",
+    "formula": "1"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span and use_uh",
+    "type": "Labor",
+    "item_code": "LAB-27",
+    "item_name": "Fixing of LT Shackle Insulator (with N/B)",
+    "formula": "int(wire_count)"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span and not use_uh",
+    "type": "Material",
+    "item_code": "101011311",
+    "item_name": "M.S Angle 65X65X6mm",
+    "formula": "1.0 * 6.5 / 1000"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span and not use_uh",
+    "type": "Material",
+    "item_code": "103011511",
+    "item_name": "M.S Flat 65X6 mm",
+    "formula": "1.0 * 3.5 / 1000"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span and not use_uh",
+    "type": "Material",
+    "item_code": "508040441",
+    "item_name": "Shakle Insulator",
+    "formula": "int(wire_count)"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'ACSR' and is_lt_span and not use_uh",
+    "type": "Labor",
+    "item_code": "LAB-27",
+    "item_name": "Fixing of LT Shackle Insulator (with N/B)",
+    "formula": "int(wire_count)"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'AB Cable' and (aug_type == 'New' or aug_type == 'Add-on 2W' or aug_type == 'Replace 2W->4W')",
+    "type": "Material",
+    "item_code": "501030521",
+    "item_name": "LT AB CABLE 1.1KV 3CX50+1CX16+1CX35sqmm",
+    "formula": "length / 1000"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'AB Cable' and (aug_type == 'New' or aug_type == 'Add-on 2W' or aug_type == 'Replace 2W->4W')",
+    "type": "Labor",
+    "item_code": "LAB-13",
+    "item_name": "Stringing & Sagging of LT AB Cable",
+    "formula": "length / 1000"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'AB Cable'",
+    "type": "Labor",
+    "item_code": "LAB-35",
+    "item_name": "Survey for L.T.O.H Line",
+    "formula": "length / 1000"
+  },
+  {
+    "object": "SmartSpan",
+    "condition": "not is_existing_span and not is_service_drop and conductor == 'AB Cable'",
+    "type": "Material",
+    "item_code": "103011511",
+    "item_name": "M.S Flat 65X6 mm",
+    "formula": "0.5 * 3.5 / 1000"
+  },
+  {
+    "object": "SmartPole",
+    "condition": "pole_type == 'LT' and height == 'LT' and pole_type == 'LT' and pole_type == 'LT'",
+    "type": "Material",
+    "item_code": "110030141",
+    "item_name": "P C C POLE:8 Mtrs.Long",
+    "formula": "1"
+  }
+]
