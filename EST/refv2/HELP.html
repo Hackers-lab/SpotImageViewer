@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { font-family: Segoe UI, Arial, sans-serif; margin: 20px; color: #333; line-height: 1.6; }
+  h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 8px; }
+  h2 { color: #2980b9; margin-top: 28px; border-left: 4px solid #3498db; padding-left: 10px; }
+  h3 { color: #16a085; margin-top: 18px; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+  th { background: #3498db; color: white; padding: 8px 12px; text-align: left; }
+  td { border: 1px solid #ddd; padding: 6px 12px; }
+  tr:nth-child(even) { background: #f8f9fa; }
+  code { background: #ecf0f1; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+  .tip { background: #eafaf1; border-left: 4px solid #27ae60; padding: 10px 14px; margin: 12px 0; }
+  .warn { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 14px; margin: 12px 0; }
+  .shortcut { background: #eaf2f8; display: inline-block; padding: 2px 8px; border-radius: 3px; font-weight: bold; }
+  kbd { background: #ecf0f1; border: 1px solid #bdc3c7; border-radius: 3px; padding: 1px 6px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>📖 ERP Estimate Generator — User Guide</h1>
+<p><b>Version 5.0</b> — Interactive electrical network estimation tool for WBSEDCL projects.</p>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<h2>1. Getting Started</h2>
+
+<h3>1.1 First Launch</h3>
+<p>When you open the application for the first time, a <b>Project Setup Wizard</b> will appear.
+Fill in the project name, select the project type, and configure UH material preferences.</p>
+
+<h3>1.2 Project Types</h3>
+<table>
+  <tr><th>Type</th><th>Supervision Rate</th><th>Notes</th></tr>
+  <tr><td>NSC</td><td>10%</td><td>New Service Connection — supports UH materials toggle</td></tr>
+  <tr><td>FDS / TURNKEY</td><td>15%</td><td>Feeder Distribution System</td></tr>
+</table>
+
+<h3>1.3 UH Materials (NSC Only)</h3>
+<p>When <b>"Use UH Materials"</b> is checked in Project Settings, the estimate uses
+readymade UH brackets, pole clamps and D-iron clamps instead of raw steel
+(Angle + Flat) for LT pole brackets. This option is only available for NSC projects.</p>
+
+<table>
+  <tr><th>UH Mode</th><th>Items Used</th></tr>
+  <tr><td>UH ON (Readymade)</td><td>UH-LT BKT 4 WAY, UH-CLAMP (4/pole for ACSR, 2/pole for AB Cable), UH-Diron (per wire count)</td></tr>
+  <tr><td>UH OFF (Raw Steel)</td><td>1m Angle 65×65×6mm + 1m Flat 65×6mm per LT pole</td></tr>
+</table>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<h2>2. Drawing Tools</h2>
+
+<h3>2.1 Canvas Objects</h3>
+<table>
+  <tr><th>Tool</th><th>Object</th><th>Description</th></tr>
+  <tr><td>POLE</td><td>SmartPole</td><td>Single utility pole (LT or HT). Click canvas to place.</td></tr>
+  <tr><td>STRUCTURE</td><td>SmartStructure</td><td>Multi-pole structure: DP, TP, 4P, or DTR sub-station.</td></tr>
+  <tr><td>SPAN</td><td>SmartSpan</td><td>Wire span between two poles/structures. Click first pole, then second.</td></tr>
+  <tr><td>CONSUMER</td><td>SmartConsumer</td><td>End consumer connection (1Ph or 3Ph). Click on a pole to attach.</td></tr>
+  <tr><td>SELECT</td><td>—</td><td>Select, move, and edit objects. Click to select, drag to move.</td></tr>
+  <tr><td>DELETE</td><td>—</td><td>Click any object to delete it and its connected spans.</td></tr>
+</table>
+
+<h3>2.2 Creating a Span</h3>
+<ol>
+  <li>Select the <b>SPAN</b> tool from the toolbar.</li>
+  <li>Click the <b>first pole</b> (it will highlight in green).</li>
+  <li>Click the <b>second pole</b> to draw the span between them.</li>
+  <li>The span length is auto-calculated from the pole positions. Edit in properties.</li>
+</ol>
+
+<div class="tip">
+  <b>Tip:</b> Span conductor type is auto-detected from connected poles:
+  HT poles → ACSR, LT poles → depends on your selection (ACSR, AB Cable, or PVC Cable).
+</div>
+
+<h3>2.3 Detail View Toggle</h3>
+<p>Click <b>"👁 Detail: ON/OFF"</b> to show or hide stay wires, earthing symbols,
+cattle guard markers, and extension indicators on the canvas.</p>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<h2>3. Object Properties</h2>
+
+<p>Select any object on the canvas to edit its properties in the right panel.</p>
+
+<h3>3.1 Pole Properties</h3>
+<table>
+  <tr><th>Property</th><th>Description</th></tr>
+  <tr><td>Pole Type</td><td>LT or HT — determines insulator and bracket rules</td></tr>
+  <tr><td>Material</td><td>PCC, STP (Steel Tubular), or H-BEAM</td></tr>
+  <tr><td>Height</td><td>8MTR, 9MTR, 9.5MTR, 11MTR, 13MTR (cascaded by material)</td></tr>
+  <tr><td>Is Existing</td><td>Mark as existing pole (no material, only fittings for new spans)</td></tr>
+  <tr><td>Existing Subtype</td><td>LT, HT, DP, TP, 4P, DTR — for existing poles</td></tr>
+  <tr><td>Extension</td><td>Add height extension (default 3m) with iron materials</td></tr>
+  <tr><td>Earth Count</td><td>Number of earthing sets on this pole</td></tr>
+  <tr><td>Stay Count</td><td>Number of stay sets (auto-calculated or manual override)</td></tr>
+</table>
+
+<h3>3.2 Structure Properties</h3>
+<table>
+  <tr><th>Property</th><th>Description</th></tr>
+  <tr><td>Structure Type</td><td>DP, TP, 4P, or DTR</td></tr>
+  <tr><td>DTR Size</td><td>10KVA to 630KVA (when type is DTR)</td></tr>
+  <tr><td>Height / Material</td><td>Same as pole — PCC, STP, H-BEAM with cascading heights</td></tr>
+  <tr><td>Earth Count</td><td>Earthing on structure</td></tr>
+  <tr><td>Stay Count</td><td>Stay wire sets</td></tr>
+</table>
+
+<h3>3.3 Span Properties</h3>
+<table>
+  <tr><th>Property</th><th>Description</th></tr>
+  <tr><td>Conductor</td><td>ACSR, AB Cable, PVC Cable, HT AB Cable</td></tr>
+  <tr><td>Conductor Size</td><td>Depends on conductor: 30SQMM, 50SQMM for ACSR etc.</td></tr>
+  <tr><td>Length (m)</td><td>Span length in metres</td></tr>
+  <tr><td>Wire Count</td><td>2, 3, or 4 wires</td></tr>
+  <tr><td>Cattle Guard</td><td>CG bracket and earthing wire on this span</td></tr>
+  <tr><td>Augmentation</td><td>New, Add-on 2W, Replace 2W→4W</td></tr>
+</table>
+
+<h3>3.4 Consumer Properties</h3>
+<table>
+  <tr><th>Property</th><th>Description</th></tr>
+  <tr><td>Phase</td><td>1 Phase or 3 Phase</td></tr>
+  <tr><td>Agency Supply</td><td>If ticked, consumer cable is supplied by agency</td></tr>
+  <tr><td>Consider Cable</td><td>Include service drop cable in estimate</td></tr>
+</table>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<h2>4. Live Estimate</h2>
+
+<p>The estimate table on the right updates automatically as you draw.
+It shows all materials and labour computed by the rule engine.</p>
+
+<h3>4.1 Editing Quantities</h3>
+<p>Double-click the <b>Qty</b> column of any row to manually override a quantity.
+Overridden values are preserved until you change the drawing.</p>
+
+<h3>4.2 Adding Custom Items</h3>
+<p>Use <b>"+ Add Material"</b> or <b>"+ Add Labor"</b> buttons to search and
+add items from the master database that aren't covered by rules.</p>
+
+<h3>4.3 3% Sag Allowance</h3>
+<p>The following items automatically get a 3% sag/wastage multiplier applied:</p>
+<ul>
+  <li>All steel sections (Channel, Angle, Flat)</li>
+  <li>GI Wire (4mm and 5mm)</li>
+  <li>ACSR Conductor (all sizes)</li>
+  <li>PVC Cable (10, 16, 25 SQMM)</li>
+  <li>AB Cable</li>
+</ul>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<h2>5. Export</h2>
+
+<h3>5.1 Excel Export</h3>
+<p>Click <b>"📊 Generate Excel"</b> or use <b>File → Generate Excel</b>.
+The workbook contains:</p>
+<ul>
+  <li><b>Estimate sheet</b> — Full BOM with materials, labour, supervision, and grand total</li>
+  <li><b>Iron Breakup sheet</b> — Detailed per-source breakdown of all steel and GI wire items</li>
+</ul>
+
+<h3>5.2 PDF Export</h3>
+<p>Click <b>"🗺️ Export PDF"</b> or use <b>File → Export PDF</b> to save the
+canvas drawing as a PDF file with legend.</p>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<h2>6. Settings (Menu)</h2>
+
+<h3>6.1 Master Database (Excel Sync)</h3>
+<p>Import or export the material and labour rate database from/to Excel.
+Useful for bulk rate updates.</p>
+
+<h3>6.2 Ruleset Manager</h3>
+<p>View, edit, add, or delete rules in the JSON ruleset that drives the
+estimate calculations. Each rule has:</p>
+<ul>
+  <li><b>Object</b> — Which canvas object type it applies to</li>
+  <li><b>Condition</b> — Python expression evaluated against the object context</li>
+  <li><b>Type</b> — Material or Labor</li>
+  <li><b>Item Code / Name</b> — Database item reference</li>
+  <li><b>Formula</b> — Quantity calculation expression</li>
+</ul>
+
+<div class="warn">
+  <b>Warning:</b> Editing rules incorrectly can break the estimate.
+  Always back up <code>rules.json</code> before making changes.
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<h2>7. Keyboard Shortcuts</h2>
+<table>
+  <tr><th>Shortcut</th><th>Action</th></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>N</kbd></td><td>New Drawing</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>Open File</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save File</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>Q</kbd></td><td>Exit</td></tr>
+  <tr><td><kbd>F1</kbd></td><td>Open User Guide</td></tr>
+  <tr><td><kbd>Scroll Wheel</kbd></td><td>Zoom in / out on canvas</td></tr>
+  <tr><td><kbd>Middle Click Drag</kbd></td><td>Pan canvas</td></tr>
+  <tr><td><kbd>Delete</kbd></td><td>Delete selected object (in SELECT mode)</td></tr>
+</table>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<h2>8. File Format</h2>
+<p>Projects are saved as <code>.json</code> files containing all pole, structure,
+span, and consumer data along with project metadata. The application
+auto-saves to <code>autosave_erp.json</code> on every change.</p>
+
+<div class="tip">
+  <b>Tip:</b> The app is fully backward-compatible with v4 saved files.
+  Old files will be upgraded automatically when opened.
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<h2>9. Troubleshooting</h2>
+
+<table>
+  <tr><th>Issue</th><th>Solution</th></tr>
+  <tr><td>Application expired</td><td>Obtain the latest version from the developer</td></tr>
+  <tr><td>Rates seem wrong</td><td>Use Settings → Master Database to verify/update rates</td></tr>
+  <tr><td>Missing items in estimate</td><td>Check rule conditions in Settings → Ruleset Manager</td></tr>
+  <tr><td>Existing spans lose status on reload</td><td>Known limitation — re-mark spans after opening</td></tr>
+  <tr><td>Excel has zero rate for an item</td><td>Item may not exist in database — add via DB Manager</td></tr>
+</table>
+
+<hr>
+<p style="color:#888; font-size:11px; text-align:center;">
+  ERP Estimate Generator v5.0 — Developed by Pramod Verma<br>
+  Data sources: CED/36 FY2023-24, CED/13 dt.15.05.2018, ESTIMATE_FORMAT_2023
+</p>
+
+</body>
+</html>

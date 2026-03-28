@@ -27,9 +27,12 @@ from PyQt6.QtWidgets import (
     QFileDialog, QMessageBox, QCheckBox, QTableWidget,
     QTableWidgetItem, QHeaderView, QSplitter, QGraphicsView,
     QDialog, QDialogButtonBox, QDoubleSpinBox, QScrollArea,
-    QFrame
+    QFrame, QMenu, QTextBrowser
 )
-from PyQt6.QtGui import QPen, QBrush, QColor, QPainter, QPageLayout, QFont
+from PyQt6.QtGui import (
+    QPen, QBrush, QColor, QPainter, QPageLayout, QFont,
+    QAction, QKeySequence
+)
 from PyQt6.QtCore import Qt, QTimer, QRectF, QPointF, pyqtSignal
 from PyQt6.QtPrintSupport import QPrinter
 
@@ -92,6 +95,7 @@ class EstimateApp(QMainWindow):
         # ── Build UI ───────────────────────────────────────────────────────
         self.setWindowTitle("ERP Estimate Generator — v5.0")
         self.setGeometry(50, 50, 1650, 930)
+        self._build_menu_bar()
         self._build_ui()
 
         # ── Wire signals ───────────────────────────────────────────────────
@@ -101,6 +105,90 @@ class EstimateApp(QMainWindow):
         # ── Load autosave ──────────────────────────────────────────────────
         self.set_tool("SELECT")
         self.load_autosave()
+
+    # =========================================================================
+    #  MENU BAR
+    # =========================================================================
+
+    def _build_menu_bar(self):
+        mb = self.menuBar()
+        mb.setStyleSheet(
+            "QMenuBar { background:#f5f5f5; font-size:12px; }"
+            "QMenuBar::item:selected { background:#d0d0d0; }"
+            "QMenu { font-size:12px; }"
+            "QMenu::item:selected { background:#3498db; color:white; }"
+        )
+
+        # ── File ──────────────────────────────────────────────────────────
+        file_menu = mb.addMenu("&File")
+
+        act_new = QAction("📄  New Drawing", self)
+        act_new.setShortcut(QKeySequence("Ctrl+N"))
+        act_new.triggered.connect(self.new_drawing)
+        file_menu.addAction(act_new)
+
+        act_open = QAction("📂  Open…", self)
+        act_open.setShortcut(QKeySequence("Ctrl+O"))
+        act_open.triggered.connect(self.load_from_file)
+        file_menu.addAction(act_open)
+
+        act_save = QAction("💾  Save…", self)
+        act_save.setShortcut(QKeySequence("Ctrl+S"))
+        act_save.triggered.connect(self.save_to_file)
+        file_menu.addAction(act_save)
+
+        file_menu.addSeparator()
+
+        act_exit = QAction("Exit", self)
+        act_exit.setShortcut(QKeySequence("Ctrl+Q"))
+        act_exit.triggered.connect(self.close)
+        file_menu.addAction(act_exit)
+
+        # ── Export ────────────────────────────────────────────────────────
+        export_menu = mb.addMenu("E&xport")
+
+        act_pdf = QAction("🗺️  Export PDF Drawing", self)
+        act_pdf.triggered.connect(self.export_pdf)
+        export_menu.addAction(act_pdf)
+
+        act_xl = QAction("📊  Generate Excel Estimate", self)
+        act_xl.triggered.connect(self.generate_excel)
+        export_menu.addAction(act_xl)
+
+        # ── Settings ─────────────────────────────────────────────────────
+        settings_menu = mb.addMenu("&Settings")
+
+        act_proj = QAction("🗂  Project Settings", self)
+        act_proj.triggered.connect(lambda: self._run_project_wizard(first_run=False))
+        settings_menu.addAction(act_proj)
+
+        settings_menu.addSeparator()
+
+        act_db = QAction("🗃️  Master Database (Excel Sync)", self)
+        act_db.triggered.connect(self.open_db_manager)
+        settings_menu.addAction(act_db)
+
+        act_rules = QAction("🧠  Ruleset Manager", self)
+        act_rules.triggered.connect(self.open_rule_manager)
+        settings_menu.addAction(act_rules)
+
+        # ── Help ──────────────────────────────────────────────────────────
+        help_menu = mb.addMenu("&Help")
+
+        act_help = QAction("📖  User Guide", self)
+        act_help.setShortcut(QKeySequence("F1"))
+        act_help.triggered.connect(self.show_help)
+        help_menu.addAction(act_help)
+
+        help_menu.addSeparator()
+
+        act_credits = QAction("🏆  Credits", self)
+        act_credits.triggered.connect(self.show_credits)
+        help_menu.addAction(act_credits)
+
+        act_about = QAction("ℹ️  About", self)
+        act_about.triggered.connect(self.show_about_dialog)
+        help_menu.addAction(act_about)
 
     # =========================================================================
     #  UI CONSTRUCTION
@@ -122,12 +210,20 @@ class EstimateApp(QMainWindow):
         left_layout.setSpacing(4)
         self.splitter.addWidget(left_panel)
 
-        left_layout.addLayout(self._build_file_toolbar())
         left_layout.addLayout(self._build_draw_toolbar())
 
         self.scene = QGraphicsScene()
         self.view  = InteractiveView(self.scene, self)
         left_layout.addWidget(self.view)
+
+        # Show Symbols checkbox at bottom-left
+        self.detail_chk = QCheckBox("Show Symbols")
+        self.detail_chk.setChecked(True)
+        self.detail_chk.setStyleSheet(
+            "font-size:11px; font-weight:bold; color:#555; spacing:4px;"
+        )
+        self.detail_chk.toggled.connect(self._toggle_detail_view)
+        left_layout.addWidget(self.detail_chk)
 
         # Right: properties + estimate table
         right_splitter = QSplitter(Qt.Orientation.Vertical)
@@ -137,74 +233,6 @@ class EstimateApp(QMainWindow):
         right_splitter.addWidget(self._build_properties_panel())
         right_splitter.addWidget(self._build_estimate_panel())
         right_splitter.setSizes([320, 680])
-
-    def _build_file_toolbar(self):
-        bar = QHBoxLayout()
-        bar.setSpacing(4)
-
-        for txt, cmd in [
-            ("📄 New",   self.new_drawing),
-            ("📂 Open",  self.load_from_file),
-            ("💾 Save",  self.save_to_file),
-        ]:
-            btn = QPushButton(txt)
-            btn.clicked.connect(cmd)
-            btn.setStyleSheet("padding:5px; font-weight:bold;")
-            bar.addWidget(btn)
-
-        proj_btn = QPushButton("🗂 Project Settings")
-        proj_btn.clicked.connect(lambda: self._run_project_wizard(first_run=False))
-        proj_btn.setStyleSheet(
-            "padding:5px; font-weight:bold; background:#2980b9; color:white;"
-        )
-        bar.addWidget(proj_btn)
-
-        # Detail-view toggle
-        self.detail_btn = QPushButton("👁 Detail: ON")
-        self.detail_btn.setCheckable(True)
-        self.detail_btn.setChecked(True)
-        self.detail_btn.clicked.connect(self._toggle_detail_view)
-        self.detail_btn.setStyleSheet(
-            "padding:5px; font-weight:bold; background:#27ae60; color:white;"
-        )
-        bar.addWidget(self.detail_btn)
-
-        credits_btn = QPushButton("🏆 Credits")
-        credits_btn.clicked.connect(self.show_credits)
-        credits_btn.setStyleSheet(
-            "padding:5px; font-weight:bold; background:#f1c40f; color:black;"
-        )
-        bar.addWidget(credits_btn)
-
-        about_btn = QPushButton("ℹ️ About")
-        about_btn.clicked.connect(self.show_about_dialog)
-        about_btn.setStyleSheet(
-            "padding:5px; font-weight:bold; background:#3498db; color:white;"
-        )
-        bar.addWidget(about_btn)
-
-        bar.addStretch()
-
-        pdf_btn = QPushButton("🗺️ Export PDF")
-        pdf_btn.clicked.connect(self.export_pdf)
-        pdf_btn.setStyleSheet(
-            "padding:5px; font-weight:bold; background:#d32f2f; color:white;"
-        )
-        bar.addWidget(pdf_btn)
-
-        xl_btn = QPushButton("📊 Generate Excel")
-        xl_btn.clicked.connect(self.generate_excel)
-        xl_btn.setStyleSheet(
-            "padding:5px; font-weight:bold; background:#107C41; color:white;"
-        )
-        bar.addWidget(xl_btn)
-
-        settings_btn = QPushButton("⚙️")
-        settings_btn.clicked.connect(self.open_settings_dialog)
-        settings_btn.setFixedWidth(36)
-        bar.addWidget(settings_btn)
-
-        return bar
 
     def _build_draw_toolbar(self):
         bar = QHBoxLayout()
@@ -226,13 +254,28 @@ class EstimateApp(QMainWindow):
         lay.setContentsMargins(6, 6, 6, 0)
         lay.setSpacing(4)
 
-        # Project info strip (read-only summary)
+        # Project info strip with edit button
+        info_row = QHBoxLayout()
+        info_row.setSpacing(0)
         self.proj_info_label = QLabel()
         self.proj_info_label.setStyleSheet(
             "font-size:11px; color:#555; padding:3px 5px;"
-            "background:#f0f0f0; border-radius:3px;"
+            "background:#f0f0f0; border-radius:3px 0 0 3px;"
         )
-        lay.addWidget(self.proj_info_label)
+        info_row.addWidget(self.proj_info_label, 1)
+
+        edit_btn = QPushButton("✏️")
+        edit_btn.setToolTip("Edit Project Settings")
+        edit_btn.setFixedSize(28, 24)
+        edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        edit_btn.setStyleSheet(
+            "QPushButton { background:#f0f0f0; border:1px solid #ccc;"
+            "  border-left:none; border-radius:0 3px 3px 0; font-size:13px; }"
+            "QPushButton:hover { background:#d5e8f7; }"
+        )
+        edit_btn.clicked.connect(lambda: self._run_project_wizard(first_run=False))
+        info_row.addWidget(edit_btn)
+        lay.addLayout(info_row)
         self._refresh_proj_label()
 
         # Object property editor
@@ -342,14 +385,8 @@ class EstimateApp(QMainWindow):
             mode = QGraphicsView.DragMode.NoDrag
         self.view.setDragMode(mode)
 
-    def _toggle_detail_view(self):
-        self.detail_view = self.detail_btn.isChecked()
-        label = "ON" if self.detail_view else "OFF"
-        color = "#27ae60" if self.detail_view else "#888"
-        self.detail_btn.setText(f"👁 Detail: {label}")
-        self.detail_btn.setStyleSheet(
-            f"padding:5px; font-weight:bold; background:{color}; color:white;"
-        )
+    def _toggle_detail_view(self, checked=None):
+        self.detail_view = self.detail_chk.isChecked()
         # Redraw all canvas items
         for item in self.scene.items():
             if hasattr(item, "detail_view"):
@@ -2415,6 +2452,30 @@ class EstimateApp(QMainWindow):
         </ul>
         <p style='font-style:italic;'>Thanks to all who provided feedback!</p>
         """)
+
+    def show_help(self):
+        help_path = os.path.join(os.path.dirname(__file__), "HELP.html")
+        if os.path.exists(help_path):
+            with open(help_path, "r", encoding="utf-8") as f:
+                html = f.read()
+        else:
+            html = "<h2>Help file not found</h2><p>HELP.html is missing.</p>"
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("User Guide — ERP Estimate Generator")
+        dlg.resize(820, 650)
+        lay = QVBoxLayout(dlg)
+        browser = QTextBrowser()
+        browser.setOpenExternalLinks(True)
+        browser.setHtml(html)
+        lay.addWidget(browser)
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(dlg.accept)
+        close_btn.setStyleSheet(
+            "padding:6px 20px; font-weight:bold; background:#3498db; color:white;"
+        )
+        lay.addWidget(close_btn)
+        dlg.exec()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
