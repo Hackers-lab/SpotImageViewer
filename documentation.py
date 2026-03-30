@@ -4,10 +4,10 @@ import ttkbootstrap as tb
 import config
 
 # --- 1. The Content Dictionary ---
-# Updated for V18.1 to include the Billing & Assessment Suite
+# Updated for V18.2 to include dark mode and UI refinements
 HELP_CONTENT = {
     "1. Introduction": {
-        "_text": f"Welcome to Spot Image Viewer V{config.CURRENT_VERSION}.\n\nVersion 18.1 continues this utility suite for WBSEDCL personnel with updated tariff management and assessment workflows.",
+        "_text": f"Welcome to Spot Image Viewer V{config.CURRENT_VERSION}.\n\nVersion 18.2 continues this utility suite for WBSEDCL personnel with updated tariff management, dark mode improvements, and assessment workflows.",
         "Key Features": "• Advanced Billing & Assessment Suite\n• Dynamic Tariff Management\n• Lightning-fast SQLite Indexing\n• Low Consumption Verification Module\n• Consumer Note Tracking"
     },
     "2. Getting Started": {

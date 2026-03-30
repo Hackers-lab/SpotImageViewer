@@ -7,7 +7,7 @@ CONFIG_FILE = os.path.join(config.BASE_DIR, "tariff_settings.json")
 MIGRATION_MARKER_FILE = os.path.join(config.BASE_DIR, "tariff_migration_version.txt")
 
 # Bump this string only when you want to force a one-time tariff reset in a new release.
-TARIFF_MIGRATION_VERSION = "18.1"
+TARIFF_MIGRATION_VERSION = "18.2"
 
 # Verified 2025-26 Source of Truth for automatic pre-filling
 DEFAULT_TARIFF = {

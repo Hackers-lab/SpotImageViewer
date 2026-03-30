@@ -187,12 +187,22 @@ class BillCalculatorApp:
         # LEFT PANEL
         inp_frame = ttk.LabelFrame(panels_frame, text=" CONSUMER DETAILS & READINGS ")
         inp_frame.grid(row=0, column=0, sticky=NSEW, padx=(0, 10), ipadx=15, ipady=15)
+        inp_frame.columnconfigure(1, weight=1)
 
         def create_input_row(row, label, widget):
             ttk.Label(inp_frame, text=label, font=("Segoe UI", 11)).grid(row=row, column=0, sticky=W, padx=10, pady=8)
-            widget.grid(row=row, column=1, sticky=E, padx=10, pady=8)
+            widget.grid(row=row, column=1, sticky=EW, padx=10, pady=8)
 
-        cat_cb = ttk.Combobox(inp_frame, textvariable=self.category_var, values=list(self.tariff_data.keys()), state="readonly", width=25)
+        category_values = list(self.tariff_data.keys())
+        max_category_len = max((len(v) for v in category_values), default=25)
+        category_cb_width = max(32, min(60, max_category_len + 2))
+        cat_cb = ttk.Combobox(
+            inp_frame,
+            textvariable=self.category_var,
+            values=category_values,
+            state="readonly",
+            width=category_cb_width
+        )
         if list(self.tariff_data.keys()): cat_cb.current(0) 
         create_input_row(0, "Tariff Category:", cat_cb)
 

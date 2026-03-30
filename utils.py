@@ -84,7 +84,7 @@ def check_for_updates_background(current_version, update_url, finished_callback)
             if latest_v_tuple > current_v_tuple:
                 finished_callback("update_found", data)
             else:
-                finished_callback("no_update", None)
+                finished_callback("no_update", data)
         except Exception as e:
             console_log(f"Update check failed: {e}")
             finished_callback("error", {"error": str(e)})

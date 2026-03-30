@@ -1,5 +1,11 @@
 {
-  "version": 18.1,
-  "release_notes": "V18.1 Updates:\n\n- Tariff Manager now supports adding and deleting tariff classes directly from the editor.\n- Updated tariff structure includes Commercial Rate A(CM-II) and revised ED slabs.\n- Theft fixed-demand calculation updated: load floor of 1 KVA, actual load for >= 1 KVA, and month roundup for fixed demand.\n- One-time tariff migration marker added to reset old tariff JSON once for this release and preserve edits afterward.",
-  "download_url": "https://drive.google.com/uc?export=download&id=1xNNneIK4cJxH8nhaxYMuSAy95vt4_OVM"
+  "version": 18.2,
+  "release_notes": "V18.2 Updates:\n\n- Added dark mode toggle in main search controls.\n- Improved dark theme consistency across listboxes, canvases, menus, and notes/folders toggles.\n- Fixed Tariff Category dropdown text clipping in Bill Calculator by expanding combobox sizing behavior.\n\nV18.1 Updates (retained for users who skipped that release):\n\n- Tariff Manager now supports adding and deleting tariff classes directly from the editor.\n- Updated tariff structure includes Commercial Rate A(CM-II) and revised ED slabs.\n- Theft fixed-demand calculation updated: load floor of 1 KVA, actual load for >= 1 KVA, and month roundup for fixed demand.\n- One-time tariff migration marker added to reset old tariff JSON once for this release and preserve edits afterward.",
+  "download_url": "https://drive.google.com/uc?export=download&id=1xNNneIK4cJxH8nhaxYMuSAy95vt4_OVM",
+  "previous_versions": [
+    {
+      "version": 18.1,
+      "release_notes": "V18.1 Updates:\n\n- Tariff Manager now supports adding and deleting tariff classes directly from the editor.\n- Updated tariff structure includes Commercial Rate A(CM-II) and revised ED slabs.\n- Theft fixed-demand calculation updated: load floor of 1 KVA, actual load for >= 1 KVA, and month roundup for fixed demand.\n- One-time tariff migration marker added to reset old tariff JSON once for this release and preserve edits afterward."
+    }
+  ]
 }

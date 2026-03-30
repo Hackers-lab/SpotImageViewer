@@ -35,6 +35,131 @@ additional_folders = utils.load_additional_folders()
 indexing_active = False
 current_search_data = {}  
 preview_references = [] 
+preview_canvas_widgets = []
+
+LIGHT_THEME = "cosmo"
+DARK_THEME = "darkly"
+
+
+def is_dark_mode_active():
+    try:
+        return root.style.theme_use() == DARK_THEME
+    except Exception:
+        return False
+
+
+def refresh_non_ttk_widget_colors():
+    """Update all plain-tk widget colours to match the current ttkbootstrap theme."""
+    dark = is_dark_mode_active()
+
+    if dark:
+        listbox_bg   = "#2c3136"
+        listbox_fg   = "#f8f9fa"
+        select_bg    = "#4c6ef5"
+        canvas_bg    = "#212529"
+        scroller_bg  = "#2c3136"
+        preview_bg   = "#2c3136"
+        notes_bg     = "#3a3024"
+        notes_fg     = "#f8f9fa"
+        folders_bg   = "#1e3044"
+        menu_bg      = "#2c3136"
+        menu_fg      = "#f8f9fa"
+        menu_act_bg  = "#4c6ef5"
+    else:
+        listbox_bg   = "#f8f9fa"
+        listbox_fg   = "#212529"
+        select_bg    = "#0d6efd"
+        canvas_bg    = "#e9ecef"
+        scroller_bg  = "#ffffff"
+        preview_bg   = "#f0f0f0"
+        notes_bg     = "#fff3cd"
+        notes_fg     = "#212529"
+        folders_bg   = "#e3f2fd"
+        menu_bg      = "#f8f9fa"
+        menu_fg      = "#212529"
+        menu_act_bg  = "#0d6efd"
+
+    select_fg   = "#ffffff"
+    menu_act_fg = "#ffffff"
+
+    # --- Listboxes ---
+    for name, bg in [('listbox_dates', listbox_bg), ('folder_listbox', folders_bg)]:
+        w = globals().get(name)
+        if w:
+            w.config(bg=bg, fg=listbox_fg, selectbackground=select_bg, selectforeground=select_fg)
+
+    # --- Canvases ---
+    w = globals().get('canvas')
+    if w:
+        w.config(bg=canvas_bg)
+
+    w = globals().get('preview_canvas_scroller')
+    if w:
+        w.config(bg=scroller_bg)
+
+    for cw in preview_canvas_widgets:
+        try:
+            if cw.winfo_exists():
+                cw.config(bg=preview_bg)
+        except Exception:
+            continue
+
+    # --- Text widget (notes) ---
+    w = globals().get('txt_remarks')
+    if w:
+        w.config(bg=notes_bg, fg=notes_fg, insertbackground=notes_fg)
+
+    # --- Frames that carry a fixed bootstyle ---
+    frame_style = "dark" if dark else "light"
+    for name in ('welcome_frame', 'top_f'):
+        w = globals().get(name)
+        if w:
+            try:
+                w.config(bootstyle=frame_style)
+            except Exception:
+                pass
+
+    # --- Menu bar ---
+    for name in ('mb', 'fm', 'bm', 'nm', 'vm', 'tm', 'hm'):
+        w = globals().get(name)
+        if w:
+            try:
+                w.config(bg=menu_bg, fg=menu_fg,
+                         activebackground=menu_act_bg, activeforeground=menu_act_fg)
+            except Exception:
+                pass
+
+    # --- Status-bar toggle buttons ---
+    for btn_name, pane_name in [('btn_notes', 'notes_pane'), ('btn_folders', 'folder_pane')]:
+        btn = globals().get(btn_name)
+        pane = globals().get(pane_name)
+        if btn and pane:
+            btn.config(bootstyle=_toggle_btn_style(pane.winfo_ismapped()))
+
+
+def update_theme_toggle_button_text():
+    if 'btn_theme_toggle' not in globals():
+        return
+
+    if is_dark_mode_active():
+        btn_theme_toggle.config(text="Light Mode", bootstyle="light-outline")
+    else:
+        btn_theme_toggle.config(text="Dark Mode", bootstyle="dark-outline")
+
+
+def toggle_theme():
+    next_theme = DARK_THEME if not is_dark_mode_active() else LIGHT_THEME
+    root.style.theme_use(next_theme)
+    refresh_non_ttk_widget_colors()
+    update_theme_toggle_button_text()
+
+
+def _toggle_btn_style(active):
+    """Return the right bootstyle for status-bar toggle buttons."""
+    if is_dark_mode_active():
+        return "light" if active else "light-outline"
+    return "dark" if active else "dark-outline"
+
 
 def launch_tool(script_name, tool_title):
     try:
@@ -397,12 +522,15 @@ def search_consumer():
         messagebox.showerror("DB Error", f"Search failed: {e}")
 
 def clear_previews():
+    global preview_canvas_widgets
     for widget in scrollable_frame.winfo_children():
         widget.destroy()
     global preview_references
     preview_references = []
+    preview_canvas_widgets = []
 
 def show_dynamic_previews(dates):
+    preview_bg = "#2c3136" if is_dark_mode_active() else "#f0f0f0"
     clear_previews()
     for i, date in enumerate(dates):
         path = current_search_data[date][0]
@@ -417,9 +545,10 @@ def show_dynamic_previews(dates):
                 pf = tb.Labelframe(scrollable_frame, text=f"{date[:2]}-{date[2:4]}-{date[4:]}", padding=5, bootstyle="info")
                 pf.grid(row=i//cols, column=i%cols, padx=10, pady=10, sticky="nsew")
                 
-                pc = tk.Canvas(pf, width=180, height=180, bg="#f0f0f0", highlightthickness=0)
+                pc = tk.Canvas(pf, width=180, height=180, bg=preview_bg, highlightthickness=0)
                 pc.pack()
                 pc.create_image(90, 90, image=ph)
+                preview_canvas_widgets.append(pc)
                 
                 def mk_click(p): return lambda e: load_image_to_canvas(p)
                 pc.bind("<Button-1>", mk_click(path))
@@ -583,20 +712,22 @@ def save_all_images():
 def toggle_notes():
     if notes_pane.winfo_ismapped():
         notes_pane.pack_forget()
-        btn_notes.config(bootstyle="dark-outline") 
+        btn_notes.config(bootstyle=_toggle_btn_style(False))
     else:
         notes_pane.pack(side=RIGHT, fill=Y, padx=5, pady=5)
-        btn_notes.config(bootstyle="dark")
+        btn_notes.config(bootstyle=_toggle_btn_style(True))
         folder_pane.pack_forget()
+        btn_folders.config(bootstyle=_toggle_btn_style(False))
 
 def toggle_folders():
     if folder_pane.winfo_ismapped():
         folder_pane.pack_forget()
-        btn_folders.config(bootstyle="dark-outline")
+        btn_folders.config(bootstyle=_toggle_btn_style(False))
     else:
         folder_pane.pack(side=RIGHT, fill=Y, padx=5, pady=5)
-        btn_folders.config(bootstyle="dark")
+        btn_folders.config(bootstyle=_toggle_btn_style(True))
         notes_pane.pack_forget()
+        btn_notes.config(bootstyle=_toggle_btn_style(False))
 
 def load_consumer_note(cid):
     try:
@@ -654,8 +785,12 @@ def _check_paths_thread():
 
 def apply_network_colors(results):
     try:
+        dark = is_dark_mode_active()
         for idx, (path, is_online) in enumerate(results):
-            color = "green" if is_online else "red"
+            if is_online:
+                color = "#00e676" if dark else "green"
+            else:
+                color = "#ff5252" if dark else "red"
             folder_listbox.itemconfig(idx, foreground=color)
     except: pass
 
@@ -683,8 +818,16 @@ def show_history(event, key, widget):
         widget.history_popup = top
         top.overrideredirect(True)
         top.geometry(f"+{widget.winfo_rootx()}+{widget.winfo_rooty()+widget.winfo_height()}")
-        lb = Listbox(top, height=10, font=("Arial", 11))
-        lb.pack()
+        _dark = is_dark_mode_active()
+        _lb_bg  = "#2c3136" if _dark else "#ffffff"
+        _lb_fg  = "#f8f9fa" if _dark else "#212529"
+        _lb_sel = "#4c6ef5" if _dark else "#0d6efd"
+        if _dark:
+            top.config(bg=_lb_bg)
+        lb = Listbox(top, height=10, font=("Arial", 11),
+                     bg=_lb_bg, fg=_lb_fg,
+                     selectbackground=_lb_sel, selectforeground="#ffffff")
+        lb.pack(fill=BOTH, expand=True)
         for i in items: lb.insert(tk.END, i)
         
         def pick(e):
@@ -835,7 +978,16 @@ def on_update_check_finished_manual(status, data):
         link = data.get("download_url")
         root.after(0, lambda: prompt_update(version, notes, link))
     elif status == "no_update":
-        root.after(0, lambda: messagebox.showinfo("No Updates", "You are already using the latest version."))
+        latest_version = data.get("version") if data else config.CURRENT_VERSION
+        release_notes = data.get("release_notes", "No feature notes available.") if data else "No feature notes available."
+        message = (
+            "You are already using the latest version.\n\n"
+            f"Current Version: v{config.CURRENT_VERSION}\n"
+            f"Latest Version: v{latest_version}\n\n"
+            "Latest Version Features:\n"
+            f"{release_notes}"
+        )
+        root.after(0, lambda: messagebox.showinfo("No Updates", message))
     elif status == "error":
         error_msg = data.get('error', 'An unknown error occurred.')
         root.after(0, lambda: messagebox.showerror("Update Error", f"Failed to check for updates:\n{error_msg}"))
@@ -933,6 +1085,9 @@ entry_meter_number.bind("<space>", lambda e: show_history(e, "meter_numbers", en
 meter_button = tb.Button(search_card, text="Search Meter") # Text/command set dynamically
 meter_button.pack(side=LEFT, padx=5)
 
+btn_theme_toggle = tb.Button(search_card, text="Dark Mode", command=toggle_theme, bootstyle="dark-outline")
+btn_theme_toggle.pack(side=LEFT, padx=5)
+
 btn_reload = tb.Button(search_card, text="Reload Images", bootstyle="warning", command=start_indexing_process)
 btn_reload.pack(side=RIGHT, padx=5)
 
@@ -963,7 +1118,7 @@ label_total_images = tb.Label(left_p, text="", font=("Segoe UI", 10))
 label_total_images.pack(pady=5)
 
 tb.Label(left_p, text="Available Dates:", font=("Segoe UI", 10, "bold")).pack(fill=X, pady=(15,0))
-listbox_dates = Listbox(left_p, font=("Segoe UI", 11), relief="flat", bg="#f8f9fa", selectbackground="#0d6efd")
+listbox_dates = Listbox(left_p, font=("Segoe UI", 11), relief="flat")
 listbox_dates.pack(fill=BOTH, expand=True, pady=5)
 listbox_dates.bind("<<ListboxSelect>>", on_date_select)
 
@@ -986,7 +1141,7 @@ welcome_sub.place(relx=0.5, rely=0.5, anchor=CENTER)
 preview_container = tb.Frame(right_inner_frame)
 preview_container.grid(row=0, column=0, sticky="nsew")
 
-preview_canvas_scroller = tk.Canvas(preview_container, bg="white", highlightthickness=0)
+preview_canvas_scroller = tk.Canvas(preview_container, highlightthickness=0)
 preview_scrollbar = tb.Scrollbar(preview_container, orient="vertical", command=preview_canvas_scroller.yview)
 scrollable_frame = tb.Frame(preview_canvas_scroller)
 
@@ -1014,7 +1169,7 @@ canvas_container.grid(row=0, column=0, sticky="nsew")
 
 btn_show_previews = tb.Button(right_outer_frame, text="Show Previews", command=raise_preview_pane, bootstyle="info-outline")
 
-canvas = tk.Canvas(canvas_container, bg="#e9ecef", highlightthickness=0)
+canvas = tk.Canvas(canvas_container, highlightthickness=0)
 canvas.pack(fill=BOTH, expand=True)
 
 btns_f = tb.Frame(canvas_container)
@@ -1050,13 +1205,13 @@ combo_notes = ttk.Combobox(note_opts_f, textvariable=note_var, values=note_optio
 combo_notes.pack(side=LEFT, fill=X, expand=True)
 tb.Button(note_opts_f, text="+", width=3, command=add_new_note_option, bootstyle="success-outline").pack(side=LEFT, padx=(5,0))
 
-txt_remarks = tk.Text(notes_pane, height=6, width=25, relief="flat", bg="#fff3cd")
+txt_remarks = tk.Text(notes_pane, height=6, width=25, relief="flat")
 txt_remarks.pack(fill=X, pady=5)
 tb.Button(notes_pane, text="Save Note", command=save_current_note, bootstyle="success").pack(fill=X, pady=2)
 tb.Button(notes_pane, text="Delete Note", command=delete_current_note, bootstyle="danger-outline").pack(fill=X, pady=2)
 
 folder_pane = tb.Labelframe(container, text="Networks", width=280, padding=10, bootstyle="info")
-folder_listbox = Listbox(folder_pane, height=15, relief="flat", bg="#e3f2fd")
+folder_listbox = Listbox(folder_pane, height=15, relief="flat")
 folder_listbox.pack(fill=BOTH, expand=True, pady=5)
 tb.Button(folder_pane, text="Add Folder", command=add_network_folder, bootstyle="success-outline").pack(fill=X, pady=2)
 tb.Button(folder_pane, text="Remove Folder", command=remove_network_folder, bootstyle="danger-outline").pack(fill=X, pady=2)
@@ -1065,6 +1220,9 @@ def run_app():
     success, msg = database.init_db()
     if not success:
         print(f"Database init failed: {msg}")
+
+    refresh_non_ttk_widget_colors()
+    update_theme_toggle_button_text()
     
     root.after(500, on_startup_check)
     root.mainloop()
