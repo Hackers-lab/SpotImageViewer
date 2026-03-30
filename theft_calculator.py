@@ -1,5 +1,6 @@
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
+import math
 import tariff_manager
 
 class TheftCalculatorApp:
@@ -76,7 +77,12 @@ class TheftCalculatorApp:
             
         normal_total_charge = normal_monthly_charge * months
         penal_energy_charge = normal_total_charge * 2
-        normal_fc = load_kva * cat_data["fixed_charge"] * months
+
+        # Fixed demand load rule: minimum 1 KVA, otherwise use actual assessed load.
+        rounded_load = max(1.0, load_kva)
+        rounded_months = math.ceil(months)
+        normal_fc = rounded_load * cat_data["fixed_charge"] * rounded_months
+
         penal_fc = normal_fc * 2 
         ed_percent = self.get_ed_rate(units_per_month, cat_data)
         total_ed = (penal_energy_charge + penal_fc) * ed_percent

@@ -4,6 +4,10 @@ import config
 
 # Use the global BASE_DIR from config.py
 CONFIG_FILE = os.path.join(config.BASE_DIR, "tariff_settings.json")
+MIGRATION_MARKER_FILE = os.path.join(config.BASE_DIR, "tariff_migration_version.txt")
+
+# Bump this string only when you want to force a one-time tariff reset in a new release.
+TARIFF_MIGRATION_VERSION = "18.1"
 
 # Verified 2025-26 Source of Truth for automatic pre-filling
 DEFAULT_TARIFF = {
@@ -38,7 +42,24 @@ DEFAULT_TARIFF = {
             {"limit": 50, "rate": 8.20}, {"limit": 150, "rate": 8.51},
             {"limit": None, "rate": 9.02}
         ],
-        "ed_slabs": [{"limit": 450, "rate": 0.0}, {"limit": None, "rate": 0.10}]
+        "ed_slabs": [
+            {"limit": 150, "rate": 0.0},
+            {"limit": 500, "rate": 0.10},
+            {"limit": 1000, "rate": 0.125},
+            {"limit": None, "rate": 0.15}
+        ]
+    },
+    "Commercial - Rate A(CM-II)": {
+        "fixed_charge": 34.0,
+        "min_charge": 105.0,
+        "load_factor": 0.75,
+        "slabs": [{"limit": None, "rate": 6.09}],
+        "ed_slabs": [
+            {"limit": 150, "rate": 0.0},
+            {"limit": 500, "rate": 0.10},
+            {"limit": 1000, "rate": 0.125},
+            {"limit": None, "rate": 0.15}
+        ]
     },
     "Agriculture Normal - Rate C(A)": {
         "fixed_charge": 60.0,
@@ -66,14 +87,63 @@ DEFAULT_TARIFF = {
     }
 }
 
+
+def _merge_missing_defaults(existing_data, default_data):
+    """Merge missing top-level tariff categories and keys from defaults."""
+    updated = False
+
+    for category, default_config in default_data.items():
+        if category not in existing_data:
+            existing_data[category] = default_config
+            updated = True
+            continue
+
+        if isinstance(existing_data[category], dict):
+            for key, value in default_config.items():
+                if key not in existing_data[category]:
+                    existing_data[category][key] = value
+                    updated = True
+
+    return existing_data, updated
+
+
+def _read_migration_marker():
+    if not os.path.exists(MIGRATION_MARKER_FILE):
+        return ""
+    try:
+        with open(MIGRATION_MARKER_FILE, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except Exception:
+        return ""
+
+
+def _write_migration_marker(version):
+    try:
+        with open(MIGRATION_MARKER_FILE, "w", encoding="utf-8") as f:
+            f.write(version)
+    except Exception:
+        pass
+
+
+def _needs_one_time_reset():
+    return _read_migration_marker() != TARIFF_MIGRATION_VERSION
+
 def load_tariff():
     """Returns tariff data; creates file with defaults if missing."""
-    if not os.path.exists(CONFIG_FILE):
+    if _needs_one_time_reset() or not os.path.exists(CONFIG_FILE):
         save_tariff(DEFAULT_TARIFF)
+        _write_migration_marker(TARIFF_MIGRATION_VERSION)
         return DEFAULT_TARIFF
     
     with open(CONFIG_FILE, "r") as f:
-        return json.load(f)
+        tariff_data = json.load(f)
+
+    merged_data, changed = _merge_missing_defaults(tariff_data, DEFAULT_TARIFF)
+    if changed:
+        save_tariff(merged_data)
+        _write_migration_marker(TARIFF_MIGRATION_VERSION)
+
+    return merged_data
 
 def save_tariff(tariff_data):
     """Saves updated dictionary back to JSON."""

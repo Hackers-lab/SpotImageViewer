@@ -20,7 +20,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='SpotImageViewerV18.0',
+    name='SpotImageViewerV18.1',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -41,5 +41,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='SpotImageViewerV18.0',
+    name='SpotImageViewerV18.1',
 )

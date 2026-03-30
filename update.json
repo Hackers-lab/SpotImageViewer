@@ -1,5 +1,5 @@
 {
-  "version": 18.0,
-  "release_notes": "🚀 V18.0 Major Updates:\n\n• Energy Bill Calculator: Comprehensive support for Domestic, Commercial, Industrial, and STW (TOD & Whole-day) consumers. Input units and contractual load for exact billing based on the latest 2025-26 tariff rates. Includes a specialized module to calculate tariff benefits for consumers impacted by abrupt billing cycles.\n\n• Theft Assessment Calculator: Instantly generate Provisional and Final assessments for any category. Enter load and category for exact penal figures and an automated check if the final assessment is within the 25% reduction limit.\n\n• Tariff Manager: Centralized hub to view and manage active rate charts. Update tariff rates directly in the app to ensure calculations remain 100% accurate as regulatory charts evolve.",
+  "version": 18.1,
+  "release_notes": "V18.1 Updates:\n\n- Tariff Manager now supports adding and deleting tariff classes directly from the editor.\n- Updated tariff structure includes Commercial Rate A(CM-II) and revised ED slabs.\n- Theft fixed-demand calculation updated: load floor of 1 KVA, actual load for >= 1 KVA, and month roundup for fixed demand.\n- One-time tariff migration marker added to reset old tariff JSON once for this release and preserve edits afterward.",
   "download_url": "https://drive.google.com/uc?export=download&id=1xNNneIK4cJxH8nhaxYMuSAy95vt4_OVM"
 }

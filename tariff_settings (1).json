@@ -116,36 +116,7 @@
                 "limit": 500,
                 "rate": 0.1
             },
-            {
-                "limit": 1000,
-                "rate": 0.125
-            },
-            {
-                "limit": null,
-                "rate": 0.15
-            }
-        ]
-    },
-    "Commercial - Rate A(CM-II)": {
-        "fixed_charge": 34.0,
-        "min_charge": 105.0,
-        "load_factor": 0.75,
-        "slabs": [
-            {
-                "limit": null,
-                "rate": 6.09
-            }
-        ],
-        "ed_slabs": [
-            {
-                "limit": 150,
-                "rate": 0.0
-            },
-            {
-                "limit": 500,
-                "rate": 0.1
-            },
-            {
+	    {
                 "limit": 1000,
                 "rate": 0.125
             },
@@ -212,5 +183,35 @@
                 "rate": 0.02475
             }
         ]
-    }
+    },
+    "Commercial - Rate A(CM-II)": {
+        "fixed_charge": 34.0,
+        "min_charge": 105.0,
+        "load_factor": 0.75,
+        "slabs": [
+
+            {
+                "limit": null,
+                "rate": 6.09
+            }
+        ],
+        "ed_slabs": [
+            {
+                "limit": 150,
+                "rate": 0.0
+            },
+            {
+                "limit": 500,
+                "rate": 0.1
+            },
+	    {
+                "limit": 1000,
+                "rate": 0.125
+            },
+            {
+                "limit": null,
+                "rate": 0.15
+            }
+	]
+     }
 }
