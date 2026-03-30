@@ -101,6 +101,30 @@ class TheftCalculatorApp:
         try: return int(var.get().strip()) if var.get().strip() else 0
         except ValueError: return 0
 
+    def get_safe_hours_decimal(self, var):
+        """Allow decimal hours and clamp to valid daily range [0, 24]."""
+        try:
+            value = float(var.get().strip()) if var.get().strip() else 0.0
+        except ValueError:
+            value = 0.0
+
+        value = max(0.0, min(24.0, value))
+        return value
+
+    def normalize_hours_input(self, var):
+        """Normalize hours text after editing is complete (on focus-out)."""
+        value = self.get_safe_hours_decimal(var)
+        normalized = f"{value:.2f}".rstrip("0").rstrip(".")
+        var.set(normalized)
+        return value
+
+    def format_decimal_hours(self, decimal_hours):
+        total_minutes = int(round(decimal_hours * 60))
+        total_minutes = max(0, min(24 * 60, total_minutes))
+        hours = total_minutes // 60
+        minutes = total_minutes % 60
+        return f"({hours:02d} hr {minutes:02d} min)"
+
     def reset_adjustments(self, *args):
         self.adj_e_var.set("0")
         self.adj_f_var.set("0")
@@ -128,8 +152,13 @@ class TheftCalculatorApp:
         unit_type = self.load_unit_var.get()
         load_kva = (raw_load / 0.85) if unit_type == "kW" else raw_load
         
-        p_days, p_hours = self.get_safe_int(self.p_days_var), self.get_safe_int(self.p_hours_var)
-        f_days, f_hours = self.get_safe_int(self.f_days_var), self.get_safe_int(self.f_hours_var)
+        p_days = self.get_safe_int(self.p_days_var)
+        f_days = self.get_safe_int(self.f_days_var)
+        p_hours = self.get_safe_hours_decimal(self.p_hours_var)
+        f_hours = self.get_safe_hours_decimal(self.f_hours_var)
+
+        self.p_hours_exact_lbl.config(text=self.format_decimal_hours(p_hours))
+        self.f_hours_exact_lbl.config(text=self.format_decimal_hours(f_hours))
         
         adj_e = self.get_safe_float(self.adj_e_var)
         adj_f = self.get_safe_float(self.adj_f_var)
@@ -165,6 +194,11 @@ class TheftCalculatorApp:
         diff_rs = prov_net - final_net
         diff_pct = (diff_rs / prov_net * 100) if prov_net > 0 else 0
         self.diff_lbl.config(text=f"Final Assessment Relief:  ₹ {diff_rs:,.2f}   ({diff_pct:.2f}%)")
+
+    def on_hours_focus_out(self, var, label):
+        value = self.normalize_hours_input(var)
+        label.config(text=self.format_decimal_hours(value))
+        self.calculate_all()
 
     def setup_ui(self):
         main_frame = ttk.Frame(self.window)
@@ -221,7 +255,11 @@ class TheftCalculatorApp:
         ttk.Label(p_inp_frame, text="Days:", font=self.FONT_LABEL).grid(row=0, column=0, sticky=W, padx=10)
         ttk.Entry(p_inp_frame, textvariable=self.p_days_var, width=10, justify="right").grid(row=0, column=1, sticky=E, padx=10)
         ttk.Label(p_inp_frame, text="Hours/Day:", font=self.FONT_LABEL).grid(row=0, column=2, sticky=W, padx=10)
-        ttk.Entry(p_inp_frame, textvariable=self.p_hours_var, width=10, justify="right").grid(row=0, column=3, sticky=E, padx=10)
+        self.p_hours_entry = ttk.Entry(p_inp_frame, textvariable=self.p_hours_var, width=10, justify="right")
+        self.p_hours_entry.grid(row=0, column=3, sticky=E, padx=10)
+        self.p_hours_exact_lbl = ttk.Label(p_inp_frame, text="(24 hr 00 min)", font=("Segoe UI", 9), bootstyle=SECONDARY)
+        self.p_hours_exact_lbl.grid(row=0, column=4, sticky=W, padx=(0, 10))
+        self.p_hours_entry.bind("<FocusOut>", lambda e: self.on_hours_focus_out(self.p_hours_var, self.p_hours_exact_lbl))
 
         ttk.Separator(prov_frame, orient=HORIZONTAL).pack(fill=X, pady=10)
 
@@ -261,7 +299,11 @@ class TheftCalculatorApp:
         ttk.Label(f_inp_frame, text="Days:", font=self.FONT_LABEL).grid(row=0, column=0, sticky=W, padx=10)
         ttk.Entry(f_inp_frame, textvariable=self.f_days_var, width=10, justify="right").grid(row=0, column=1, sticky=E, padx=10)
         ttk.Label(f_inp_frame, text="Hours/Day:", font=self.FONT_LABEL).grid(row=0, column=2, sticky=W, padx=10)
-        ttk.Entry(f_inp_frame, textvariable=self.f_hours_var, width=10, justify="right").grid(row=0, column=3, sticky=E, padx=10)
+        self.f_hours_entry = ttk.Entry(f_inp_frame, textvariable=self.f_hours_var, width=10, justify="right")
+        self.f_hours_entry.grid(row=0, column=3, sticky=E, padx=10)
+        self.f_hours_exact_lbl = ttk.Label(f_inp_frame, text="(19 hr 00 min)", font=("Segoe UI", 9), bootstyle=SECONDARY)
+        self.f_hours_exact_lbl.grid(row=0, column=4, sticky=W, padx=(0, 10))
+        self.f_hours_entry.bind("<FocusOut>", lambda e: self.on_hours_focus_out(self.f_hours_var, self.f_hours_exact_lbl))
 
         ttk.Separator(final_frame, orient=HORIZONTAL).pack(fill=X, pady=10)
 
