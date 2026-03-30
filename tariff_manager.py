@@ -83,7 +83,12 @@ DEFAULT_TARIFF = {
             {"limit": 500, "rate": 5.07}, 
             {"limit": None, "rate": 7.65}
         ],
-        "ed_slabs": [{"limit": 500, "rate": 0.0}, {"limit": None, "rate": 0.02475}]
+        "ed_slabs": [
+            {"limit": 500, "rate": 0.0},
+            {"limit": 2000, "rate": 0.025},
+            {"limit": 3500, "rate": 0.075},
+            {"limit": None, "rate": 0.125}
+        ]
     }
 }
 
