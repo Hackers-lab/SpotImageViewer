@@ -31,6 +31,10 @@ class TheftCalculatorApp:
         self.adj_e_var = ttk.StringVar(value="0")
         self.adj_f_var = ttk.StringVar(value="0")
         self.adj_ed_var = ttk.StringVar(value="0")
+        
+        self.f_adj_e_str = ttk.StringVar(value="₹ 0.00")
+        self.f_adj_f_str = ttk.StringVar(value="₹ 0.00")
+        self.f_adj_ed_str = ttk.StringVar(value="₹ 0.00")
 
         self.setup_ui()
         self.bind_traces()
@@ -185,9 +189,9 @@ class TheftCalculatorApp:
         self.f_val_ed.config(text=f"₹ {final['ed']:,.2f}  ({final['ed_percent']*100:.0f}%)")
         self.f_val_gross.config(text=f"₹ {final['gross']:,.2f}")
         
-        self.f_adj_e_lbl.config(text=f"₹ {adj_e:,.2f}")
-        self.f_adj_f_lbl.config(text=f"₹ {adj_f:,.2f}")
-        self.f_adj_ed_lbl.config(text=f"₹ {adj_ed:,.2f}")
+        self.f_adj_e_str.set(f"₹ {adj_e:,.2f}")
+        self.f_adj_f_str.set(f"₹ {adj_f:,.2f}")
+        self.f_adj_ed_str.set(f"₹ {adj_ed:,.2f}")
         self.f_val_adj.config(text=f"- ₹ {total_adj:,.2f}")
         self.f_val_net.config(text=f"₹ {final_net:,.2f}")
 
@@ -311,15 +315,15 @@ class TheftCalculatorApp:
         f_adj_frame = ttk.Frame(final_frame); f_adj_frame.pack(fill=X); f_adj_frame.columnconfigure(1, weight=1)
         
         ttk.Label(f_adj_frame, text="Energy Charge (₹):", font=self.FONT_LABEL, foreground="gray").grid(row=0, column=0, sticky=W, padx=10)
-        self.f_adj_e_lbl = ttk.Label(f_adj_frame, text="₹ 0.00", font=self.FONT_VALUE, foreground="gray")
+        self.f_adj_e_lbl = ttk.Entry(f_adj_frame, textvariable=self.f_adj_e_str, width=14, justify="right", state="readonly")
         self.f_adj_e_lbl.grid(row=0, column=1, sticky=E, padx=10)
 
         ttk.Label(f_adj_frame, text="Fixed/Demand (₹):", font=self.FONT_LABEL, foreground="gray").grid(row=1, column=0, sticky=W, padx=10)
-        self.f_adj_f_lbl = ttk.Label(f_adj_frame, text="₹ 0.00", font=self.FONT_VALUE, foreground="gray")
+        self.f_adj_f_lbl = ttk.Entry(f_adj_frame, textvariable=self.f_adj_f_str, width=14, justify="right", state="readonly")
         self.f_adj_f_lbl.grid(row=1, column=1, sticky=E, padx=10)
 
         ttk.Label(f_adj_frame, text="Electricity Duty (₹):", font=self.FONT_LABEL, foreground="gray").grid(row=2, column=0, sticky=W, padx=10)
-        self.f_adj_ed_lbl = ttk.Label(f_adj_frame, text="₹ 0.00", font=self.FONT_VALUE, foreground="gray")
+        self.f_adj_ed_lbl = ttk.Entry(f_adj_frame, textvariable=self.f_adj_ed_str, width=14, justify="right", state="readonly")
         self.f_adj_ed_lbl.grid(row=2, column=1, sticky=E, padx=10)
 
         ttk.Separator(final_frame, orient=HORIZONTAL).pack(fill=X, pady=10)

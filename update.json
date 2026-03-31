@@ -1,8 +1,12 @@
 {
-  "version": 18.3,
-  "release_notes": "V18.3 Updates:\n\n- Theft Calculator now supports decimal Hours/Day input.\n- Added exact interpreted time display beside hour inputs (HH hr MM min).\n- Improved hours editing behavior to avoid auto-overwrite while typing.\n- Enforced valid Hours/Day range of 0 to 24 with normalization on focus-out.\n- Improved update check dialog when no new version is found by showing version details and feature notes.",
+  "version": 18.4,
+  "release_notes": "V18.4 Updates:\n\n- Minor bug fixes and visual improvements.",
   "download_url": "https://drive.google.com/uc?export=download&id=1xNNneIK4cJxH8nhaxYMuSAy95vt4_OVM",
   "previous_versions": [
+    {
+      "version": 18.3,
+      "release_notes": "V18.3 Updates:\n\n- Theft Calculator now supports decimal Hours/Day input.\n- Added exact interpreted time display beside hour inputs (HH hr MM min).\n- Improved hours editing behavior to avoid auto-overwrite while typing.\n- Enforced valid Hours/Day range of 0 to 24 with normalization on focus-out.\n- Improved update check dialog when no new version is found by showing version details and feature notes."
+    },
     {
       "version": 18.2,
       "release_notes": "V18.2 Updates:\n\n- Added dark mode toggle in main search controls.\n- Improved dark theme consistency across listboxes, canvases, menus, and notes/folders toggles.\n- Fixed Tariff Category dropdown text clipping in Bill Calculator by expanding combobox sizing behavior."
