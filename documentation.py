@@ -7,7 +7,7 @@ import config
 # Updated for V18.3 to include time-input and UI refinements
 HELP_CONTENT = {
     "1. Introduction": {
-        "_text": f"Welcome to Spot Image Viewer V{config.CURRENT_VERSION}.\n\nVersion 18.3 continues this utility suite for WBSEDCL personnel with updated tariff management, dark mode improvements, and assessment workflows.",
+        "_text": f"Welcome to Spot Image Viewer V{config.CURRENT_VERSION}.\n\n continues this utility suite for WBSEDCL personnel with updated tariff management, dark mode improvements, and assessment workflows.",
         "Key Features": "• Advanced Billing & Assessment Suite\n• Dynamic Tariff Management\n• Lightning-fast SQLite Indexing\n• Low Consumption Verification Module\n• Consumer Note Tracking"
     },
     "2. Getting Started": {
