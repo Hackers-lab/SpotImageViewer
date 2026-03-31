@@ -1,6 +1,6 @@
 {
   "version": 18.4,
-  "release_notes": "V18.4 Updates:\n\n- Minor bug fixes and visual improvements.",
+  "release_notes": "V18.4 Updates:\n\n- Image Viewer: Scroll mouse wheel to zoom in/out on images.\n- Image Viewer: Click and drag to pan/move around when zoomed in.\n- Theft Calculator: UI redesigned to match a consistent table-aligned layout.\n- Bug fixes and visual improvements.",
   "download_url": "https://drive.google.com/uc?export=download&id=1xNNneIK4cJxH8nhaxYMuSAy95vt4_OVM",
   "previous_versions": [
     {

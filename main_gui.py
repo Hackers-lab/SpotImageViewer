@@ -31,6 +31,10 @@ img_tk = None
 img = None
 img_original = None
 zoom_scale = 1.0
+pan_x = 0
+pan_y = 0
+drag_start_x = 0
+drag_start_y = 0
 additional_folders = utils.load_additional_folders()
 indexing_active = False
 current_search_data = {}  
@@ -572,13 +576,15 @@ def on_date_select(event):
 
 def load_image_to_canvas(path):
     raise_canvas_pane()
-    global img_original, zoom_scale, img, img_tk
+    global img_original, zoom_scale, img, img_tk, pan_x, pan_y
     if not os.path.exists(path):
         messagebox.showerror("Error", "Image file not accessible (Offline?)")
         return
     try:
         img_original = Image.open(path)
         zoom_scale = 1.0
+        pan_x = 0
+        pan_y = 0
         render_image()
         show_buttons() 
     except Exception as e:
@@ -593,7 +599,7 @@ def raise_canvas_pane():
     btn_show_previews.pack(side=TOP, anchor=NE, padx=5, pady=2) 
 
 def render_image():
-    global img, img_tk
+    global img, img_tk, pan_x, pan_y
     if not img_original: return
     
     cw = canvas.winfo_width()
@@ -606,18 +612,55 @@ def render_image():
     if zoom_scale == 1.0:
         ratio = min(cw/w, ch/h)
         nw, nh = int(w*ratio), int(h*ratio)
+        pan_x = 0
+        pan_y = 0
     else:
         nw, nh = int(w*zoom_scale), int(h*zoom_scale)
         
     img = img_original.resize((nw, nh), Image.Resampling.LANCZOS)
     img_tk = ImageTk.PhotoImage(img)
     canvas.delete("all")
-    canvas.create_image(cw//2, ch//2, anchor=CENTER, image=img_tk)
+    canvas.create_image((cw//2) + pan_x, (ch//2) + pan_y, anchor=CENTER, image=img_tk)
 
 def zoom(factor):
     global zoom_scale
     zoom_scale *= factor
     render_image()
+
+def start_pan(event):
+    global drag_start_x, drag_start_y
+    if zoom_scale == 1.0: return
+    drag_start_x = event.x
+    drag_start_y = event.y
+    canvas.config(cursor="fleur")
+
+def do_pan(event):
+    global pan_x, pan_y, drag_start_x, drag_start_y
+    if zoom_scale == 1.0: return
+    dx = event.x - drag_start_x
+    dy = event.y - drag_start_y
+    pan_x += dx
+    pan_y += dy
+    drag_start_x = event.x
+    drag_start_y = event.y
+    canvas.move("all", dx, dy)
+
+def end_pan(event):
+    if zoom_scale == 1.0: return
+    canvas.config(cursor="")
+
+def on_image_mousewheel(event):
+    if not img_original: return
+    if event.delta > 0:
+        zoom(1.2)
+    elif event.delta < 0:
+        zoom(0.8)
+
+def _bind_image_mousewheel(event):
+    canvas.bind_all("<MouseWheel>", on_image_mousewheel)
+
+def _unbind_image_mousewheel(event):
+    canvas.unbind_all("<MouseWheel>")
 
 def print_image():
     if not img_original: return
@@ -1171,6 +1214,13 @@ btn_show_previews = tb.Button(right_outer_frame, text="Show Previews", command=r
 
 canvas = tk.Canvas(canvas_container, highlightthickness=0)
 canvas.pack(fill=BOTH, expand=True)
+
+canvas.bind("<ButtonPress-1>", start_pan)
+canvas.bind("<B1-Motion>", do_pan)
+canvas.bind("<ButtonRelease-1>", end_pan)
+
+canvas.bind('<Enter>', _bind_image_mousewheel)
+canvas.bind('<Leave>', _unbind_image_mousewheel)
 
 btns_f = tb.Frame(canvas_container)
 btns_f.pack(pady=5)
