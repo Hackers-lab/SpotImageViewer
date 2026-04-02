@@ -39,6 +39,21 @@ def get_meter_number(consumer_id):
 def get_consumer_by_meter(meter_no):
     """Retrieves a consumer id for a given meter number from the database."""
     return database.get_consumer_by_meter(meter_no)
+
+
+def get_consumer_profile(consumer_id):
+    """Retrieves full profile details for a consumer from the database."""
+    return database.get_consumer_profile(consumer_id)
+
+
+def search_consumers_by_name(name_query, limit=200):
+    """Search consumers by partial name, case-insensitive."""
+    return database.search_consumers_by_name(name_query, limit=limit)
+
+
+def search_consumers_by_mobile(mobile_number, limit=200):
+    """Search consumers by exact 10-digit mobile number."""
+    return database.search_consumers_by_mobile(mobile_number, limit=limit)
     
 def update_meter_mapping(mapping_dict):
     """Updates the meter mapping in the database."""
@@ -46,7 +61,12 @@ def update_meter_mapping(mapping_dict):
 
 def save_search_history(key, val):
     try:
-        d = database.get_info_value("search_history", {"consumer_ids": [], "meter_numbers": []})
+        d = database.get_info_value(
+            "search_history",
+            {"consumer_ids": [], "meter_numbers": [], "consumer_names": [], "mobile_numbers": []}
+        )
+        if key not in d:
+            d[key] = []
         if val in d[key]: d[key].remove(val)
         d[key].append(val)
         if len(d[key]) > 10: d[key] = d[key][-10:]
@@ -56,7 +76,10 @@ def save_search_history(key, val):
 
 def load_search_history(key):
     try:
-        d = database.get_info_value("search_history", {"consumer_ids": [], "meter_numbers": []})
+        d = database.get_info_value(
+            "search_history",
+            {"consumer_ids": [], "meter_numbers": [], "consumer_names": [], "mobile_numbers": []}
+        )
         return d.get(key, [])
     except:
         return []

@@ -12,6 +12,7 @@ import subprocess
 import sys
 import webbrowser
 import ctypes
+import re
 from datetime import datetime
 import openpyxl
 from PIL import Image, ImageTk, ImageDraw
@@ -185,9 +186,9 @@ def update_theme_toggle_button_text():
         return
 
     if is_dark_mode_active():
-        btn_theme_toggle.config(text="Light Mode", bootstyle="light-outline")
+        btn_theme_toggle.config(text="Light Mode", bootstyle="primary")
     else:
-        btn_theme_toggle.config(text="Dark Mode", bootstyle="dark-outline")
+        btn_theme_toggle.config(text="Dark Mode", bootstyle="primary")
 
 
 def toggle_theme():
@@ -500,6 +501,111 @@ def finish_indexing(total):
     btn_reload.config(state="normal")
     messagebox.showinfo("Done", f"Indexing Complete.\nTotal Images: {total}")
 
+
+def _safe_text(value):
+    if value is None:
+        return "-"
+    text = str(value).strip()
+    return text if text else "-"
+
+
+def _format_consumer_details(cid, mru):
+    profile = utils.get_consumer_profile(cid) or {}
+    lines = [
+        f"Consumer ID: {_safe_text(cid)}",
+        f"Meter No: {_safe_text(profile.get('meter_no'))}",
+        f"Name: {_safe_text(profile.get('name'))}",
+        f"Address: {_safe_text(profile.get('address'))}",
+        f"Mobile Number: {_safe_text(profile.get('mobile_number'))}",
+        f"Contractual Load: {_safe_text(profile.get('contractual_load'))}",
+        f"Class: {_safe_text(profile.get('class'))}",
+        f"MRU: {_safe_text(mru)}",
+    ]
+    return "\n".join(lines)
+
+
+def _open_consumer_from_selection(cid):
+    entry_consumer_id.delete(0, tk.END)
+    entry_consumer_id.insert(0, cid)
+    search_consumer()
+
+
+def show_search_results_selector(results, title):
+    if not results:
+        return
+
+    picker = Toplevel(root)
+    picker.title(title)
+    picker.geometry("1000x420")
+    picker.transient(root)
+    picker.grab_set()
+
+    tb.Label(
+        picker,
+        text=f"{len(results)} result(s). Select one consumer:",
+        font=("Segoe UI", 10, "bold")
+    ).pack(anchor=NW, padx=10, pady=(10, 4))
+
+    grid_frame = tb.Frame(picker, padding=8)
+    grid_frame.pack(fill=BOTH, expand=True)
+
+    cols = ("consumer_id", "meter_no", "name", "mobile_number", "address")
+    tree = ttk.Treeview(grid_frame, columns=cols, show="headings", height=12)
+    tree.heading("consumer_id", text="Consumer ID")
+    tree.heading("meter_no", text="Meter No")
+    tree.heading("name", text="Name")
+    tree.heading("mobile_number", text="Mobile")
+    tree.heading("address", text="Address")
+
+    tree.column("consumer_id", width=120, anchor="w")
+    tree.column("meter_no", width=120, anchor="w")
+    tree.column("name", width=210, anchor="w")
+    tree.column("mobile_number", width=120, anchor="w")
+    tree.column("address", width=390, anchor="w")
+
+    yscroll = tb.Scrollbar(grid_frame, orient="vertical", command=tree.yview)
+    xscroll = tb.Scrollbar(grid_frame, orient="horizontal", command=tree.xview)
+    tree.configure(yscrollcommand=yscroll.set, xscrollcommand=xscroll.set)
+
+    tree.grid(row=0, column=0, sticky="nsew")
+    yscroll.grid(row=0, column=1, sticky="ns")
+    xscroll.grid(row=1, column=0, sticky="ew")
+    grid_frame.grid_rowconfigure(0, weight=1)
+    grid_frame.grid_columnconfigure(0, weight=1)
+
+    for item in results:
+        tree.insert(
+            "",
+            "end",
+            values=(
+                _safe_text(item.get("consumer_id")),
+                _safe_text(item.get("meter_no")),
+                _safe_text(item.get("name")),
+                _safe_text(item.get("mobile_number")),
+                _safe_text(item.get("address")),
+            )
+        )
+
+    btns = tb.Frame(picker, padding=8)
+    btns.pack(fill=X)
+
+    def choose_and_open():
+        selected = tree.selection()
+        if not selected:
+            messagebox.showwarning("Select", "Please select one row.", parent=picker)
+            return
+        values = tree.item(selected[0], "values")
+        chosen_cid = values[0] if values else ""
+        if not chosen_cid:
+            return
+        picker.destroy()
+        _open_consumer_from_selection(chosen_cid)
+
+    tb.Button(btns, text="Open Selected", bootstyle="primary", command=choose_and_open).pack(side=LEFT)
+    tb.Button(btns, text="Cancel", bootstyle="secondary", command=picker.destroy).pack(side=LEFT, padx=6)
+
+    tree.bind("<Double-1>", lambda e: choose_and_open())
+
 def search_consumer():
     cid = entry_consumer_id.get().strip()
     if not cid.isdigit() or len(cid) != 9:
@@ -544,9 +650,7 @@ def search_consumer():
             current_search_data[date].append(path)
             
         count = len(rows)
-        meter = utils.get_meter_number(cid)
-        meter_txt = f"\nMeter: {meter}" if meter else ""
-        label_consumer_details.config(text=f"ID: {cid}\nMRU: {mru}{meter_txt}", bootstyle="primary")
+        label_consumer_details.config(text=_format_consumer_details(cid, mru), bootstyle="primary")
         label_total_images.config(text=f"Images Found: {count}")
         
         latest = dates_ordered[0]
@@ -881,10 +985,20 @@ def apply_network_colors(results):
 def update_meter_search_state():
     if database.has_meter_data():
         entry_meter_number.config(state="normal")
-        meter_button.config(text="Search Meter", command=search_meter, bootstyle="primary")
+        meter_button.config(state="normal", bootstyle="primary")
+        entry_name.config(state="normal")
+        entry_mobile.config(state="normal")
+        btn_search_name.config(state="normal", bootstyle="primary")
+        btn_search_mobile.config(state="normal", bootstyle="primary")
+        lbl_consumer_hint.grid_remove()
     else:
         entry_meter_number.config(state="disabled")
-        meter_button.config(text="Update Meter List", command=update_meter_list_threaded, bootstyle="success")
+        meter_button.config(state="disabled", bootstyle="secondary")
+        entry_name.config(state="disabled")
+        entry_mobile.config(state="disabled")
+        btn_search_name.config(state="disabled", bootstyle="secondary")
+        btn_search_mobile.config(state="disabled", bootstyle="secondary")
+        lbl_consumer_hint.grid()
 
 
 
@@ -918,8 +1032,14 @@ def show_history(event, key, widget):
                 widget.delete(0, tk.END)
                 widget.insert(0, val)
                 top.destroy()
-                if key == "consumer_ids": search_consumer()
-                else: search_meter()
+                if key == "consumer_ids":
+                    search_consumer()
+                elif key == "meter_numbers":
+                    search_meter()
+                elif key == "consumer_names":
+                    search_name()
+                else:
+                    search_mobile()
                 
         lb.bind("<Button-1>", pick)
         lb.bind("<FocusOut>", lambda e: top.destroy())
@@ -939,30 +1059,113 @@ def search_meter():
     else:
         messagebox.showinfo("Not Found", "Meter Number not found.")
 
-def update_meter_list_threaded():
-    utils.console_log("FUNCTION STARTED: update_meter_list_threaded")
-    utils.console_log("Step 1: Opening Message Box...")
-    messagebox.showinfo("Excel File Format", "Please ensure the Excel file contains:\n- Consumer ID in Column 1\n- Meter Number in Column 2")
-    utils.console_log("Step 1: Message Box Closed by User.")
-    
+
+def search_name():
+    name_query = entry_name.get().strip()
+    if len(name_query) < 3:
+        messagebox.showwarning("Error", "Enter at least 3 characters for Name search.")
+        return
+
+    results = utils.search_consumers_by_name(name_query, limit=300)
+    if not results:
+        messagebox.showinfo("Not Found", "No consumer found for this name.")
+        return
+
+    utils.save_search_history("consumer_names", name_query)
+    if len(results) == 1:
+        _open_consumer_from_selection(results[0].get("consumer_id", ""))
+        return
+
+    show_search_results_selector(results, f"Name Search: {name_query}")
+
+
+def search_mobile():
+    raw_mobile = entry_mobile.get().strip()
+    normalized = re.sub(r"\D", "", raw_mobile)
+    if len(normalized) == 12 and normalized.startswith("91"):
+        normalized = normalized[2:]
+
+    if len(normalized) != 10:
+        messagebox.showwarning("Error", "Mobile number must be 10 digits.")
+        return
+
+    entry_mobile.delete(0, tk.END)
+    entry_mobile.insert(0, normalized)
+
+    results = utils.search_consumers_by_mobile(normalized, limit=300)
+    if not results:
+        messagebox.showinfo("Not Found", "No consumer found for this mobile number.")
+        return
+
+    utils.save_search_history("mobile_numbers", normalized)
+    if len(results) == 1:
+        _open_consumer_from_selection(results[0].get("consumer_id", ""))
+        return
+
+    show_search_results_selector(results, f"Mobile Search: {normalized}")
+
+def generate_consumer_data_template():
+    try:
+        save_path = filedialog.asksaveasfilename(
+            title="Save Consumer Data Template",
+            defaultextension=".xlsx",
+            filetypes=[("Excel Workbook", "*.xlsx")],
+            initialfile="consumer_data_template.xlsx"
+        )
+        if not save_path:
+            return
+
+        wb = openpyxl.Workbook()
+        sheet = wb.active
+        sheet.title = "ConsumerData"
+
+        headers = [
+            "CONSUMER ID",
+            "METER NO",
+            "NAME",
+            "ADDRESS",
+            "MOBILE NUMBER",
+            "CONTRACTUAL LOAD",
+            "CLASS",
+        ]
+        sheet.append(headers)
+
+        # Keep one sample row so users can directly copy/paste from row 2.
+        sheet.append(["", "", "", "", "", "", ""])
+        sheet.freeze_panes = "A2"
+
+        widths = [18, 16, 28, 36, 18, 18, 14]
+        for idx, width in enumerate(widths, start=1):
+            col = openpyxl.utils.get_column_letter(idx)
+            sheet.column_dimensions[col].width = width
+
+        wb.save(save_path)
+        messagebox.showinfo("Template Generated", f"Template created successfully:\n{save_path}")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to generate template.\n{e}")
+
+
+def import_consumer_data_threaded():
+    utils.console_log("FUNCTION STARTED: import_consumer_data_threaded")
+
     def open_file_picker():
-        utils.console_log("Step 2: Opening File Dialog (askopenfilename)...")
+        utils.console_log("Step 1: Opening File Dialog (askopenfilename)...")
         try:
             path = filedialog.askopenfilename(filetypes=[("Excel", "*.xlsx *.xls")])
-            utils.console_log(f"Step 2: Dialog Result -> {path}")
+            utils.console_log(f"Step 1: Dialog Result -> {path}")
         except Exception as e:
             utils.console_log(f"!!! ERROR in File Dialog: {e}")
             return
-        
-        if not path: 
+
+        if not path:
             utils.console_log("Action Cancelled by user.")
             return
-        
-        utils.console_log("Step 3: Preparing UI for update...")
-        meter_button.config(state="disabled", text="Updating...")
+
+        utils.console_log("Step 2: Preparing UI for update...")
+        btn_update_consumer.config(state="disabled", text="Updating...")
         progress_bar.pack(side=RIGHT, padx=10)
         progress_bar.start(10)
-        
+
         threading.Thread(target=worker, args=(path,), daemon=True).start()
 
     def worker(file_path):
@@ -971,20 +1174,80 @@ def update_meter_list_threaded():
             d = {}
             wb = openpyxl.load_workbook(file_path)
             sheet = wb.active
-            
-            for row in sheet.iter_rows():
-                if len(row) >= 2 and row[0].value and row[1].value:
-                    cid = str(row[0].value).strip()
-                    meter = str(row[1].value).strip()
-                    if cid and meter:
-                        d[cid] = meter
-            
+
+            header_map = {
+                "consumer id": "consumer_id",
+                "consumerid": "consumer_id",
+                "meter no": "meter_no",
+                "meterno": "meter_no",
+                "name": "name",
+                "address": "address",
+                "mobile number": "mobile_number",
+                "mobilenumber": "mobile_number",
+                "mobile": "mobile_number",
+                "contractual load": "contractual_load",
+                "contractualload": "contractual_load",
+                "class": "class",
+            }
+
+            rows = list(sheet.iter_rows(values_only=True))
+            if not rows:
+                raise ValueError("Excel sheet is empty.")
+
+            first_row = rows[0]
+            index_map = {}
+            for idx, val in enumerate(first_row):
+                if val is None:
+                    continue
+                key = str(val).strip().lower().replace("_", " ")
+                key = " ".join(key.split())
+                key_compact = key.replace(" ", "")
+                mapped = header_map.get(key) or header_map.get(key_compact)
+                if mapped:
+                    index_map[mapped] = idx
+
+            has_headers = "consumer_id" in index_map and "meter_no" in index_map
+            data_rows = rows[1:] if has_headers else rows
+
+            for row in data_rows:
+                if not row:
+                    continue
+
+                def get_value(field, fallback_idx):
+                    idx = index_map.get(field, fallback_idx)
+                    if idx is None or idx >= len(row):
+                        return ""
+                    val = row[idx]
+                    if val is None:
+                        return ""
+                    if isinstance(val, float) and val.is_integer():
+                        return str(int(val)).strip()
+                    return str(val).strip()
+
+                cid = get_value("consumer_id", 0)
+                meter_no = get_value("meter_no", 1)
+                if not cid or not meter_no:
+                    continue
+
+                mobile = re.sub(r"\D", "", get_value("mobile_number", 4))
+                if len(mobile) == 12 and mobile.startswith("91"):
+                    mobile = mobile[2:]
+
+                d[cid] = {
+                    "meter_no": meter_no,
+                    "name": get_value("name", 2),
+                    "address": get_value("address", 3),
+                    "mobile_number": mobile,
+                    "contractual_load": get_value("contractual_load", 5),
+                    "class": get_value("class", 6),
+                }
+
             utils.console_log(f"WORKER: Processed {len(d)} rows.")
-            
+
             utils.update_meter_mapping(d)
             utils.console_log("WORKER: Database updated.")
-            
-            root.after(0, lambda: messagebox.showinfo("Success", "Meter list updated."))
+
+            root.after(0, lambda: messagebox.showinfo("Success", f"Consumer data updated.\nRecords imported: {len(d)}"))
         except Exception as e:
             utils.console_log(f"!!! WORKER ERROR: {e}")
             root.after(0, lambda e=e: messagebox.showerror("Error", f"Failed to read Excel.\n{str(e)}\n\nEnsure 'openpyxl' is installed."))
@@ -993,12 +1256,80 @@ def update_meter_list_threaded():
             root.after(0, reset_ui)
 
     def reset_ui():
+        btn_update_consumer.config(state="normal", text="Update Consumer Data")
         update_meter_search_state()
         progress_bar.stop()
         progress_bar.pack_forget()
 
-    utils.console_log("WAITING: Scheduling File Picker in 200ms to prevent freeze...")
-    root.after(200, open_file_picker)
+    root.after(100, open_file_picker)
+
+
+def update_meter_list_threaded():
+    dialog = Toplevel(root)
+    dialog.title("Update Consumer Data")
+    dialog.geometry("430x220")
+    dialog.transient(root)
+    dialog.grab_set()
+
+    frm = tb.Frame(dialog, padding=16)
+    frm.pack(fill=BOTH, expand=True)
+
+    tb.Label(
+        frm,
+        text="Choose an action for Consumer Data:",
+        font=("Segoe UI", 10, "bold"),
+        bootstyle="primary"
+    ).pack(anchor=NW, pady=(0, 8))
+
+    tb.Label(
+        frm,
+        text=(
+            "1. Generate Template: creates an Excel template with the required columns.\n"
+            "2. Import Consumer Data: import your filled Excel file."
+        ),
+        justify=LEFT,
+        wraplength=390
+    ).pack(anchor=NW, pady=(0, 12))
+
+    tb.Label(
+        frm,
+        text=(
+            "Required columns (any order):\n"
+            "CONSUMER ID, METER NO, NAME, ADDRESS,\n"
+            "MOBILE NUMBER, CONTRACTUAL LOAD, CLASS"
+        ),
+        justify=LEFT,
+        wraplength=390,
+        bootstyle="secondary"
+    ).pack(anchor=NW, pady=(0, 12))
+
+    btn_row = tb.Frame(frm)
+    btn_row.pack(fill=X)
+
+    def _generate_then_close():
+        generate_consumer_data_template()
+
+    def _import_then_close():
+        dialog.destroy()
+        import_consumer_data_threaded()
+
+    tb.Button(
+        btn_row,
+        text="Generate Template",
+        width=20,
+        bootstyle="primary",
+        command=_generate_then_close
+    ).pack(side=LEFT, padx=(0, 10))
+
+    tb.Button(
+        btn_row,
+        text="Import Consumer Data",
+        width=20,
+        bootstyle="primary",
+        command=_import_then_close
+    ).pack(side=LEFT)
+
+    tb.Button(frm, text="Close", bootstyle="secondary", command=dialog.destroy).pack(side=BOTTOM, pady=(14, 0))
 
 def show_about():
     about_win = Toplevel(root)
@@ -1133,7 +1464,7 @@ root.config(menu=mb)
 fm = Menu(mb, tearoff=0)
 mb.add_cascade(label="File", menu=fm)
 fm.add_command(label="Reload Images", command=start_indexing_process)
-fm.add_command(label="Update Meter List", command=update_meter_list_threaded)
+fm.add_command(label="Update Consumer Data", command=update_meter_list_threaded)
 fm.add_separator()
 fm.add_command(label="Exit", command=root.quit)
 
@@ -1162,34 +1493,71 @@ hm.add_command(label="Documentation", command=open_help)
 hm.add_command(label="Check for Updates", command=manual_update_check)
 hm.add_command(label="About", command=show_about)
 
-top_f = tb.Frame(root, padding=15, bootstyle="light") 
+top_f = tb.Frame(root, padding=8, bootstyle="light") 
 top_f.pack(fill=X)
 
-search_card = tb.Labelframe(top_f, text="Search Controls", padding=10, bootstyle="default")
+search_card = tb.Labelframe(top_f, text="Search Controls", padding=6, bootstyle="default")
 search_card.pack(fill=X, expand=True)
 
-tb.Label(search_card, text="Consumer ID:", font=("Segoe UI", 11, "bold")).pack(side=LEFT, padx=5)
-entry_consumer_id = tb.Entry(search_card, width=15, font=("Segoe UI", 11))
-entry_consumer_id.pack(side=LEFT, padx=5)
+# Col 6 is a spacer so Update Consumer Data and utility buttons stay right-aligned
+search_card.columnconfigure(6, weight=1)
+
+# ── Row 0: Consumer ID (always enabled) + Meter No (enabled only with data) ──
+tb.Label(search_card, text="Consumer ID", font=("Segoe UI", 9, "bold")).grid(row=0, column=0, padx=(4, 4), pady=2, sticky="e")
+entry_consumer_id = tb.Entry(search_card, width=22, font=("Segoe UI", 10))
+entry_consumer_id.grid(row=0, column=1, padx=(0, 6), pady=2, sticky="w")
 entry_consumer_id.bind("<Return>", lambda e: search_consumer())
 entry_consumer_id.bind("<space>", lambda e: show_history(e, "consumer_ids", entry_consumer_id))
 
-tb.Button(search_card, text="Search", bootstyle="primary", command=search_consumer).pack(side=LEFT, padx=5)
+tb.Button(search_card, text="Search", width=12, bootstyle="primary", command=search_consumer).grid(row=0, column=2, padx=(0, 10), pady=2)
 
-tb.Label(search_card, text="Meter No:", font=("Segoe UI", 11, "bold")).pack(side=LEFT, padx=15)
-entry_meter_number = tb.Entry(search_card, width=15, font=("Segoe UI", 11))
-entry_meter_number.pack(side=LEFT, padx=5)
+tb.Label(search_card, text="Meter No", font=("Segoe UI", 9, "bold")).grid(row=0, column=3, padx=(0, 4), pady=2, sticky="e")
+entry_meter_number = tb.Entry(search_card, width=22, font=("Segoe UI", 10))
+entry_meter_number.grid(row=0, column=4, padx=(0, 6), pady=2, sticky="w")
 entry_meter_number.bind("<Return>", lambda e: search_meter())
 entry_meter_number.bind("<space>", lambda e: show_history(e, "meter_numbers", entry_meter_number))
 
-meter_button = tb.Button(search_card, text="Search Meter") # Text/command set dynamically
-meter_button.pack(side=LEFT, padx=5)
+meter_button = tb.Button(search_card, text="Search Meter", width=14, bootstyle="primary", command=search_meter)
+meter_button.grid(row=0, column=5, padx=(0, 4), pady=2, sticky="w")
 
-btn_theme_toggle = tb.Button(search_card, text="Dark Mode", command=toggle_theme, bootstyle="dark-outline")
-btn_theme_toggle.pack(side=LEFT, padx=5)
+btn_update_consumer = tb.Button(search_card, text="Update Consumer Data", width=23, bootstyle="danger", command=update_meter_list_threaded)
+btn_update_consumer.grid(row=0, column=6, padx=(8, 8), pady=2)
 
-btn_reload = tb.Button(search_card, text="Reload Images", bootstyle="warning", command=start_indexing_process)
-btn_reload.pack(side=RIGHT, padx=5)
+# ── Row 1: Name + Mobile (greyed when no consumer data loaded) ──
+tb.Label(search_card, text="Name", font=("Segoe UI", 9, "bold")).grid(row=1, column=0, padx=(4, 4), pady=2, sticky="e")
+entry_name = tb.Entry(search_card, width=22, font=("Segoe UI", 10))
+entry_name.grid(row=1, column=1, padx=(0, 6), pady=2, sticky="w")
+entry_name.bind("<Return>", lambda e: search_name())
+entry_name.bind("<space>", lambda e: show_history(e, "consumer_names", entry_name))
+btn_search_name = tb.Button(search_card, text="Search Name", width=12, bootstyle="primary", command=search_name)
+btn_search_name.grid(row=1, column=2, padx=(0, 10), pady=2)
+
+tb.Label(search_card, text="Mobile", font=("Segoe UI", 9, "bold")).grid(row=1, column=3, padx=(0, 4), pady=2, sticky="e")
+entry_mobile = tb.Entry(search_card, width=22, font=("Segoe UI", 10))
+entry_mobile.grid(row=1, column=4, padx=(0, 6), pady=2, sticky="w")
+entry_mobile.bind("<Return>", lambda e: search_mobile())
+entry_mobile.bind("<space>", lambda e: show_history(e, "mobile_numbers", entry_mobile))
+btn_search_mobile = tb.Button(search_card, text="Search Mobile", width=14, bootstyle="primary", command=search_mobile)
+btn_search_mobile.grid(row=1, column=5, padx=(0, 4), pady=2, sticky="w")
+
+# ── Row 1 col 6: spacer-aligned with Update Consumer Data above ──
+# (empty cell keeps columns aligned)
+
+# ── Row 2: hint label (shown only when consumer data is absent) ──
+lbl_consumer_hint = tb.Label(
+    search_card,
+    text="\u26a0  Update Consumer Data to enable Meter No, Name & Mobile search",
+    font=("Segoe UI", 8),
+    bootstyle="warning"
+)
+lbl_consumer_hint.grid(row=2, column=0, columnspan=7, padx=(4, 4), pady=(0, 2), sticky="w")
+
+# ── Utility buttons — far right (spacer col 6 keeps visual separation) ──
+btn_theme_toggle = tb.Button(search_card, text="Dark Mode", width=14, command=toggle_theme, bootstyle="primary")
+btn_theme_toggle.grid(row=0, column=8, padx=(4, 6), pady=2, sticky="e")
+
+btn_reload = tb.Button(search_card, text="Reload Images", width=14, bootstyle="primary", command=start_indexing_process)
+btn_reload.grid(row=1, column=8, padx=(4, 6), pady=2, sticky="e")
 
 stat_f = tb.Frame(root, padding=5, bootstyle="secondary")
 stat_f.pack(side=BOTTOM, fill=X)
@@ -1210,7 +1578,7 @@ container.pack(fill=BOTH, expand=True)
 left_p = tb.Labelframe(container, text="Details", width=250, padding=10, bootstyle="default")
 left_p.pack(side=LEFT, fill=Y, padx=5)
 
-label_consumer_details = tb.Label(left_p, text="Welcome", font=("Segoe UI", 12, "bold"), wraplength=220, bootstyle="primary")
+label_consumer_details = tb.Label(left_p, text="Welcome", font=("Segoe UI", 9), wraplength=220, justify=LEFT, bootstyle="primary")
 label_consumer_details.pack(pady=10)
 label_latest_date = tb.Label(left_p, text="", font=("Segoe UI", 10, "bold"), bootstyle="success")
 label_latest_date.pack(pady=5)

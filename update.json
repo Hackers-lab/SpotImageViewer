@@ -1,8 +1,12 @@
 {
-  "version": 18.4,
-  "release_notes": "V18.4 Updates:\n\n- Image Viewer: Scroll mouse wheel to zoom in/out on images.\n- Image Viewer: Click and drag to pan/move around when zoomed in.\n- Theft Calculator: UI redesigned to match a consistent table-aligned layout.\n- Bug fixes and visual improvements.",
+  "version": 19.1,
+  "release_notes": "V19.1 Updates:\n\n- Added full Consumer Data workflow with fields: Consumer ID, Meter No, Name, Address, Mobile Number, Contractual Load, and Class.\n- Added Name and Mobile search support with proper multi-result handling.\n- Improved Details pane to show complete consumer information in compact wrapped format.\n- Added Update Consumer Data action dialog with two options: Generate Template and Import Consumer Data.\n- Added consumer data template generator (.xlsx) with required headers for easy copy/paste workflows.\n- Search controls UI refined for alignment, spacing consistency, and better button behavior when consumer data is unavailable.\n- Meter/Name/Mobile search controls are now disabled until consumer data is imported, with clear inline guidance.",
   "download_url": "https://drive.google.com/uc?export=download&id=1xNNneIK4cJxH8nhaxYMuSAy95vt4_OVM",
   "previous_versions": [
+    {
+      "version": 18.4,
+      "release_notes": "V18.4 Updates:\n\n- Image Viewer: Scroll mouse wheel to zoom in/out on images.\n- Image Viewer: Click and drag to pan/move around when zoomed in.\n- Theft Calculator: UI redesigned to match a consistent table-aligned layout.\n- Bug fixes and visual improvements."
+    },
     {
       "version": 18.3,
       "release_notes": "V18.3 Updates:\n\n- Theft Calculator now supports decimal Hours/Day input.\n- Added exact interpreted time display beside hour inputs (HH hr MM min).\n- Improved hours editing behavior to avoid auto-overwrite while typing.\n- Enforced valid Hours/Day range of 0 to 24 with normalization on focus-out.\n- Improved update check dialog when no new version is found by showing version details and feature notes."
