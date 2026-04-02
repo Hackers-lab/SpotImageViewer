@@ -205,6 +205,13 @@ class TheftCalculatorApp:
         self.calculate_all()
 
     def setup_ui(self):
+        summary_frame = ttk.Frame(self.window)
+        summary_frame.pack(side=BOTTOM, fill=X, padx=15, pady=(0, 15))
+        ttk.Separator(summary_frame, orient=HORIZONTAL).pack(fill=X)
+        self.diff_lbl = ttk.Label(summary_frame, text="Final Assessment Relief: ₹ 0.00  (0.00%)", font=("Segoe UI", 12, "bold"), bootstyle=PRIMARY)
+        self.diff_lbl.pack(pady=10)
+        ttk.Separator(summary_frame, orient=HORIZONTAL).pack(fill=X)
+
         main_frame = ttk.Frame(self.window)
         main_frame.pack(fill=BOTH, expand=YES, padx=15, pady=15)
 
@@ -337,14 +344,6 @@ class TheftCalculatorApp:
         self.f_val_adj = create_table_row(f_table, 10, "Less: Total Deductions:")
         self.f_val_net = create_table_row(f_table, 12, "NET PAYABLE:", is_net=True)
         self.f_val_net.configure(bootstyle=SUCCESS)
-
-        # BANNER
-        summary_frame = ttk.Frame(main_frame)
-        summary_frame.pack(fill=X, pady=(15, 0))
-        ttk.Separator(summary_frame, orient=HORIZONTAL).pack(fill=X)
-        self.diff_lbl = ttk.Label(summary_frame, text="Final Assessment Relief: ₹ 0.00  (0.00%)", font=("Segoe UI", 12, "bold"), bootstyle=PRIMARY)
-        self.diff_lbl.pack(pady=10)
-        ttk.Separator(summary_frame, orient=HORIZONTAL).pack(fill=X)
 
     def bind_traces(self):
         self.category_var.trace_add("write", self.reset_adjustments)

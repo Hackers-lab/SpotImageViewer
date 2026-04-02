@@ -379,3 +379,29 @@ def has_meter_data():
         return count > 0
     except:
         return False
+
+
+def get_all_consumer_profiles():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT consumer_id, meter_no, name, address, mobile_number
+            FROM meter_mapping
+            """
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [
+            {
+                "consumer_id": r[0] or "",
+                "meter_no": r[1] or "",
+                "name": r[2] or "",
+                "address": r[3] or "",
+                "mobile_number": r[4] or "",
+            }
+            for r in rows
+        ]
+    except:
+        return []

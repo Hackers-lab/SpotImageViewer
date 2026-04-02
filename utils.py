@@ -54,6 +54,11 @@ def search_consumers_by_name(name_query, limit=200):
 def search_consumers_by_mobile(mobile_number, limit=200):
     """Search consumers by exact 10-digit mobile number."""
     return database.search_consumers_by_mobile(mobile_number, limit=limit)
+
+
+def get_all_consumer_profiles():
+    """Return all consumer records for batch tools like fuzzy lookup."""
+    return database.get_all_consumer_profiles()
     
 def update_meter_mapping(mapping_dict):
     """Updates the meter mapping in the database."""

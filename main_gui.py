@@ -13,9 +13,16 @@ import sys
 import webbrowser
 import ctypes
 import re
+from collections import defaultdict
+from difflib import SequenceMatcher
 from datetime import datetime
 import openpyxl
 from PIL import Image, ImageTk, ImageDraw
+
+try:
+    from rapidfuzz import fuzz as rapidfuzz_fuzz
+except Exception:
+    rapidfuzz_fuzz = None
 
 import tkinter as tk
 from tkinter import messagebox, filedialog, Menu, Toplevel, Listbox, ttk
@@ -991,6 +998,10 @@ def update_meter_search_state():
         btn_search_name.config(state="normal", bootstyle="primary")
         btn_search_mobile.config(state="normal", bootstyle="primary")
         lbl_consumer_hint.grid_remove()
+        try:
+            tm.entryconfig("Fuzzy Lookup", state="normal")
+        except Exception:
+            pass
     else:
         entry_meter_number.config(state="disabled")
         meter_button.config(state="disabled", bootstyle="secondary")
@@ -999,6 +1010,10 @@ def update_meter_search_state():
         btn_search_name.config(state="disabled", bootstyle="secondary")
         btn_search_mobile.config(state="disabled", bootstyle="secondary")
         lbl_consumer_hint.grid()
+        try:
+            tm.entryconfig("Fuzzy Lookup", state="disabled")
+        except Exception:
+            pass
 
 
 
@@ -1264,10 +1279,448 @@ def import_consumer_data_threaded():
     root.after(100, open_file_picker)
 
 
+def _normalize_fuzzy_text(value):
+    text = str(value or "").upper()
+    text = re.sub(r"[^A-Z0-9 ]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _normalize_mobile_10(value):
+    digits = re.sub(r"\D", "", str(value or ""))
+    if len(digits) == 12 and digits.startswith("91"):
+        digits = digits[2:]
+    return digits if len(digits) == 10 else ""
+
+
+def _tokenize_for_lookup(text):
+    tokens = [t for t in _normalize_fuzzy_text(text).split(" ") if len(t) >= 2]
+    return tokens
+
+
+def _fast_text_similarity(a, b):
+    """Return text similarity percentage using RapidFuzz when available."""
+    if not a or not b:
+        return 0.0
+
+    tokens_a = set(_tokenize_for_lookup(a))
+    tokens_b = set(_tokenize_for_lookup(b))
+
+    def token_sim(x, y):
+        if rapidfuzz_fuzz is not None:
+            return float(rapidfuzz_fuzz.ratio(x, y)) / 100.0
+        return SequenceMatcher(None, x, y).ratio()
+
+    # Coverage from input side: if most input tokens are found in DB text
+    # (even with minor spelling differences), score should remain high.
+    if tokens_a:
+        covered = 0
+        for ta in tokens_a:
+            best = 0.0
+            for tb in tokens_b:
+                s = token_sim(ta, tb)
+                if s > best:
+                    best = s
+            if best >= 0.80:
+                covered += 1
+        coverage_input = covered / len(tokens_a)
+    else:
+        coverage_input = 0.0
+
+    if rapidfuzz_fuzz is not None:
+        ratio_score = float(rapidfuzz_fuzz.ratio(a, b))
+        sort_score = float(rapidfuzz_fuzz.token_sort_ratio(a, b))
+        partial_score = float(rapidfuzz_fuzz.partial_ratio(a, b))
+        set_score = float(rapidfuzz_fuzz.token_set_ratio(a, b))
+
+        # Base score plus input-coverage boost for containment-style matches.
+        blended = (
+            (0.20 * ratio_score)
+            + (0.20 * sort_score)
+            + (0.25 * partial_score)
+            + (0.35 * set_score)
+        )
+        adjusted = blended * (0.55 + (0.90 * coverage_input))
+        return min(100.0, adjusted)
+    return SequenceMatcher(None, a, b).ratio() * 100.0
+
+
+def generate_fuzzy_lookup_template():
+    try:
+        save_path = filedialog.asksaveasfilename(
+            title="Save Fuzzy Lookup Template",
+            defaultextension=".xlsx",
+            filetypes=[("Excel Workbook", "*.xlsx")],
+            initialfile="fuzzy_lookup_input_template.xlsx"
+        )
+        if not save_path:
+            return
+
+        wb = openpyxl.Workbook()
+        sheet = wb.active
+        sheet.title = "FuzzyLookupInput"
+        sheet.append(["NAME", "C/O", "ADDRESS", "MOBILE NUMBER"])
+        sheet.append(["", "", "", ""])
+        sheet.freeze_panes = "A2"
+
+        widths = [28, 28, 42, 18]
+        for idx, width in enumerate(widths, start=1):
+            col = openpyxl.utils.get_column_letter(idx)
+            sheet.column_dimensions[col].width = width
+
+        wb.save(save_path)
+        messagebox.showinfo("Template Generated", f"Fuzzy lookup template created:\n{save_path}")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to generate fuzzy template.\n{e}")
+
+
+def run_fuzzy_lookup_threaded(threshold=0.85, top_n=5):
+    try:
+        threshold = float(threshold)
+    except Exception:
+        threshold = 0.85
+    threshold = max(0.0, min(1.0, threshold))
+
+    try:
+        top_n = int(top_n)
+    except Exception:
+        top_n = 20
+    top_n = max(1, min(200, top_n))
+
+    def open_input_file():
+        input_path = filedialog.askopenfilename(
+            title="Select Fuzzy Lookup Input File",
+            filetypes=[("Excel", "*.xlsx *.xls")]
+        )
+        if not input_path:
+            return
+
+        input_dir = os.path.dirname(os.path.abspath(input_path))
+        output_path = os.path.join(input_dir, "fuzzy_lookup_results.xlsx")
+        if os.path.exists(output_path):
+            ts = time.strftime("%Y%m%d_%H%M%S")
+            output_path = os.path.join(input_dir, f"fuzzy_lookup_results_{ts}.xlsx")
+
+        progress_bar.config(mode="determinate", maximum=100)
+        progress_bar["value"] = 0
+        progress_bar.pack(side=RIGHT, padx=10)
+        status_label.config(text="Fuzzy Lookup: starting…")
+        threading.Thread(target=worker, args=(input_path, output_path), daemon=True).start()
+
+    def worker(input_path, output_path):
+        start_time = time.time()
+        _processed = [0]
+        _total = [0]
+        _last_ui = [0.0]
+
+        def _update_progress():
+            pct = (_processed[0] / _total[0] * 100.0) if _total[0] else 0.0
+            elapsed_s = int(time.time() - start_time)
+            progress_bar["value"] = pct
+            status_label.config(
+                text=f"Fuzzy Lookup: {pct:.0f}% ({_processed[0]}/{_total[0]}) | Elapsed: {elapsed_s}s"
+            )
+
+        try:
+            db_profiles = utils.get_all_consumer_profiles()
+            if not db_profiles:
+                root.after(0, lambda: messagebox.showwarning("No Consumer Data", "No consumer data found. Please update consumer data first."))
+                return
+
+            prepped_db = []
+            mobile_index = defaultdict(set)
+            prefix_index = defaultdict(set)
+            token_index = defaultdict(set)
+
+            for idx, row in enumerate(db_profiles):
+                db_name = str(row.get("name", ""))
+                db_address = str(row.get("address", ""))
+                db_combined_raw = f"{db_name} {db_address}".strip()
+                combined_norm = _normalize_fuzzy_text(db_combined_raw)
+                combined_tokens = set(_tokenize_for_lookup(combined_norm))
+                mobile_norm = _normalize_mobile_10(row.get("mobile_number", ""))
+
+                prepped_db.append({
+                    "consumer_id": str(row.get("consumer_id", "")),
+                    "name": db_name,
+                    "address": db_address,
+                    "mobile_number": str(row.get("mobile_number", "")),
+                    "mobile_norm": mobile_norm,
+                    "combined_norm": combined_norm,
+                    "tokens": combined_tokens,
+                })
+
+                if mobile_norm:
+                    mobile_index[mobile_norm].add(idx)
+
+                for tok in combined_tokens:
+                    if len(tok) >= 3:
+                        prefix_index[tok[:3]].add(idx)
+                    if len(tok) >= 4:
+                        token_index[tok].add(idx)
+
+            wb_in = openpyxl.load_workbook(input_path)
+            sh_in = wb_in.active
+            rows = list(sh_in.iter_rows(values_only=True))
+            if not rows:
+                raise ValueError("Input Excel is empty.")
+
+            header_map = {
+                "name": "name",
+                "co": "co",
+                "c/o": "co",
+                "careof": "co",
+                "address": "address",
+                "mobile": "mobile",
+                "mobilenumber": "mobile",
+                "mobile number": "mobile",
+            }
+
+            first_row = rows[0]
+            idx_map = {}
+            for i, v in enumerate(first_row):
+                if v is None:
+                    continue
+                key = str(v).strip().lower().replace("_", " ")
+                key = " ".join(key.split())
+                compact = key.replace(" ", "")
+                mapped = header_map.get(key) or header_map.get(compact)
+                if mapped:
+                    idx_map[mapped] = i
+
+            has_headers = "name" in idx_map and "address" in idx_map
+            data_rows = rows[1:] if has_headers else rows
+            _total[0] = len(data_rows)
+
+            def _get_input_value(row_vals, field, fallback_idx):
+                idx = idx_map.get(field, fallback_idx)
+                if idx is None or idx >= len(row_vals):
+                    return ""
+                val = row_vals[idx]
+                return "" if val is None else str(val).strip()
+
+            out_wb = openpyxl.Workbook()
+            out_sh = out_wb.active
+            out_sh.title = "FuzzyLookupResults"
+            out_headers = [
+                "Input Name",
+                "Input C/O",
+                "Input Address",
+                "Input Mobile",
+                "Matched Consumer ID",
+                "Matched Name",
+                "Matched Address",
+                "Matched Mobile",
+                "Combined Text Match %",
+                "Mobile Exact Match %",
+                "Final Score %",
+                "Match Type",
+                "Rank",
+            ]
+            out_sh.append(out_headers)
+
+            for in_row in data_rows:
+                _processed[0] += 1
+                _now = time.time()
+                if _now - _last_ui[0] >= 0.15:
+                    _last_ui[0] = _now
+                    root.after(0, _update_progress)
+
+                if not in_row:
+                    continue
+
+                input_name = _get_input_value(in_row, "name", 0)
+                input_co = _get_input_value(in_row, "co", 1)
+                input_address = _get_input_value(in_row, "address", 2)
+                input_mobile = _get_input_value(in_row, "mobile", 3)
+
+                if not (input_name or input_co or input_address or input_mobile):
+                    continue
+
+                input_combined = _normalize_fuzzy_text(f"{input_name} {input_co} {input_address}")
+                input_mobile_norm = _normalize_mobile_10(input_mobile)
+                input_tokens = [t for t in _tokenize_for_lookup(input_combined) if len(t) >= 3]
+
+                candidate_ids = set()
+
+                # Exact mobile is the strongest and fastest blocker.
+                if input_mobile_norm:
+                    candidate_ids.update(mobile_index.get(input_mobile_norm, set()))
+
+                # Prefix blocking from first few input tokens.
+                for tok in input_tokens[:6]:
+                    candidate_ids.update(prefix_index.get(tok[:3], set()))
+
+                # Add candidates by longest tokens to improve precision.
+                longest_tokens = sorted({t for t in input_tokens if len(t) >= 4}, key=len, reverse=True)[:4]
+                for tok in longest_tokens:
+                    candidate_ids.update(token_index.get(tok, set()))
+
+                # Fallback: if blocking is too narrow, relax using only prefixes.
+                if not candidate_ids and input_tokens:
+                    for tok in input_tokens:
+                        candidate_ids.update(prefix_index.get(tok[:3], set()))
+
+                # Last-resort fallback keeps behavior robust for unusual/short inputs.
+                if not candidate_ids:
+                    candidate_ids = set(range(len(prepped_db)))
+
+                candidates = []
+                for cand_idx in candidate_ids:
+                    db_row = prepped_db[cand_idx]
+                    text_score = 0.0
+                    if input_combined and db_row["combined_norm"]:
+                        if input_tokens and db_row["tokens"]:
+                            overlap = len(set(input_tokens).intersection(db_row["tokens"]))
+                            if overlap == 0 and (not input_mobile_norm or db_row["mobile_norm"] != input_mobile_norm):
+                                continue
+                        text_score = _fast_text_similarity(input_combined, db_row["combined_norm"])
+
+                    mobile_score = 100.0 if (input_mobile_norm and db_row["mobile_norm"] == input_mobile_norm) else 0.0
+                    final_score = max(text_score, mobile_score)
+
+                    if text_score >= (threshold * 100.0) or mobile_score == 100.0:
+                        candidates.append({
+                            "db": db_row,
+                            "text_score": text_score,
+                            "mobile_score": mobile_score,
+                            "final_score": final_score,
+                        })
+
+                candidates.sort(key=lambda x: (x["final_score"], x["text_score"], x["mobile_score"]), reverse=True)
+                candidates = candidates[:top_n]
+
+                if not candidates:
+                    out_sh.append([
+                        input_name,
+                        input_co,
+                        input_address,
+                        input_mobile,
+                        "",
+                        "",
+                        "",
+                        "",
+                        "0.00",
+                        "0.00",
+                        "0.00",
+                        "No Match",
+                        "",
+                    ])
+                    continue
+
+                rank = 1
+                for c in candidates:
+                    db_row = c["db"]
+                    if c["mobile_score"] == 100.0 and c["text_score"] >= (threshold * 100.0):
+                        match_type = "Both"
+                    elif c["mobile_score"] == 100.0:
+                        match_type = "Mobile Exact"
+                    else:
+                        match_type = "Fuzzy Text"
+
+                    out_sh.append([
+                        input_name,
+                        input_co,
+                        input_address,
+                        input_mobile,
+                        db_row["consumer_id"],
+                        db_row["name"],
+                        db_row["address"],
+                        db_row["mobile_number"],
+                        f"{c['text_score']:.2f}",
+                        f"{c['mobile_score']:.2f}",
+                        f"{c['final_score']:.2f}",
+                        match_type,
+                        rank,
+                    ])
+                    rank += 1
+
+            widths = [24, 24, 36, 16, 18, 26, 36, 16, 20, 18, 14, 14, 10]
+            for idx, width in enumerate(widths, start=1):
+                col = openpyxl.utils.get_column_letter(idx)
+                out_sh.column_dimensions[col].width = width
+            out_sh.freeze_panes = "A2"
+
+            out_wb.save(output_path)
+            root.after(0, lambda: messagebox.showinfo("Fuzzy Lookup Complete", f"Results exported to:\n{output_path}"))
+        except Exception as e:
+            root.after(0, lambda e=e: messagebox.showerror("Fuzzy Lookup Error", str(e)))
+        finally:
+            root.after(0, finish_ui)
+
+    def finish_ui():
+        progress_bar.stop()
+        progress_bar.pack_forget()
+        progress_bar.config(mode="indeterminate")
+        progress_bar["value"] = 0
+        status_label.config(text="Ready")
+
+    root.after(100, open_input_file)
+
+
+def open_fuzzy_lookup_tool_dialog():
+    dialog = Toplevel(root)
+    dialog.title("Fuzzy Lookup Tool")
+    dialog.geometry("500x260")
+    dialog.transient(root)
+    dialog.grab_set()
+
+    frm = tb.Frame(dialog, padding=16)
+    frm.pack(fill=BOTH, expand=True)
+
+    tb.Label(frm, text="Fuzzy Lookup Tool", font=("Segoe UI", 11, "bold"), bootstyle="primary").pack(anchor=NW)
+    tb.Label(
+        frm,
+        text=(
+            "Input columns: NAME, C/O, ADDRESS, MOBILE NUMBER.\n"
+            "Text matching uses combined NAME + C/O + ADDRESS against database NAME + ADDRESS.\n"
+            "Mobile is matched exactly and included in scoring/output."
+        ),
+        justify=LEFT,
+        wraplength=460,
+        bootstyle="secondary"
+    ).pack(anchor=NW, pady=(4, 10))
+
+    opts = tb.Frame(frm)
+    opts.pack(fill=X, pady=(0, 12))
+    tb.Label(opts, text="Threshold (0 to 1):", font=("Segoe UI", 9)).pack(side=LEFT)
+    threshold_var = tk.StringVar(value="0.85")
+    tb.Entry(opts, textvariable=threshold_var, width=8, justify="center").pack(side=LEFT, padx=(6, 16))
+
+    tb.Label(opts, text="Result Count:", font=("Segoe UI", 9)).pack(side=LEFT)
+    topn_var = tk.StringVar(value="5")
+    tb.Entry(opts, textvariable=topn_var, width=8, justify="center").pack(side=LEFT, padx=(6, 0))
+
+    btn_row = tb.Frame(frm)
+    btn_row.pack(fill=X)
+
+    tb.Button(
+        btn_row,
+        text="Generate Fuzzy Template",
+        width=24,
+        bootstyle="primary",
+        command=generate_fuzzy_lookup_template
+    ).pack(side=LEFT, padx=(0, 10))
+
+    def _run_and_close():
+        dialog.destroy()
+        run_fuzzy_lookup_threaded(threshold=threshold_var.get(), top_n=topn_var.get())
+
+    tb.Button(
+        btn_row,
+        text="Run Fuzzy Lookup",
+        width=20,
+        bootstyle="primary",
+        command=_run_and_close
+    ).pack(side=LEFT)
+
+    tb.Button(frm, text="Close", bootstyle="secondary", command=dialog.destroy).pack(side=BOTTOM, pady=(14, 0))
+
+
 def update_meter_list_threaded():
     dialog = Toplevel(root)
     dialog.title("Update Consumer Data")
-    dialog.geometry("430x220")
+    dialog.geometry("520x230")
     dialog.transient(root)
     dialog.grab_set()
 
@@ -1486,6 +1939,9 @@ mb.add_cascade(label="Tools", menu=tm)
 tm.add_command(label="Bill Calculator", command=lambda: BillCalculatorApp(root))
 tm.add_command(label="Theft Bill Calculator", command=lambda: TheftCalculatorApp(root))
 tm.add_command(label="Tariff Editor", command=lambda: TariffEditor(root))
+tm.add_command(label="Fuzzy Lookup", command=open_fuzzy_lookup_tool_dialog)
+# Disabled by default until consumer data confirms presence (update_meter_search_state re-enables it)
+tm.entryconfig("Fuzzy Lookup", state="disabled")
 
 hm = Menu(mb, tearoff=0)
 mb.add_cascade(label="Help", menu=hm)
