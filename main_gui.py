@@ -11,9 +11,10 @@ import json
 import subprocess
 import sys
 import webbrowser
+import ctypes
 from datetime import datetime
 import openpyxl
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageDraw
 
 import tkinter as tk
 from tkinter import messagebox, filedialog, Menu, Toplevel, Listbox, ttk
@@ -43,6 +44,44 @@ preview_canvas_widgets = []
 
 LIGHT_THEME = "cosmo"
 DARK_THEME = "darkly"
+
+
+def set_windows_app_id():
+    """Set an explicit AppUserModelID so Windows taskbar uses this app identity."""
+    if os.name != "nt":
+        return
+
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("SpotImageViewer.App")
+    except Exception:
+        pass
+
+
+def ensure_app_icons():
+    """Create app icon files once and return (ico_path, png_path)."""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    assets_dir = os.path.join(base_dir, "assets")
+    os.makedirs(assets_dir, exist_ok=True)
+    png_path = os.path.join(assets_dir, "spot_icon.png")
+    ico_path = os.path.join(assets_dir, "spot_icon.ico")
+
+    if os.path.exists(png_path) and os.path.exists(ico_path):
+        return ico_path, png_path
+
+    size = 128
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    # Rounded-square tile and a simple camera glyph for clear readability.
+    draw.rounded_rectangle((8, 8, size - 8, size - 8), radius=24, fill=(14, 86, 237, 255))
+    draw.rounded_rectangle((28, 42, size - 28, size - 28), radius=14, fill=(255, 255, 255, 255))
+    draw.ellipse((50, 50, 78, 78), fill=(14, 86, 237, 255))
+    draw.rectangle((40, 34, 58, 44), fill=(255, 255, 255, 255))
+    draw.ellipse((44, 36, 54, 46), fill=(14, 86, 237, 255))
+
+    img.save(png_path, format="PNG")
+    img.save(ico_path, format="ICO", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128)])
+    return ico_path, png_path
 
 
 def is_dark_mode_active():
@@ -1059,10 +1098,28 @@ def on_startup_check():
 # ==============================================================================
 # GUI SETUP 
 # ==============================================================================
+set_windows_app_id()
+
 root = tb.Window(themename="cosmo") 
 root.title(f"Spot Image Viewer V{config.CURRENT_VERSION}")
 root.geometry("1300x850")
 root.state("zoomed")
+
+try:
+    icon_ico, icon_png = ensure_app_icons()
+    if os.name == "nt":
+        root.iconbitmap(icon_ico)
+        root.wm_iconbitmap(icon_ico)
+
+    # Keep a persistent reference so Tk does not garbage-collect the icon image.
+    app_icon = ImageTk.PhotoImage(Image.open(icon_png))
+    root.iconphoto(True, app_icon)
+
+    if os.name == "nt":
+        root.after(100, lambda: root.iconbitmap(icon_ico))
+except Exception as e:
+    print(f"Icon setup warning: {e}")
+    app_icon = None
 
 def on_close():
     root.destroy()

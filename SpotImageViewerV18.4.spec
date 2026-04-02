@@ -21,6 +21,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='SpotImageViewerV18.4',
+    icon='assets/spot_icon.ico',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
