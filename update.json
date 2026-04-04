@@ -1,7 +1,11 @@
 {
   "version": 19.1,
   "release_notes": "V19.1 Updates:\n\n- Added full Consumer Data workflow with fields: Consumer ID, Meter No, Name, Address, Mobile Number, Contractual Load, and Class.\n- Added Name and Mobile search support with proper multi-result handling.\n- Improved Details pane to show complete consumer information in compact wrapped format.\n- Added Update Consumer Data action dialog with two options: Generate Template and Import Consumer Data.\n- Added consumer data template generator (.xlsx) with required headers for easy copy/paste workflows.\n- Search controls UI refined for alignment, spacing consistency, and better button behavior when consumer data is unavailable.\n- Meter/Name/Mobile search controls are now disabled until consumer data is imported, with clear inline guidance.",
-  "download_url": "https://drive.google.com/uc?export=download&id=1xNNneIK4cJxH8nhaxYMuSAy95vt4_OVM",
+  "download_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/V19.1/SpotImageViewerV19.1.zip",
+  "installer_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/V19.1/SpotImageViewerV19.1.zip",
+  "install_args": "/VERYSILENT /NORESTART",
+  "launch_exe": "SpotImageViewerV19.1.exe",
+  "sha256": "a36570694cd0a906dea277ac99599b1fb04daf8b03a0ca631e1759a20abd09d3",
   "previous_versions": [
     {
       "version": 18.4,
