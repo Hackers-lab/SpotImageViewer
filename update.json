@@ -4,7 +4,7 @@
   "download_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/V19.1/SpotImageViewerV19.1.zip",
   "installer_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/V19.1/SpotImageViewerV19.1.zip",
   "install_args": "/VERYSILENT /NORESTART",
-  "launch_exe": "SpotImageViewerV19.1.exe",
+  "launch_exe": "SpotImageViewerV19.1\\SpotImageViewerV19.1.exe",
   "sha256": "a36570694cd0a906dea277ac99599b1fb04daf8b03a0ca631e1759a20abd09d3",
   "previous_versions": [
     {
