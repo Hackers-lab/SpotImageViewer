@@ -197,7 +197,8 @@ class TheftCalculatorApp:
 
         diff_rs = prov_net - final_net
         diff_pct = (diff_rs / prov_net * 100) if prov_net > 0 else 0
-        self.diff_lbl.config(text=f"Final Assessment Relief:  ₹ {diff_rs:,.2f}   ({diff_pct:.2f}%)")
+        relief_style = DANGER if diff_pct > 25 else SUCCESS
+        self.diff_lbl.config(text=f"Final Assessment Relief: ₹ {diff_rs:,.2f} ({diff_pct:.2f}%)", bootstyle=relief_style)
 
     def on_hours_focus_out(self, var, label):
         value = self.normalize_hours_input(var)
@@ -205,13 +206,6 @@ class TheftCalculatorApp:
         self.calculate_all()
 
     def setup_ui(self):
-        summary_frame = ttk.Frame(self.window)
-        summary_frame.pack(side=BOTTOM, fill=X, padx=15, pady=(0, 15))
-        ttk.Separator(summary_frame, orient=HORIZONTAL).pack(fill=X)
-        self.diff_lbl = ttk.Label(summary_frame, text="Final Assessment Relief: ₹ 0.00  (0.00%)", font=("Segoe UI", 12, "bold"), bootstyle=PRIMARY)
-        self.diff_lbl.pack(pady=10)
-        ttk.Separator(summary_frame, orient=HORIZONTAL).pack(fill=X)
-
         main_frame = ttk.Frame(self.window)
         main_frame.pack(fill=BOTH, expand=YES, padx=15, pady=15)
 
@@ -224,6 +218,7 @@ class TheftCalculatorApp:
         input_bar.pack(fill=X, padx=20, pady=10)
         input_bar.columnconfigure(0, weight=0) 
         input_bar.columnconfigure(1, weight=1)
+        input_bar.columnconfigure(2, weight=1)
 
         ttk.Label(input_bar, text="Offender Type:", font=self.FONT_LABEL).grid(row=0, column=0, sticky=W, pady=5)
         offender_subframe = ttk.Frame(input_bar)
@@ -241,6 +236,14 @@ class TheftCalculatorApp:
         load_subframe.grid(row=2, column=1, sticky=W)
         ttk.Entry(load_subframe, textvariable=self.load_var, justify="center", width=12).pack(side=LEFT, padx=5)
         ttk.Combobox(load_subframe, textvariable=self.load_unit_var, values=["KVA", "kW"], state="readonly", width=6).pack(side=LEFT)
+
+        self.diff_lbl = ttk.Label(
+            input_bar,
+            text="Final Assessment Relief: ₹ 0.00 (0.00%)",
+            font=("Segoe UI", 11, "bold"),
+            bootstyle=SUCCESS
+        )
+        self.diff_lbl.grid(row=2, column=2, sticky=E, padx=(10, 0))
 
         panels_frame = ttk.Frame(main_frame)
         panels_frame.pack(fill=BOTH, expand=YES)

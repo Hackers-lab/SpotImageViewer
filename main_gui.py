@@ -1720,7 +1720,6 @@ def open_fuzzy_lookup_tool_dialog():
 def update_meter_list_threaded():
     dialog = Toplevel(root)
     dialog.title("Update Consumer Data")
-    dialog.geometry("520x230")
     dialog.transient(root)
     dialog.grab_set()
 
@@ -1783,6 +1782,21 @@ def update_meter_list_threaded():
     ).pack(side=LEFT)
 
     tb.Button(frm, text="Close", bootstyle="secondary", command=dialog.destroy).pack(side=BOTTOM, pady=(14, 0))
+
+    # Auto-fit dialog to content and keep it within visible screen bounds.
+    dialog.update_idletasks()
+    required_width = dialog.winfo_reqwidth()
+    required_height = dialog.winfo_reqheight()
+    screen_width = dialog.winfo_screenwidth()
+    screen_height = dialog.winfo_screenheight()
+    screen_margin = 24
+
+    width = min(required_width, screen_width - (screen_margin * 2))
+    height = min(required_height, screen_height - (screen_margin * 2))
+    x = max(screen_margin, (screen_width - width) // 2)
+    y = max(screen_margin, (screen_height - height) // 2)
+
+    dialog.geometry(f"{width}x{height}+{x}+{y}")
 
 def show_about():
     about_win = Toplevel(root)
