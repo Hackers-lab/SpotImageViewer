@@ -1,6 +1,7 @@
 from bill_calculator import BillCalculatorApp
 from theft_calculator import TheftCalculatorApp
 from tariff_editor import TariffEditor
+from image_check_status import ImageCheckStatus
 
 import os
 import shutil
@@ -1956,6 +1957,8 @@ tm.add_command(label="Tariff Editor", command=lambda: TariffEditor(root))
 tm.add_command(label="Fuzzy Lookup", command=open_fuzzy_lookup_tool_dialog)
 # Disabled by default until consumer data confirms presence (update_meter_search_state re-enables it)
 tm.entryconfig("Fuzzy Lookup", state="disabled")
+tm.add_separator()
+tm.add_command(label="Image Check Status", command=lambda: ImageCheckStatus(root))
 
 hm = Menu(mb, tearoff=0)
 mb.add_cascade(label="Help", menu=hm)
