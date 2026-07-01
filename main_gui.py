@@ -1,7 +1,7 @@
 from bill_calculator import BillCalculatorApp
 from theft_calculator import TheftCalculatorApp
 from tariff_editor import TariffEditor
-from image_check_status import ImageCheckStatus
+
 
 import os
 import shutil
@@ -215,6 +215,14 @@ def _toggle_btn_style(active):
 
 def launch_tool(script_name, tool_title):
     try:
+        if getattr(sys, 'frozen', False):
+            base_dir = os.path.dirname(sys.executable)
+            exe_name = os.path.splitext(script_name)[0] + ".exe"
+            exe_path = os.path.join(base_dir, exe_name)
+            if os.path.exists(exe_path):
+                subprocess.Popen([exe_path], cwd=base_dir)
+                return
+
         script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), script_name)
         if not os.path.exists(script_path):
             messagebox.showerror("Tool Not Found", f"{tool_title} file was not found:\n{script_path}")
@@ -1958,7 +1966,7 @@ tm.add_command(label="Fuzzy Lookup", command=open_fuzzy_lookup_tool_dialog)
 # Disabled by default until consumer data confirms presence (update_meter_search_state re-enables it)
 tm.entryconfig("Fuzzy Lookup", state="disabled")
 tm.add_separator()
-tm.add_command(label="Image Check Status", command=lambda: ImageCheckStatus(root))
+tm.add_command(label="Image Check GUI", command=lambda: launch_tool("imagecheckgui.py", "Image Check GUI"))
 
 hm = Menu(mb, tearoff=0)
 mb.add_cascade(label="Help", menu=hm)

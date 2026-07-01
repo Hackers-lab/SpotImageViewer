@@ -47,6 +47,7 @@ Beyond image viewing, SpotImageViewer is a computational powerhouse for utility 
 ![Bill Calculator](images/bill%20calculator.jpg)
 
 *   **Low Consumption Auditor:** Automatically cross-check usage patterns to identify potential meter issues or abnormalities.
+*   **WBSedcl Meter Verification (Image Check GUI):** A standalone specialized tool designed to audit spot images, perform OTP-secured logins, verify meter installations, and commit audit verdicts directly back to the Tomcat web service portal.
 
 ### ⚙️ Intelligent Data Management
 *   **Dynamic Tariff Editor:** Keep your calculations up-to-date with a built-in manager for electricity tariff slabs.
