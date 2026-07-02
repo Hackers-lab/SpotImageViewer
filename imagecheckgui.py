@@ -223,7 +223,7 @@ class TomcatAPIClient:
             msg = res.get("message") if isinstance(res, dict) else str(res)
             raise Exception(f"Failed to fetch billing history: {msg}")
 
-    def submit_audit_record(self, username, token, off_code, acc_month, acc_year, ccc_code, ccc_name, con_id, smrdn, verification_stat, meter_note=" ", sapdata="MIS"):
+    def submit_audit_record(self, username, token, off_code, acc_month, acc_year, ccc_code, ccc_name, con_id, smrdn, verification_stat, meter_note=" ", sapdata="MIS", tariff=" "):
         path = "/spotaiportal/snapshot"
         payload = [{
             "username": username,
@@ -238,6 +238,7 @@ class TomcatAPIClient:
             "verification_stat": verification_stat,
             "meter_note": meter_note if meter_note else " ",
             "sapdata": sapdata,
+            "tariff": tariff if tariff else " ",
             "parameter": "imagecheckinginsert"
         }]
         res = self._post(path, payload)
@@ -496,7 +497,12 @@ class ActiveQueueFrame(ctk.CTkScrollableFrame):
         self.badge_labels = {} # con_id -> tk.Label
         self.selected_con_id = None
 
-    def populate_queue(self, records):
+    def populate_queue(self, records, audited_ids=None, audit_decisions=None, allow_without_lookup=True):
+        if audited_ids is None:
+            audited_ids = set()
+        if audit_decisions is None:
+            audit_decisions = {}
+
         # Destroy all children first
         for child in self.winfo_children():
             child.destroy()
@@ -519,8 +525,21 @@ class ActiveQueueFrame(ctk.CTkScrollableFrame):
             row_frm.pack(fill="x", pady=2, padx=4)
             self.row_frames[con_id] = row_frm
 
+            # Resolve status
+            if con_id in audited_ids:
+                status = audit_decisions.get(con_id, {}).get("verification_stat", "C")
+            else:
+                status = "C" if allow_without_lookup else "Pending"
+
             # Checkbox
-            var = tk.StringVar(value="C")
+            var = tk.StringVar()
+            if status == "C":
+                var.set("C")
+            elif status == "Pending":
+                var.set("")
+            else:
+                var.set(status)
+
             self.checkbox_vars[con_id] = var
             chk = tk.Checkbutton(
                 row_frm, 
@@ -549,11 +568,44 @@ class ActiveQueueFrame(ctk.CTkScrollableFrame):
             meter_lbl.pack(anchor="w", fill="x", pady=(0, 2))
 
             # Status Badge Label
+            if status == "C":
+                b_text = "Approved"
+                b_bg = "#064e3b"
+                b_fg = "#10b981"
+            elif status == "Pending":
+                b_text = "Pending"
+                b_bg = "#374151"
+                b_fg = "#9ca3af"
+            elif status == "IL":
+                b_text = "Illegible"
+                b_bg = "#78350f"
+                b_fg = "#fbbf24"
+            elif status == "MM":
+                b_text = "Diff Meter"
+                b_bg = "#7f1d1d"
+                b_fg = "#f87171"
+            elif status == "LM":
+                b_text = "Diff Loc"
+                b_bg = "#581c87"
+                b_fg = "#c084fc"
+            elif status == "NMI":
+                b_text = "Non Meter"
+                b_bg = "#374151"
+                b_fg = "#9ca3af"
+            elif status == "I":
+                b_text = "Mismatch"
+                b_bg = "#1e3a8a"
+                b_fg = "#60a5fa"
+            else:
+                b_text = "Approved"
+                b_bg = "#064e3b"
+                b_fg = "#10b981"
+
             badge = tk.Label(
                 row_frm, 
-                text="Approved", 
-                bg="#064e3b", 
-                fg="#10b981", 
+                text=b_text, 
+                bg=b_bg, 
+                fg=b_fg, 
                 font=("Arial", 9, "bold"),
                 width=10,
                 height=1,
@@ -605,6 +657,8 @@ class ActiveQueueFrame(ctk.CTkScrollableFrame):
         if con_id_str in self.checkbox_vars:
             if status == "C":
                 self.checkbox_vars[con_id_str].set("C")
+            elif status == "Pending":
+                self.checkbox_vars[con_id_str].set("")
             else:
                 self.checkbox_vars[con_id_str].set(status) # offvalue
 
@@ -616,6 +670,12 @@ class ActiveQueueFrame(ctk.CTkScrollableFrame):
                     text="Approved", 
                     bg="#064e3b", 
                     fg="#10b981"
+                )
+            elif status == "Pending":
+                lbl.configure(
+                    text="Pending", 
+                    bg="#374151", 
+                    fg="#9ca3af"
                 )
             elif status == "IL":
                 lbl.configure(
@@ -873,6 +933,8 @@ class MeterAuditApp(ctk.CTk):
         self.audit_decisions = {} # con_id -> {"verification_stat": status, "meter_note": note}
         self.is_committing = False
         self.audited_ids = set()
+        self.allow_submission_without_lookup = False # Settings security flag
+        self.cancel_requested = False
         self.telemetry_labels = {}
         self.keep_alive_active = False
         self.keep_alive_thread = None
@@ -1165,7 +1227,7 @@ class MeterAuditApp(ctk.CTk):
         self.pacing_lbl = ctk.CTkLabel(slider_frm, text="Pacing: 0.4s", font=ctk.CTkFont(size=10))
         self.pacing_lbl.pack(side="left", padx=(2, 4))
         
-        self.pacing_slider = ctk.CTkSlider(slider_frm, from_=0.1, to=2.0, number_of_steps=19, height=14, command=self.on_pacing_change)
+        self.pacing_slider = ctk.CTkSlider(slider_frm, from_=0.1, to=15.0, number_of_steps=149, height=14, command=self.on_pacing_change)
         self.pacing_slider.set(0.4)
         self.pacing_slider.pack(side="left", fill="x", expand=True)
 
@@ -1182,7 +1244,7 @@ class MeterAuditApp(ctk.CTk):
 
         self.commit_btn = ctk.CTkButton(
             self.selector_frm, 
-            text="Commit Batch", 
+            text="Update", 
             height=26, 
             fg_color="#10b981", 
             hover_color="#059669", 
@@ -1190,6 +1252,19 @@ class MeterAuditApp(ctk.CTk):
             command=self.start_batch_commit
         )
         self.commit_btn.grid(row=2, column=3, padx=4, pady=(2, 8), sticky="ew")
+
+        # Row 3: Security & Submission Settings
+        settings_frm = ctk.CTkFrame(self.selector_frm, fg_color="transparent")
+        settings_frm.grid(row=3, column=0, columnspan=4, padx=6, pady=(0, 6), sticky="ew")
+        
+        self.submission_toggle = ctk.CTkSwitch(
+            settings_frm,
+            text="Allow Submission Without Lookup",
+            font=ctk.CTkFont(size=11),
+            command=self.toggle_submission_setting
+        )
+        self.submission_toggle.deselect()  # Unchecked by default
+        self.submission_toggle.pack(side="left", padx=4)
 
         # 3. Active Queue Table Container
         self.table_frm = ctk.CTkFrame(self.left_panel, fg_color="#23232f", corner_radius=8)
@@ -1568,7 +1643,12 @@ class MeterAuditApp(ctk.CTk):
         self.log_to_console(f"Loaded {len(records)} records in-memory from {source}.")
 
         # Populate GUI Table list
-        self.queue_frame.populate_queue(records)
+        self.queue_frame.populate_queue(
+            records,
+            audited_ids=self.audited_ids,
+            audit_decisions=self.audit_decisions,
+            allow_without_lookup=self.allow_submission_without_lookup
+        )
 
         # Restore local progress
         self.load_local_progress()
@@ -1841,20 +1921,33 @@ class MeterAuditApp(ctk.CTk):
         total = len(self.queue_records)
         audited = len(self.audited_ids)
         
-        correct = total
+        correct = 0
         illegible = 0
         other = 0
         
         for rec in self.queue_records:
             cid = str(rec.get("con_id"))
-            dec = self.audit_decisions.get(cid, {"verification_stat": "C"})
-            stat = dec.get("verification_stat", "C")
-            if stat == "IL":
-                illegible += 1
-                correct -= 1
-            elif stat in ("MM", "LM", "NMI", "I"):
-                other += 1
-                correct -= 1
+            if self.allow_submission_without_lookup:
+                # Count un-audited records as Correct by default
+                dec = self.audit_decisions.get(cid, {"verification_stat": "C"})
+                stat = dec.get("verification_stat", "C")
+                if stat == "IL":
+                    illegible += 1
+                elif stat in ("MM", "LM", "NMI", "I"):
+                    other += 1
+                else:
+                    correct += 1
+            else:
+                # Only count audited records
+                if cid in self.audited_ids:
+                    dec = self.audit_decisions.get(cid, {"verification_stat": "C"})
+                    stat = dec.get("verification_stat", "C")
+                    if stat == "IL":
+                        illegible += 1
+                    elif stat in ("MM", "LM", "NMI", "I"):
+                        other += 1
+                    else:
+                        correct += 1
                 
         pct = int((audited / total) * 100) if total > 0 else 0
         self.stats_progress_lbl.configure(text=f"Progress: {audited} / {total} ({pct}%)")
@@ -1863,6 +1956,8 @@ class MeterAuditApp(ctk.CTk):
         self.lbl_stat_correct.configure(text=str(correct))
         self.lbl_stat_illegible.configure(text=str(illegible))
         self.lbl_stat_other.configure(text=str(other))
+        
+        self.update_button_state()
 
     def open_consumer_details_popup(self):
         if self.current_index < 0 or self.current_index >= len(self.queue_records):
@@ -2030,25 +2125,36 @@ class MeterAuditApp(ctk.CTk):
             return
         
         if self.is_committing:
-            messagebox.showwarning("Commit Blocked", "Batch submission is already running.")
+            # If already running, this button click represents a Cancel request
+            if not self.cancel_requested:
+                self.cancel_requested = True
+                self.commit_btn.configure(state="disabled", text="Stopping...")
+                self.log_to_console("🛑 Cancellation requested. Safely aborting remaining upload tasks...")
             return
 
         confirm = messagebox.askyesno(
-            "Confirm Batch Commit", 
-            f"Are you sure you want to commit verification decisions for all {len(self.queue_records)} records to the backend Tomcat server?"
+            "Confirm Batch Update", 
+            f"Are you sure you want to update verification decisions for all {len(self.queue_records)} records to the backend Tomcat server?"
         )
         if not confirm:
             return
 
         self.is_committing = True
-        self.commit_btn.configure(state="disabled", text="Committing...")
+        self.cancel_requested = False
+        
+        # Turn the update button into a red cancel button
+        self.commit_btn.configure(text="Cancel Update", fg_color="#ef4444", hover_color="#dc2626")
         self.fetch_queue_btn.configure(state="disabled")
+        self.set_selectors_state("disabled")
 
         # Run submission loop in background thread
         threading.Thread(target=self._batch_commit_task, daemon=True).start()
 
     def _batch_commit_task(self):
         records = list(self.queue_records)
+        if not self.allow_submission_without_lookup:
+            records = [r for r in records if str(r.get("con_id")) in self.audited_ids]
+
         decisions = dict(self.audit_decisions)
         
         username = self.session_username
@@ -2059,18 +2165,61 @@ class MeterAuditApp(ctk.CTk):
         pacing = float(self.pacing_slider.get())
 
         total = len(records)
+        if total == 0:
+            self.log_to_console("⚠️ Batch Commit Aborted: No audited/marked records to submit.")
+            self.after(0, lambda: messagebox.showwarning(
+                "No Audited Records", 
+                "No manually audited records were found. Please mark/audit records first, or enable 'Allow Submission Without Lookup' in the settings."
+            ))
+            self.is_committing = False
+            
+            def restore_ui_early():
+                self.commit_btn.configure(state="normal", text="Update", fg_color="#10b981", hover_color="#059669")
+                self.fetch_queue_btn.configure(state="normal")
+                self.set_selectors_state("normal")
+            self.after(0, restore_ui_early)
+            return
+
         success_count = 0
         failure_count = 0
 
         self.log_to_console(f"\n--- Batch Upload Initiated ({total} records) ---")
 
         for idx, rec in enumerate(records, start=1):
+            if self.cancel_requested:
+                self.log_to_console("🛑 Update process stopped by the user.")
+                break
             con_id = rec.get("con_id")
             
             # Extract decision
-            decision = decisions.get(str(con_id), {"verification_stat": "C", "meter_note": " "})
+            decision = decisions.get(str(con_id), {"verification_stat": "C"})
             status = decision.get("verification_stat", "C")
-            note = decision.get("meter_note", " ")
+            
+            # Format meter note dynamically: keep original if not "003"/empty, else send three spaces
+            original_mrnote = rec.get("mrnote", "") or ""
+            if original_mrnote in ("003", "") or str(original_mrnote).strip() == "":
+                note_to_submit = "   "
+            else:
+                note_to_submit = str(original_mrnote)
+
+            # Calculate sapdata from ai_flag dynamically
+            ai_flag_val = rec.get("ai_flag", "") or ""
+            ai_flag_str = str(ai_flag_val).strip()
+            if "Accepted by Meter Reader" in ai_flag_str:
+                sapdata_val = "HIT"
+            elif "Not accepted by Meter Reader" in ai_flag_str:
+                sapdata_val = "MIS"
+            elif "No Reading from AI Engine" in ai_flag_str:
+                sapdata_val = "NOA"
+            elif "Not under AI scope" in ai_flag_str or "Not under AI Scope" in ai_flag_str:
+                sapdata_val = "NUS"
+            else:
+                sapdata_val = "MIS"
+
+            # Extract tariff class
+            tariff_val = rec.get("tariff", " ")
+            if not tariff_val or str(tariff_val).strip().lower() == "none":
+                tariff_val = " "
 
             ccc_code = rec.get("ccc_code", off_code)
             ccc_name = rec.get("ccc_name", "KUSHIDA CCC")
@@ -2081,7 +2230,7 @@ class MeterAuditApp(ctk.CTk):
                 smrdn = " "
 
             # Log current action
-            self.log_to_console(f"[{idx}/{total}] Uploading Consumer ID {con_id} (Status: {status})...")
+            self.log_to_console(f"[{idx}/{total}] Uploading Consumer ID {con_id} (Status: {status}, Sapdata: {sapdata_val}, Tariff: {tariff_val})...")
 
             # Try request
             try:
@@ -2096,7 +2245,9 @@ class MeterAuditApp(ctk.CTk):
                     con_id=con_id,
                     smrdn=smrdn,
                     verification_stat=status,
-                    meter_note=note
+                    meter_note=note_to_submit,
+                    sapdata=sapdata_val,
+                    tariff=tariff_val
                 )
                 if success:
                     success_count += 1
@@ -2125,14 +2276,168 @@ class MeterAuditApp(ctk.CTk):
         # Reset UI controls on main thread
         def reset_ui():
             self.is_committing = False
-            self.commit_btn.configure(state="normal", text="Commit Batch")
+            self.commit_btn.configure(state="normal", text="Update", fg_color="#10b981", hover_color="#059669")
             self.fetch_queue_btn.configure(state="normal")
-            messagebox.showinfo(
-                "Batch Execution Done", 
-                f"Batch upload finished.\n\nSuccess: {success_count}\nFailures: {failure_count}"
-            )
+            self.set_selectors_state("normal")
+            
+            if self.cancel_requested:
+                processed = success_count + failure_count
+                messagebox.showwarning(
+                    "Upload Cancelled", 
+                    f"Batch upload was aborted by user.\n\nSuccessfully updated: {success_count}\nRemaining: {total - processed}"
+                )
+            else:
+                messagebox.showinfo(
+                    "Batch Execution Done", 
+                    f"Batch upload finished.\n\nSuccess: {success_count}\nFailures: {failure_count}"
+                )
+            self.cancel_requested = False
 
         self.after(0, reset_ui)
+
+    def prompt_password(self, callback):
+        """Shows a premium password modal popup to confirm settings change."""
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Security Verification")
+        dialog.geometry("340x180")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+        
+        # Center the dialog on the screen relative to parent
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() // 2) - 170
+        y = self.winfo_y() + (self.winfo_height() // 2) - 90
+        dialog.geometry(f"+{x}+{y}")
+        
+        lbl = ctk.CTkLabel(
+            dialog, 
+            text="Enter Password to toggle this setting:", 
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        lbl.pack(pady=(20, 10))
+        
+        pw_entry = ctk.CTkEntry(dialog, show="*", width=200)
+        pw_entry.pack(pady=5)
+        pw_entry.focus_force()
+        
+        btn_frm = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_frm.pack(pady=(15, 10))
+        
+        def on_confirm(event=None):
+            pw = pw_entry.get()
+            if pw == "password":
+                dialog.destroy()
+                callback(True)
+            else:
+                messagebox.showerror("Access Denied", "Incorrect password!", parent=dialog)
+                dialog.destroy()
+                callback(False)
+                
+        def on_cancel():
+            dialog.destroy()
+            callback(None)
+            
+        pw_entry.bind("<Return>", on_confirm)
+        
+        btn_ok = ctk.CTkButton(
+            btn_frm, 
+            text="Verify", 
+            width=80, 
+            fg_color="#10b981", 
+            hover_color="#059669", 
+            command=on_confirm
+        )
+        btn_ok.pack(side="left", padx=5)
+        
+        btn_cancel = ctk.CTkButton(
+            btn_frm, 
+            text="Cancel", 
+            width=80, 
+            fg_color="gray30", 
+            hover_color="gray40", 
+            command=on_cancel
+        )
+        btn_cancel.pack(side="left", padx=5)
+
+    def toggle_submission_setting(self):
+        # We need to verify password to change the value
+        # First, temporarily revert the switch value visual state until verified
+        current_switch_state = self.submission_toggle.get()
+        
+        # Toggle back visually until password is authenticated
+        if current_switch_state == 1:
+            self.submission_toggle.deselect()
+        else:
+            self.submission_toggle.select()
+            
+        def on_verified(result):
+            if result is True:
+                # Password correct, apply new state
+                if current_switch_state == 1:
+                    self.submission_toggle.select()
+                    self.allow_submission_without_lookup = True
+                    self.log_to_console("Security Settings: Enabled submission without lookup.")
+                else:
+                    self.submission_toggle.deselect()
+                    self.allow_submission_without_lookup = False
+                    self.log_to_console("Security Settings: Disabled submission without lookup.")
+                self.refresh_unaudited_rows()
+                self.update_stats_dashboard()
+            elif result is False:
+                # Password incorrect, keep old state (already reverted visually)
+                pass
+            else:
+                # Canceled, keep old state (already reverted visually)
+                pass
+                
+        self.prompt_password(on_verified)
+
+    def set_selectors_state(self, state):
+        """Disables or enables top selector dropdown menus to prevent corruption during upload."""
+        self.month_combo.configure(state=state)
+        self.year_combo.configure(state=state)
+        self.aiflag_combo.configure(state=state)
+        self.mru_combo.configure(state=state)
+
+    def refresh_unaudited_rows(self):
+        """Refreshes the badges and checkboxes of un-audited records when settings change."""
+        for rec in self.queue_records:
+            con_id_str = str(rec.get("con_id"))
+            if con_id_str not in self.audited_ids:
+                if self.allow_submission_without_lookup:
+                    # Show as Approved
+                    if con_id_str in self.queue_frame.checkbox_vars:
+                        self.queue_frame.checkbox_vars[con_id_str].set("C")
+                    if con_id_str in self.queue_frame.badge_labels:
+                        self.queue_frame.badge_labels[con_id_str].configure(
+                            text="Approved", 
+                            bg="#064e3b", 
+                            fg="#10b981"
+                        )
+                else:
+                    # Show as Pending
+                    if con_id_str in self.queue_frame.checkbox_vars:
+                        self.queue_frame.checkbox_vars[con_id_str].set("")
+                    if con_id_str in self.queue_frame.badge_labels:
+                        self.queue_frame.badge_labels[con_id_str].configure(
+                            text="Pending", 
+                            bg="#374151", 
+                            fg="#9ca3af"
+                        )
+
+    def update_button_state(self):
+        """Updates the enable/disable state of the Update button based on settings and audited records."""
+        if self.is_committing:
+            return
+            
+        if self.allow_submission_without_lookup:
+            self.commit_btn.configure(state="normal")
+        else:
+            if len(self.audited_ids) > 0:
+                self.commit_btn.configure(state="normal")
+            else:
+                self.commit_btn.configure(state="disabled")
 
 
 if __name__ == "__main__":
