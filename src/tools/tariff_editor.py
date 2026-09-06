@@ -122,10 +122,15 @@ class SlabEditor(ttk.Toplevel):
             Messagebox.show_error("Invalid input. Limit must be an integer (or 'None') and rate must be a number.", "Input Error", parent=self)
 
 class TariffEditor:
-    def __init__(self, parent):
-        self.window = ttk.Toplevel(parent)
-        self.window.title("WBSEDCL Tariff Editor")
-        self.window.geometry("900x600")
+    def __init__(self, parent, container=None):
+        if container is not None:
+            self.window = container
+            self.is_embedded = True
+        else:
+            self.window = ttk.Toplevel(parent)
+            self.window.title("WBSEDCL Tariff Editor")
+            self.window.geometry("900x600")
+            self.is_embedded = False
         self.data = tariff_manager.load_tariff()
         self.current_category = None
 
@@ -190,13 +195,12 @@ class TariffEditor:
         save_button = ttk.Button(self.details_frame, text="Save Category Changes", command=self.save_category, bootstyle=SUCCESS)
         save_button.pack(pady=10)
         
-        self.details_frame.pack_forget() # Hide until a category is selected
-
-        # Initial Warning
-        Messagebox.show_warning(
-            "You are about to edit the live tariff configuration. Changes will directly impact calculations. Proceed with caution.",
-            "Editor Warning", parent=self.window
-        )
+        # Initial Warning (only if launched as separate standalone window)
+        if not getattr(self, 'is_embedded', False):
+            Messagebox.show_warning(
+                "You are about to edit the live tariff configuration. Changes will directly impact calculations. Proceed with caution.",
+                "Editor Warning", parent=self.window
+            )
 
     def create_slab_tab(self, key, text):
         tab = ttk.Frame(self.notebook, padding=5)

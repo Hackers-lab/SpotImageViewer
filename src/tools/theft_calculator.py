@@ -4,12 +4,17 @@ import math
 import tariff_manager
 
 class TheftCalculatorApp:
-    def __init__(self, parent):
+    def __init__(self, parent, container=None):
         self.tariff_data = tariff_manager.load_tariff()
         
-        self.window = ttk.Toplevel(parent)
-        self.window.title("Theft Assessment Calculator - SpotImageViewer")
-        self.window.state('zoomed')
+        if container is not None:
+            self.window = container
+            self.is_embedded = True
+        else:
+            self.window = ttk.Toplevel(parent)
+            self.window.title("Theft Assessment Calculator - SpotImageViewer")
+            self.window.state('zoomed')
+            self.is_embedded = False
 
         # Fonts
         self.FONT_TITLE = ("Segoe UI", 15, "bold")

@@ -29,6 +29,7 @@ import tkinter as tk
 from tkinter import messagebox, filedialog, Menu, Toplevel, Listbox, ttk
 from tkinter import CENTER, NE, NW, SW, SE, TOP, BOTTOM, LEFT, RIGHT, BOTH, X, Y, END
 import ttkbootstrap as tb
+import customtkinter as ctk
 
 import config
 import database
@@ -206,11 +207,23 @@ def update_theme_toggle_button_text():
         btn_theme_toggle.config(text="Light Mode", bootstyle="primary")
     else:
         btn_theme_toggle.config(text="Dark Mode", bootstyle="primary")
+    if 'sidebar_theme_switch' in globals():
+        try:
+            if is_dark_mode_active():
+                sidebar_theme_switch.select()
+            else:
+                sidebar_theme_switch.deselect()
+        except Exception:
+            pass
 
 
 def toggle_theme():
     next_theme = DARK_THEME if not is_dark_mode_active() else LIGHT_THEME
     root.style.theme_use(next_theme)
+    try:
+        ctk.set_appearance_mode("Dark" if next_theme == DARK_THEME else "Light")
+    except Exception:
+        pass
     refresh_non_ttk_widget_colors()
     update_theme_toggle_button_text()
 
@@ -1985,10 +1998,302 @@ def on_startup_check():
 # ==============================================================================
 set_windows_app_id()
 
-root = tb.Window(themename="cosmo") 
+set_windows_app_id()
+
+ctk.set_appearance_mode("Dark")
+ctk.set_default_color_theme("blue")
+
+root = ctk.CTk()
 root.title(f"Spot Image Viewer V{config.CURRENT_VERSION}")
-root.geometry("1300x850")
-root.state("zoomed")
+root.geometry("1360x880")
+root.minsize(1050, 680)
+
+# Initialize ttkbootstrap style onto CustomTkinter window
+root.style = tb.Style("darkly")
+
+# --- Layout: Main Horizontal Shell (Sidebar Left + Content Right) ---
+shell_frame = ctk.CTkFrame(root, corner_radius=0, fg_color="transparent")
+shell_frame.pack(fill=BOTH, expand=True)
+
+# 1. Left Navigation Sidebar
+sidebar_frame = ctk.CTkFrame(shell_frame, width=220, corner_radius=0)
+sidebar_frame.pack(side=LEFT, fill=Y)
+sidebar_frame.pack_propagate(False)
+
+# Sidebar Header
+brand_frame = ctk.CTkFrame(sidebar_frame, fg_color="transparent")
+brand_frame.pack(fill=X, padx=14, pady=(18, 12))
+
+lbl_logo = ctk.CTkLabel(
+    brand_frame,
+    text="⚡ SpotImageViewer",
+    font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold"),
+    anchor="w"
+)
+lbl_logo.pack(side=TOP, fill=X)
+
+lbl_v_badge = ctk.CTkLabel(
+    brand_frame,
+    text=f"Version {config.CURRENT_VERSION} • Pro Suite",
+    font=ctk.CTkFont(family="Segoe UI", size=10),
+    text_color="gray60",
+    anchor="w"
+)
+lbl_v_badge.pack(side=TOP, fill=X, pady=(2, 0))
+
+# Sidebar Navigation Buttons Container
+nav_btn_container = ctk.CTkFrame(sidebar_frame, fg_color="transparent")
+nav_btn_container.pack(fill=X, padx=8, pady=6)
+
+nav_buttons = {}
+
+def create_nav_button(nav_id, label, icon=""):
+    display_text = f"{icon}  {label}" if icon else label
+    btn = ctk.CTkButton(
+        nav_btn_container,
+        text=display_text,
+        height=40,
+        corner_radius=8,
+        anchor="w",
+        font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+        fg_color="transparent",
+        text_color=("gray10", "gray90"),
+        hover_color=("gray85", "gray25"),
+        command=lambda: switch_view(nav_id)
+    )
+    btn.pack(fill=X, pady=3)
+    nav_buttons[nav_id] = btn
+    return btn
+
+btn_nav_viewer = create_nav_button("viewer", "Viewer & Search", "🔍")
+btn_nav_bill   = create_nav_button("bill", "Bill Calculator", "⚡")
+btn_nav_theft  = create_nav_button("theft", "Theft Assessment", "⚖️")
+btn_nav_audit  = create_nav_button("audit", "Low Cons. Audit", "📋")
+btn_nav_tariff = create_nav_button("tariff", "Tariff Editor", "🛠️")
+btn_nav_settings = create_nav_button("settings", "Settings & Updates", "⚙️")
+
+# Sidebar Bottom Panel: Dark/Light Mode Switch & Documentation Button
+sidebar_bottom_frame = ctk.CTkFrame(sidebar_frame, fg_color="transparent")
+sidebar_bottom_frame.pack(side=BOTTOM, fill=X, padx=12, pady=16)
+
+sidebar_theme_switch = ctk.CTkSwitch(
+    sidebar_bottom_frame,
+    text="Dark Mode",
+    font=ctk.CTkFont(family="Segoe UI", size=12),
+    command=toggle_theme
+)
+sidebar_theme_switch.select()
+sidebar_theme_switch.pack(fill=X, pady=(0, 10))
+
+btn_doc_sidebar = ctk.CTkButton(
+    sidebar_bottom_frame,
+    text="📖 Help & Docs",
+    height=32,
+    corner_radius=6,
+    fg_color=("gray80", "gray30"),
+    text_color=("gray10", "gray90"),
+    hover_color=("gray70", "gray40"),
+    font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+    command=open_help
+)
+btn_doc_sidebar.pack(fill=X)
+
+# 2. Right Content Area (View Switcher)
+main_content_frame = ctk.CTkFrame(shell_frame, corner_radius=0, fg_color="transparent")
+main_content_frame.pack(side=LEFT, fill=BOTH, expand=True)
+
+# View Containers
+view_frames = {}
+
+def get_or_create_view_frame(view_id):
+    if view_id not in view_frames:
+        vf = ctk.CTkFrame(main_content_frame, corner_radius=0, fg_color="transparent")
+        view_frames[view_id] = vf
+    return view_frames[view_id]
+
+# Primary Viewer View Container
+view_viewer = get_or_create_view_frame("viewer")
+view_bill   = get_or_create_view_frame("bill")
+view_theft  = get_or_create_view_frame("theft")
+view_audit  = get_or_create_view_frame("audit")
+view_tariff = get_or_create_view_frame("tariff")
+view_settings = get_or_create_view_frame("settings")
+
+current_active_view = None
+
+def switch_view(view_id):
+    global current_active_view
+    if current_active_view == view_id:
+        return
+
+    # Hide current active view
+    if current_active_view and current_active_view in view_frames:
+        view_frames[current_active_view].pack_forget()
+
+    # Highlight active nav button
+    for vid, btn in nav_buttons.items():
+        if vid == view_id:
+            btn.configure(fg_color=("gray75", "#1f538d"), text_color="white")
+        else:
+            btn.configure(fg_color="transparent", text_color=("gray10", "gray90"))
+
+    # Show new active view
+    target_frame = view_frames[view_id]
+    target_frame.pack(fill=BOTH, expand=True)
+    current_active_view = view_id
+
+    # Lazy-instantiate embedded tools on first view
+    if view_id == "bill" and not getattr(view_bill, "_initialized", False):
+        init_bill_calc_view(view_bill)
+    elif view_id == "theft" and not getattr(view_theft, "_initialized", False):
+        init_theft_calc_view(view_theft)
+    elif view_id == "audit" and not getattr(view_audit, "_initialized", False):
+        init_audit_view(view_audit)
+    elif view_id == "tariff" and not getattr(view_tariff, "_initialized", False):
+        init_tariff_view(view_tariff)
+    elif view_id == "settings" and not getattr(view_settings, "_initialized", False):
+        init_settings_view(view_settings)
+
+def init_bill_calc_view(container_frame):
+    container_frame._initialized = True
+    header = ctk.CTkFrame(container_frame, height=44, corner_radius=0)
+    header.pack(fill=X)
+    ctk.CTkLabel(
+        header,
+        text="⚡ Electricity Bill Calculator (WBERC Domestic & Commercial)",
+        font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold")
+    ).pack(side=LEFT, padx=15, pady=8)
+
+    ctk.CTkButton(
+        header,
+        text="↗ Open in Window",
+        width=130,
+        height=28,
+        font=ctk.CTkFont(family="Segoe UI", size=11),
+        command=lambda: BillCalculatorApp(root)
+    ).pack(side=RIGHT, padx=15, pady=8)
+
+    tool_body = tb.Frame(container_frame)
+    tool_body.pack(fill=BOTH, expand=True)
+    BillCalculatorApp(root, container=tool_body)
+
+def init_theft_calc_view(container_frame):
+    container_frame._initialized = True
+    header = ctk.CTkFrame(container_frame, height=44, corner_radius=0)
+    header.pack(fill=X)
+    ctk.CTkLabel(
+        header,
+        text="⚖️ Theft Assessment Calculator (Section 135 Electricity Act)",
+        font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold")
+    ).pack(side=LEFT, padx=15, pady=8)
+
+    ctk.CTkButton(
+        header,
+        text="↗ Open in Window",
+        width=130,
+        height=28,
+        font=ctk.CTkFont(family="Segoe UI", size=11),
+        command=lambda: TheftCalculatorApp(root)
+    ).pack(side=RIGHT, padx=15, pady=8)
+
+    tool_body = tb.Frame(container_frame)
+    tool_body.pack(fill=BOTH, expand=True)
+    TheftCalculatorApp(root, container=tool_body)
+
+def init_audit_view(container_frame):
+    container_frame._initialized = True
+    header = ctk.CTkFrame(container_frame, height=44, corner_radius=0)
+    header.pack(fill=X)
+    ctk.CTkLabel(
+        header,
+        text="📋 Low Consumption Verification & Audit Mode",
+        font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold")
+    ).pack(side=LEFT, padx=15, pady=8)
+
+    ctk.CTkButton(
+        header,
+        text="↗ Open in Window",
+        width=130,
+        height=28,
+        font=ctk.CTkFont(family="Segoe UI", size=11),
+        command=lambda: LowConsumptionVerifier(root)
+    ).pack(side=RIGHT, padx=15, pady=8)
+
+    tool_body = tb.Frame(container_frame)
+    tool_body.pack(fill=BOTH, expand=True)
+    LowConsumptionVerifier(root, container=tool_body)
+
+def init_tariff_view(container_frame):
+    container_frame._initialized = True
+    header = ctk.CTkFrame(container_frame, height=44, corner_radius=0)
+    header.pack(fill=X)
+    ctk.CTkLabel(
+        header,
+        text="🛠️ WBSEDCL Live Tariff & Slabs Editor",
+        font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold")
+    ).pack(side=LEFT, padx=15, pady=8)
+
+    ctk.CTkButton(
+        header,
+        text="↗ Open in Window",
+        width=130,
+        height=28,
+        font=ctk.CTkFont(family="Segoe UI", size=11),
+        command=lambda: TariffEditor(root)
+    ).pack(side=RIGHT, padx=15, pady=8)
+
+    tool_body = tb.Frame(container_frame)
+    tool_body.pack(fill=BOTH, expand=True)
+    TariffEditor(root, container=tool_body)
+
+def init_settings_view(container_frame):
+    container_frame._initialized = True
+    header = ctk.CTkFrame(container_frame, height=44, corner_radius=0)
+    header.pack(fill=X)
+    ctk.CTkLabel(
+        header,
+        text="⚙️ Settings & System Management",
+        font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold")
+    ).pack(side=LEFT, padx=15, pady=8)
+
+    scroll = ctk.CTkScrollableFrame(container_frame, fg_color="transparent")
+    scroll.pack(fill=BOTH, expand=True, padx=20, pady=15)
+
+    # 1. Update card
+    c_up = ctk.CTkFrame(scroll)
+    c_up.pack(fill=X, pady=(0, 15))
+    ctk.CTkLabel(c_up, text="🚀 Software Updates", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=15, pady=(12, 4))
+    ctk.CTkLabel(c_up, text=f"Currently running Spot Image Viewer v{config.CURRENT_VERSION}. Click below to query GitHub releases for new updates.").pack(anchor="w", padx=15, pady=(0, 10))
+    ctk.CTkButton(c_up, text="Check for Updates Now", width=200, command=manual_update_check).pack(anchor="w", padx=15, pady=(0, 12))
+
+    # 2. Consumer data card
+    c_cd = ctk.CTkFrame(scroll)
+    c_cd.pack(fill=X, pady=(0, 15))
+    ctk.CTkLabel(c_cd, text="👥 Consumer Database", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=15, pady=(12, 4))
+    ctk.CTkLabel(c_cd, text="Import meter, name, mobile, and address metadata from Excel sheets to enable comprehensive search.").pack(anchor="w", padx=15, pady=(0, 10))
+    b_row1 = ctk.CTkFrame(c_cd, fg_color="transparent")
+    b_row1.pack(fill=X, padx=15, pady=(0, 12))
+    ctk.CTkButton(b_row1, text="Update Consumer Data", width=180, fg_color="#d9534f", hover_color="#c9302c", command=update_meter_list_threaded).pack(side=LEFT, padx=(0, 10))
+    ctk.CTkButton(b_row1, text="Generate Excel Template", width=180, fg_color="transparent", border_width=1, command=generate_consumer_data_template).pack(side=LEFT, padx=(0, 10))
+    ctk.CTkButton(b_row1, text="Run Fuzzy Lookup Tool", width=180, command=open_fuzzy_lookup_tool_dialog).pack(side=LEFT)
+
+    # 3. Network folders & Backup card
+    c_net = ctk.CTkFrame(scroll)
+    c_net.pack(fill=X, pady=(0, 15))
+    ctk.CTkLabel(c_net, text="📁 Network Folders & Storage", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=15, pady=(12, 4))
+    ctk.CTkLabel(c_net, text=f"Primary Folder: {config.IMAGE_FOLDER}").pack(anchor="w", padx=15, pady=(0, 10))
+    b_row2 = ctk.CTkFrame(c_net, fg_color="transparent")
+    b_row2.pack(fill=X, padx=15, pady=(0, 12))
+    ctk.CTkButton(b_row2, text="Add Network Folder", width=160, command=add_network_folder).pack(side=LEFT, padx=(0, 10))
+    ctk.CTkButton(b_row2, text="Backup Images by Date", width=180, command=perform_backup).pack(side=LEFT, padx=(0, 10))
+    ctk.CTkButton(b_row2, text="Export Notes (CSV)", width=160, command=export_notes_csv).pack(side=LEFT)
+
+    # 4. About card
+    c_ab = ctk.CTkFrame(scroll)
+    c_ab.pack(fill=X, pady=(0, 15))
+    ctk.CTkLabel(c_ab, text="ℹ️ About Spot Image Viewer", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=15, pady=(12, 4))
+    ctk.CTkLabel(c_ab, text="Developer: Pramod Verma | Contact: je.kushidaccc@gmail.com\nHigh performance electricity billing & image verification workspace.").pack(anchor="w", padx=15, pady=(0, 10))
+    ctk.CTkButton(c_ab, text="About & Contact Details", width=180, fg_color="transparent", border_width=1, command=show_about).pack(anchor="w", padx=15, pady=(0, 12))
 
 try:
     icon_ico, icon_png = ensure_app_icons()
@@ -2032,14 +2337,14 @@ nm.add_command(label="Export Notes", command=export_notes_csv)
 
 vm = Menu(mb, tearoff=0)
 mb.add_cascade(label="Verification", menu=vm)
-vm.add_command(label="Low Consumption Check", command=lambda: LowConsumptionVerifier(root))
+vm.add_command(label="Low Consumption Check", command=lambda: switch_view("audit"))
 
-# Remove the old launch_tool references and use the classes instead
+# Menu bar connects directly to the views as well as window launchers
 tm = Menu(mb, tearoff=0)
 mb.add_cascade(label="Tools", menu=tm)
-tm.add_command(label="Bill Calculator", command=lambda: BillCalculatorApp(root))
-tm.add_command(label="Theft Bill Calculator", command=lambda: TheftCalculatorApp(root))
-tm.add_command(label="Tariff Editor", command=lambda: TariffEditor(root))
+tm.add_command(label="Bill Calculator", command=lambda: switch_view("bill"))
+tm.add_command(label="Theft Bill Calculator", command=lambda: switch_view("theft"))
+tm.add_command(label="Tariff Editor", command=lambda: switch_view("tariff"))
 tm.add_command(label="Fuzzy Lookup", command=open_fuzzy_lookup_tool_dialog)
 # Disabled by default until consumer data confirms presence (update_meter_search_state re-enables it)
 tm.entryconfig("Fuzzy Lookup", state="disabled")
@@ -2052,7 +2357,7 @@ hm.add_command(label="Documentation", command=open_help)
 hm.add_command(label="Check for Updates", command=manual_update_check)
 hm.add_command(label="About", command=show_about)
 
-top_f = tb.Frame(root, padding=8, bootstyle="light") 
+top_f = tb.Frame(view_viewer, padding=8, bootstyle="light") 
 top_f.pack(fill=X)
 
 search_card = tb.Labelframe(top_f, text="Search Controls", padding=6, bootstyle="default")
@@ -2118,7 +2423,7 @@ btn_theme_toggle.grid(row=0, column=8, padx=(4, 6), pady=2, sticky="e")
 btn_reload = tb.Button(search_card, text="Reload Images", width=14, bootstyle="primary", command=start_indexing_process)
 btn_reload.grid(row=1, column=8, padx=(4, 6), pady=2, sticky="e")
 
-stat_f = tb.Frame(root, padding=5, bootstyle="secondary")
+stat_f = tb.Frame(view_viewer, padding=5, bootstyle="secondary")
 stat_f.pack(side=BOTTOM, fill=X)
 status_label = tb.Label(stat_f, text="Ready", font=("Segoe UI", 10), bootstyle="inverse-secondary")
 status_label.pack(side=LEFT, padx=5)
@@ -2131,7 +2436,7 @@ btn_folders.pack(side=RIGHT, padx=5)
 btn_notes = tb.Button(toggle_f, text="Notes", command=toggle_notes, bootstyle="dark-outline")
 btn_notes.pack(side=RIGHT, padx=5)
 
-container = tb.Frame(root, padding=10)
+container = tb.Frame(view_viewer, padding=10)
 container.pack(fill=BOTH, expand=True)
 
 left_p = tb.Labelframe(container, text="Details", width=250, padding=10, bootstyle="default")
@@ -2255,6 +2560,7 @@ def run_app():
     if not success:
         print(f"Database init failed: {msg}")
 
+    switch_view("viewer")
     refresh_non_ttk_widget_colors()
     update_theme_toggle_button_text()
     

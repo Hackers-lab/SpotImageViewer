@@ -83,12 +83,17 @@ class ModernDatePickerDialog(DatePickerDialog):
 
 
 class BillCalculatorApp:
-    def __init__(self, parent):
+    def __init__(self, parent, container=None):
         self.tariff_data = tariff_manager.load_tariff()
         
-        self.window = ttk.Toplevel(parent)
-        self.window.title("Electricity Bill Calculator - SpotImageViewer")
-        self.window.state('zoomed')
+        if container is not None:
+            self.window = container
+            self.is_embedded = True
+        else:
+            self.window = ttk.Toplevel(parent)
+            self.window.title("Electricity Bill Calculator - SpotImageViewer")
+            self.window.state('zoomed')
+            self.is_embedded = False
 
         # --- INSTANCE VARIABLES ---
         self.category_var = ttk.StringVar()

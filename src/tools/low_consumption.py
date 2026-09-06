@@ -11,12 +11,18 @@ from PIL import Image, ImageTk
 import config
 from database import get_db_connection
 
-class LowConsumptionVerifier(tk.Toplevel):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.title("Low Consumption Verification Mode")
-        self.geometry("1300x850")
-        self.state("zoomed")
+class LowConsumptionVerifier:
+    def __init__(self, parent, container=None):
+        if container is not None:
+            self.window = container
+            self.is_embedded = True
+        else:
+            self.top = tk.Toplevel(parent)
+            self.window = self.top
+            self.top.title("Low Consumption Verification Mode")
+            self.top.geometry("1300x850")
+            self.top.state("zoomed")
+            self.is_embedded = False
         
         # Data & Session Paths
         self.data = [] 
@@ -29,17 +35,17 @@ class LowConsumptionVerifier(tk.Toplevel):
         self.create_widgets()
         
         # Startup Logic
-        self.after(200, self.startup_check)
+        self.window.after(200, self.startup_check)
 
     def create_widgets(self):
-        toolbar = tb.Frame(self, bootstyle="secondary", padding=5)
+        toolbar = tb.Frame(self.window, bootstyle="secondary", padding=5)
         toolbar.pack(fill=X, side=TOP)
         tb.Button(toolbar, text="Load Excel", command=self.load_excel, bootstyle="info").pack(side=LEFT, padx=5)
         tb.Button(toolbar, text="Paste from Clipboard", command=self.load_paste, bootstyle="info").pack(side=LEFT, padx=5)
         tb.Button(toolbar, text="Export CSV", command=self.export_report, bootstyle="success").pack(side=LEFT, padx=5)
         tb.Label(toolbar, text=" |  Shortcuts: Alt+S (Save), Alt+N (Skip)", bootstyle="inverse-secondary").pack(side=LEFT, padx=15)
 
-        split = tb.Panedwindow(self, orient=HORIZONTAL)
+        split = tb.Panedwindow(self.window, orient=HORIZONTAL)
         split.pack(fill=BOTH, expand=True, padx=5, pady=5)
 
         left_frame = tb.Frame(split, width=400)
@@ -142,8 +148,8 @@ class LowConsumptionVerifier(tk.Toplevel):
 
         self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
 
-        self.bind("<Alt-s>", lambda e: self.save_and_next())
-        self.bind("<Alt-n>", lambda e: self.skip_item())
+        self.window.bind("<Alt-s>", lambda e: self.save_and_next())
+        self.window.bind("<Alt-n>", lambda e: self.skip_item())
 
 
     def startup_check(self):
@@ -155,8 +161,10 @@ class LowConsumptionVerifier(tk.Toplevel):
                 if self.data:
                     if messagebox.askyesno("Session Found", f"Restore previous session with {len(self.data)} records?"):
                         self.filter_tree()
-                        self.lift()
-                        self.focus_force()
+                        if hasattr(self.window, 'lift'):
+                            self.window.lift()
+                        if hasattr(self.window, 'focus_force'):
+                            self.window.focus_force()
                         first_pending = next((item['id'] for item in self.data if item['status'] == "PENDING"), None)
                         if first_pending is not None:
                             self.tree.selection_set(first_pending)

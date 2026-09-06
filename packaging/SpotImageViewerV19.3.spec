@@ -1,7 +1,8 @@
-# -*- mode: python ; coding: utf-8 -*-
 import os
+import customtkinter
 
 PROJECT_ROOT = os.path.abspath(os.path.join(SPECPATH, '..'))
+CTK_DIR = os.path.dirname(customtkinter.__file__)
 
 a_main = Analysis(
     [os.path.join(PROJECT_ROOT, 'main.py')],
@@ -10,6 +11,7 @@ a_main = Analysis(
     datas=[
         (os.path.join(PROJECT_ROOT, 'assets', 'spot_icon.ico'), 'assets'),
         (os.path.join(PROJECT_ROOT, 'assets', 'spot_icon.png'), 'assets'),
+        (CTK_DIR, 'customtkinter'),
     ],
     hiddenimports=['ttkbootstrap', 'PIL', 'openpyxl', 'requests', 'packaging', 'darkdetect', 'customtkinter'],
     hookspath=[],
