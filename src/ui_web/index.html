@@ -231,13 +231,32 @@
           </div>
         </div>
 
-        <!-- Photoshop-Style Right Collapsed Vertical Tab Rail -->
-        <button id="detailsPanelRail" onclick="toggleDetailsPanel()" title="Expand Consumer Details" class="hidden w-8 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1b1b1b] shrink-0 flex-col items-center pt-3 gap-2.5 hover:bg-slate-50 dark:hover:bg-[#222] transition z-10 group">
-          <div class="w-6 h-6 rounded flex items-center justify-center text-slate-400 group-hover:text-sky-500">
-            <i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
-          </div>
-          <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 group-hover:text-slate-200" style="writing-mode: vertical-rl;">Consumer Details</span>
-        </button>
+        <!-- Photoshop-Style Right Collapsed Vertical Tab Rails (3 Collapsible Tabs) -->
+        <div id="detailsPanelRail" class="hidden w-9 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-[#181818] shrink-0 flex-col items-center py-2 gap-2 z-10 select-none">
+          <!-- Rail Tab 1: Profile -->
+          <button onclick="expandToSection('section-profile')" title="Expand Consumer Details" class="w-full flex-1 flex flex-col items-center justify-start py-3 gap-2 hover:bg-slate-100 dark:hover:bg-[#252525] transition group border-b border-slate-200/60 dark:border-slate-800/60">
+            <div class="w-6 h-6 rounded flex items-center justify-center text-slate-400 group-hover:text-sky-500">
+              <i data-lucide="user" class="w-3.5 h-3.5"></i>
+            </div>
+            <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-slate-200 whitespace-nowrap" style="writing-mode: vertical-rl;">Details</span>
+          </button>
+
+          <!-- Rail Tab 2: Notes -->
+          <button onclick="expandToSection('section-notes')" title="Expand Notes & Remarks" class="w-full flex-1 flex flex-col items-center justify-start py-3 gap-2 hover:bg-slate-100 dark:hover:bg-[#252525] transition group border-b border-slate-200/60 dark:border-slate-800/60">
+            <div class="w-6 h-6 rounded flex items-center justify-center text-slate-400 group-hover:text-amber-500">
+              <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+            </div>
+            <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-slate-200 whitespace-nowrap" style="writing-mode: vertical-rl;">Notes</span>
+          </button>
+
+          <!-- Rail Tab 3: Cycles -->
+          <button onclick="expandToSection('section-cycles')" title="Expand Available Cycles" class="w-full flex-1 flex flex-col items-center justify-start py-3 gap-2 hover:bg-slate-100 dark:hover:bg-[#252525] transition group">
+            <div class="w-6 h-6 rounded flex items-center justify-center text-slate-400 group-hover:text-emerald-500">
+              <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+            </div>
+            <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-slate-200 whitespace-nowrap" style="writing-mode: vertical-rl;">Cycles</span>
+          </button>
+        </div>
 
         <!-- Right: Consumer Profile Card & Notes (3 Sections) -->
         <div id="detailsPanel" class="details-panel w-80 border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#1c1c1c] flex flex-col justify-between shrink-0 p-3 overflow-y-auto">
@@ -257,16 +276,19 @@
             </div>
 
             <!-- SECTION 1: CONSUMER DETAILS -->
-            <div class="bg-white dark:bg-[#232323] rounded-lg border border-slate-200 dark:border-slate-800/90 shadow-sm overflow-hidden">
-              <div class="px-3 py-2 bg-slate-100/70 dark:bg-[#2a2a2a] border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between">
+            <div id="section-profile" class="bg-white dark:bg-[#232323] rounded-lg border border-slate-200 dark:border-slate-800/90 shadow-sm overflow-hidden transition-all duration-200">
+              <div onclick="toggleSection('section-profile')" class="px-3 py-2 bg-slate-100/70 dark:bg-[#2a2a2a] border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between cursor-pointer select-none hover:bg-slate-200/60 dark:hover:bg-[#303030] transition">
                 <div class="flex items-center gap-1.5">
                   <i data-lucide="user" class="w-3.5 h-3.5 text-sky-500"></i>
                   <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">1. Consumer Details</h3>
                 </div>
-                <span class="text-[9px] px-1.5 py-0.5 rounded font-mono bg-sky-500/10 text-sky-600 dark:text-sky-400 font-semibold">PROFILE</span>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[9px] px-1.5 py-0.5 rounded font-mono bg-sky-500/10 text-sky-600 dark:text-sky-400 font-semibold">PROFILE</span>
+                  <i id="icon-section-profile" data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200"></i>
+                </div>
               </div>
               
-              <div class="p-3 space-y-2.5">
+              <div id="body-section-profile" class="p-3 space-y-2.5">
                 <div>
                   <span class="text-[10px] text-slate-500 font-medium block uppercase tracking-wider">Consumer Name</span>
                   <span id="profileName" class="text-xs font-semibold text-slate-900 dark:text-slate-100 block truncate">-</span>
@@ -303,16 +325,19 @@
             </div>
 
             <!-- SECTION 2: NOTES & REMARKS -->
-            <div class="bg-white dark:bg-[#232323] rounded-lg border border-slate-200 dark:border-slate-800/90 shadow-sm overflow-hidden">
-              <div class="px-3 py-2 bg-slate-100/70 dark:bg-[#2a2a2a] border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between">
+            <div id="section-notes" class="bg-white dark:bg-[#232323] rounded-lg border border-slate-200 dark:border-slate-800/90 shadow-sm overflow-hidden transition-all duration-200">
+              <div onclick="toggleSection('section-notes')" class="px-3 py-2 bg-slate-100/70 dark:bg-[#2a2a2a] border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between cursor-pointer select-none hover:bg-slate-200/60 dark:hover:bg-[#303030] transition">
                 <div class="flex items-center gap-1.5">
                   <i data-lucide="edit-3" class="w-3.5 h-3.5 text-amber-500"></i>
                   <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">2. Notes & Remarks</h3>
                 </div>
-                <span class="text-[9px] px-1.5 py-0.5 rounded font-mono bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold">AUDIT</span>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[9px] px-1.5 py-0.5 rounded font-mono bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold">AUDIT</span>
+                  <i id="icon-section-notes" data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200"></i>
+                </div>
               </div>
 
-              <div class="p-3 space-y-2.5">
+              <div id="body-section-notes" class="p-3 space-y-2.5">
                 <div>
                   <label class="text-[10px] text-slate-500 font-medium block uppercase tracking-wider mb-1">Status Category</label>
                   <select id="noteCategory" class="w-full bg-slate-50 dark:bg-[#1a1a1a] border border-slate-300 dark:border-slate-700 rounded text-xs px-2 py-1.5 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500">
@@ -339,16 +364,19 @@
             </div>
 
             <!-- SECTION 3: AVAILABLE CYCLES -->
-            <div class="bg-white dark:bg-[#232323] rounded-lg border border-slate-200 dark:border-slate-800/90 shadow-sm overflow-hidden">
-              <div class="px-3 py-2 bg-slate-100/70 dark:bg-[#2a2a2a] border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between">
+            <div id="section-cycles" class="bg-white dark:bg-[#232323] rounded-lg border border-slate-200 dark:border-slate-800/90 shadow-sm overflow-hidden transition-all duration-200">
+              <div onclick="toggleSection('section-cycles')" class="px-3 py-2 bg-slate-100/70 dark:bg-[#2a2a2a] border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between cursor-pointer select-none hover:bg-slate-200/60 dark:hover:bg-[#303030] transition">
                 <div class="flex items-center gap-1.5">
                   <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-500"></i>
                   <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">3. Available Cycles</h3>
                 </div>
-                <span class="text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">HISTORY</span>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">HISTORY</span>
+                  <i id="icon-section-cycles" data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200"></i>
+                </div>
               </div>
 
-              <div class="p-2.5">
+              <div id="body-section-cycles" class="p-2.5">
                 <div id="cyclesList" class="space-y-1 max-h-44 overflow-y-auto pr-1">
                   <span class="text-xs text-slate-500 italic px-1 block">No cycles loaded</span>
                 </div>

@@ -68,6 +68,40 @@ function toggleDetailsPanel() {
   lucide.createIcons();
 }
 
+function toggleSection(sectionId) {
+  const body = document.getElementById(`body-${sectionId}`);
+  const icon = document.getElementById(`icon-${sectionId}`);
+  if (!body) return;
+  const isHidden = body.classList.toggle('hidden');
+  if (icon) {
+    icon.style.transform = isHidden ? 'rotate(-90deg)' : 'rotate(0deg)';
+  }
+}
+
+function expandToSection(sectionId) {
+  const panel = document.getElementById('detailsPanel');
+  const rail = document.getElementById('detailsPanelRail');
+  if (panel && rail) {
+    panel.classList.remove('hidden-panel');
+    rail.classList.add('hidden');
+    rail.classList.remove('flex');
+    localStorage.setItem('siv_details_collapsed', '0');
+  }
+  // Open the targeted section if closed
+  const body = document.getElementById(`body-${sectionId}`);
+  const icon = document.getElementById(`icon-${sectionId}`);
+  if (body && body.classList.contains('hidden')) {
+    body.classList.remove('hidden');
+    if (icon) icon.style.transform = 'rotate(0deg)';
+  }
+  // Scroll to section smoothly
+  const secEl = document.getElementById(sectionId);
+  if (secEl) {
+    secEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  lucide.createIcons();
+}
+
 function restoreLayoutPrefs() {
   if (localStorage.getItem('siv_sidebar_collapsed') === '1') {
     const sidebar = document.getElementById('sidebar');

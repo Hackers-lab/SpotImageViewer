@@ -483,20 +483,29 @@ html[data-theme="light"] #detailsPanel select {
 #detailsPanelRail, #sidebarRail {
   width: var(--rail-w) !important;
   background: #1c1c1c !important;
-  cursor: pointer;
   user-select: none;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 #sidebarRail {
   border-right: 1px solid var(--border) !important;
+  cursor: pointer;
 }
 
 #detailsPanelRail {
   border-left: 1px solid var(--border) !important;
 }
 
-#sidebarRail:hover, #detailsPanelRail:hover {
+#sidebarRail:hover {
+  background: #252525 !important;
+}
+
+#detailsPanelRail button {
+  background: transparent !important;
+  cursor: pointer;
+}
+
+#detailsPanelRail button:hover {
   background: #252525 !important;
 }
 
@@ -507,7 +516,7 @@ html[data-theme="light"] #sidebarRail {
 }
 
 html[data-theme="light"] #sidebarRail:hover,
-html[data-theme="light"] #detailsPanelRail:hover {
+html[data-theme="light"] #detailsPanelRail button:hover {
   background: #eaecee !important;
 }
 
