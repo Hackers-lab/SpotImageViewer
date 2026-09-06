@@ -4,78 +4,93 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Spot Image Viewer & Verification Studio</title>
-  <!-- Tailwind CSS via CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com" charset="UTF-8"></script>
+  <script charset="UTF-8">
+    tailwind.config = {
+      darkMode: ['selector', '[data-theme="dark"]'],
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://unpkg.com/lucide@latest" charset="UTF-8"></script>
   <link rel="stylesheet" href="css/app.css">
 </head>
-<body class="bg-slate-950 text-slate-100 flex overflow-hidden h-screen w-screen select-none">
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex overflow-hidden h-screen w-screen select-none transition-colors duration-300">
 
   <!-- Left Sidebar Navigation Rail -->
-  <aside class="w-20 md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0 transition-all duration-300 z-20">
+  <aside class="w-20 md:w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 transition-all duration-300 z-20">
     <div>
       <!-- Brand Logo -->
-      <div class="h-16 flex items-center px-4 md:px-6 gap-3 border-b border-slate-800">
+      <div class="h-16 flex items-center px-4 md:px-6 gap-3 border-b border-slate-200 dark:border-slate-800">
         <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
           <i data-lucide="eye" class="w-5 h-5 text-white"></i>
         </div>
         <div class="hidden md:block">
-          <h1 class="font-bold text-sm leading-tight text-slate-100 tracking-wide">SpotImageViewer</h1>
-          <span class="text-xs text-sky-400 font-medium tracking-wider">v19.4 STUDIO</span>
+          <h1 class="font-bold text-sm leading-tight text-slate-900 dark:text-slate-100 tracking-wide">SpotImageViewer</h1>
+          <span class="text-xs text-sky-600 dark:text-sky-400 font-medium tracking-wider">v19.4 STUDIO</span>
         </div>
       </div>
 
       <!-- Navigation Tabs -->
       <nav class="p-3 space-y-1.5 mt-2" id="navContainer">
-        <button onclick="switchTab('viewer')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-all group active" data-tab="viewer">
-          <i data-lucide="image" class="w-5 h-5 text-slate-400 group-hover:text-sky-400"></i>
+        <button onclick="switchTab('viewer')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all group active bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white" data-tab="viewer">
+          <i data-lucide="image" class="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-sky-600 dark:group-hover:text-sky-400"></i>
           <span class="hidden md:inline font-medium text-sm">Image Viewer</span>
         </button>
-        <button onclick="switchTab('bill')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-all group" data-tab="bill">
-          <i data-lucide="zap" class="w-5 h-5 text-slate-400 group-hover:text-amber-400"></i>
+        <button onclick="switchTab('bill')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="bill">
+          <i data-lucide="zap" class="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-amber-600 dark:group-hover:text-amber-400"></i>
           <span class="hidden md:inline font-medium text-sm">Bill Calculator</span>
         </button>
-        <button onclick="switchTab('theft')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-all group" data-tab="theft">
-          <i data-lucide="scale" class="w-5 h-5 text-slate-400 group-hover:text-rose-400"></i>
+        <button onclick="switchTab('theft')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="theft">
+          <i data-lucide="scale" class="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-rose-600 dark:group-hover:text-rose-400"></i>
           <span class="hidden md:inline font-medium text-sm">Theft Assessment</span>
         </button>
-        <button onclick="switchTab('tariffs')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-all group" data-tab="tariffs">
-          <i data-lucide="sliders" class="w-5 h-5 text-slate-400 group-hover:text-emerald-400"></i>
+        <button onclick="switchTab('tariffs')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="tariffs">
+          <i data-lucide="sliders" class="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400"></i>
           <span class="hidden md:inline font-medium text-sm">Tariff Manager</span>
         </button>
-        <button onclick="switchTab('settings')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-all group" data-tab="settings">
-          <i data-lucide="settings" class="w-5 h-5 text-slate-400 group-hover:text-violet-400"></i>
+        <button onclick="switchTab('audit')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="audit">
+          <i data-lucide="file-spreadsheet" class="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-teal-600 dark:group-hover:text-teal-400"></i>
+          <span class="hidden md:inline font-medium text-sm">Low Cons. Audit</span>
+        </button>
+        <button onclick="switchTab('settings')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="settings">
+          <i data-lucide="settings" class="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-violet-600 dark:group-hover:text-violet-400"></i>
           <span class="hidden md:inline font-medium text-sm">Settings & Update</span>
         </button>
       </nav>
     </div>
 
     <!-- Bottom Status / Theme Toggle -->
-    <div class="p-3 border-t border-slate-800 space-y-2">
-      <button onclick="toggleTheme()" class="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white text-xs font-medium transition">
+    <div class="p-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
+      <button onclick="toggleTheme()" class="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-medium transition">
         <div class="flex items-center gap-3">
-          <i data-lucide="sun-moon" class="w-4 h-4 text-sky-400"></i>
+          <i data-lucide="sun-moon" class="w-4 h-4 text-sky-600 dark:text-sky-400"></i>
           <span class="hidden md:inline">Theme</span>
         </div>
-        <span id="themeLabel" class="hidden md:inline text-[11px] font-semibold text-slate-500 uppercase">Dark</span>
+        <span id="themeLabel" class="hidden md:inline text-xs font-semibold text-slate-500 uppercase">DARK</span>
       </button>
 
-      <div class="hidden md:flex items-center justify-between px-3 py-2 bg-slate-950/60 rounded-xl border border-slate-800/80">
-        <div class="flex items-center gap-2 text-xs text-slate-400">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+      <div class="hidden md:flex items-center justify-between px-3 py-2 bg-slate-100 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800/80">
+        <div class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"></span>
           <span>Database</span>
         </div>
-        <span id="statImages" class="text-xs font-semibold text-slate-200">113 Imgs</span>
+        <span id="statImages" class="text-xs font-semibold text-slate-800 dark:text-slate-200">0 Imgs</span>
       </div>
     </div>
   </aside>
 
   <!-- Main Content View Area -->
-  <main class="flex-1 flex flex-col min-w-0 bg-slate-950/40 relative overflow-hidden">
+  <main class="flex-1 flex flex-col min-w-0 bg-slate-100/50 dark:bg-slate-950/40 relative overflow-hidden">
 
     <!-- Universal Top Navigation Bar -->
-    <header class="h-16 border-b border-slate-800/80 px-6 flex items-center justify-between gap-4 bg-slate-900/60 backdrop-blur-md z-10">
+    <header class="h-16 border-b border-slate-200 dark:border-slate-800/80 px-6 flex items-center justify-between gap-4 bg-white/80 dark:bg-slate-900/60 backdrop-blur-md z-10">
       <!-- Universal Smart Search Bar -->
       <div class="flex items-center gap-3 flex-1 max-w-xl">
         <div class="relative w-full">
@@ -85,8 +100,8 @@
           <input 
             type="text" 
             id="searchInput" 
-            placeholder="Search Consumer ID (9 digits), Meter No, Name, or Mobile..." 
-            class="w-full pl-10 pr-24 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-all"
+            placeholder="Search Consumer ID, Meter, Name, or Mobile..." 
+            class="w-full pl-10 pr-24 py-2 bg-white dark:bg-slate-950/80 border border-slate-300 dark:border-slate-800 rounded-xl text-sm text-slate-900 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-all"
             onkeydown="if(event.key === 'Enter') handleSearch()"
           />
           <div class="absolute inset-y-1 right-1 flex items-center gap-1">
@@ -96,7 +111,7 @@
           </div>
         </div>
 
-        <select id="searchType" class="bg-slate-950/80 border border-slate-800 text-slate-300 text-xs rounded-xl px-3 py-2 outline-none focus:border-sky-500">
+        <select id="searchType" class="bg-white dark:bg-slate-950/80 border border-slate-300 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs rounded-xl px-3 py-2 outline-none focus:border-sky-500">
           <option value="auto">Auto-Detect</option>
           <option value="cid">Consumer ID</option>
           <option value="meter">Meter No</option>
@@ -107,13 +122,10 @@
 
       <!-- Quick Action Indicators -->
       <div class="flex items-center gap-3">
-        <div id="consumerBadge" class="hidden px-3 py-1.5 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-semibold flex items-center gap-2">
+        <div id="consumerBadge" class="hidden px-3 py-1.5 rounded-lg bg-sky-100 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/30 text-sky-700 dark:text-sky-400 text-xs font-semibold flex items-center gap-2">
           <i data-lucide="user-check" class="w-4 h-4"></i>
           <span id="consumerBadgeText">Active: -</span>
         </div>
-        <button onclick="triggerUpdateCheck()" class="p-2 text-slate-400 hover:text-sky-400 hover:bg-slate-800/80 rounded-xl transition" title="Check for updates">
-          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-        </button>
       </div>
     </header>
 
@@ -121,107 +133,133 @@
     <section id="tab-viewer" class="tab-content flex-1 flex flex-col min-h-0 relative">
       <div class="flex-1 flex min-h-0">
         <!-- Left: Image Viewer Canvas & Toolbar -->
-        <div class="flex-1 flex flex-col min-w-0 bg-slate-950 relative">
-          <!-- Canvas Overlay Controls (Floating Toolbar) -->
-          <div class="absolute top-4 left-4 z-10 flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-2 rounded-2xl border border-slate-800 shadow-xl">
-            <button onclick="zoomIn()" class="p-1.5 hover:bg-slate-800 text-slate-300 hover:text-white rounded-lg transition" title="Zoom In (+)">
+        <div class="flex-1 flex flex-col min-w-0 bg-slate-200 dark:bg-slate-950 relative">
+          
+          <div class="absolute top-4 left-4 z-10 flex items-center gap-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-3 py-2 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl">
+            <button onclick="zoomIn()" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg transition" title="Zoom In (+)">
               <i data-lucide="zoom-in" class="w-4 h-4"></i>
             </button>
-            <button onclick="zoomOut()" class="p-1.5 hover:bg-slate-800 text-slate-300 hover:text-white rounded-lg transition" title="Zoom Out (-)">
+            <button onclick="zoomOut()" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg transition" title="Zoom Out (-)">
               <i data-lucide="zoom-out" class="w-4 h-4"></i>
             </button>
-            <button onclick="resetZoom()" class="p-1.5 hover:bg-slate-800 text-slate-300 hover:text-white rounded-lg transition" title="Reset View">
+            <button onclick="resetZoom()" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg transition" title="Reset View">
               <i data-lucide="maximize" class="w-4 h-4"></i>
             </button>
-            <span class="w-[1px] h-4 bg-slate-800"></span>
-            <button onclick="rotateImage()" class="p-1.5 hover:bg-slate-800 text-slate-300 hover:text-white rounded-lg transition" title="Rotate 90deg">
+            <span class="w-[1px] h-4 bg-slate-300 dark:bg-slate-800"></span>
+            <button onclick="rotateImage()" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg transition" title="Rotate 90deg">
               <i data-lucide="rotate-cw" class="w-4 h-4"></i>
             </button>
-            <span id="zoomLevel" class="text-[11px] font-semibold text-sky-400 px-1">100%</span>
+            <span id="zoomLevel" class="text-xs font-semibold text-sky-600 dark:text-sky-400 px-1">100%</span>
+            <span class="w-[1px] h-4 bg-slate-300 dark:bg-slate-800"></span>
+            <button onclick="printActiveImage()" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg transition" title="Print Image">
+              <i data-lucide="printer" class="w-4 h-4"></i>
+            </button>
+            <button onclick="saveActiveImage()" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg transition" title="Save Image">
+              <i data-lucide="download" class="w-4 h-4"></i>
+            </button>
+            <button onclick="saveAllImages()" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg transition" title="Save All Images">
+              <i data-lucide="copy-check" class="w-4 h-4"></i>
+            </button>
           </div>
 
-          <!-- Active Image Header Tag -->
-          <div class="absolute top-4 right-4 z-10 flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-800 text-xs font-mono text-slate-300 shadow-xl">
-            <i data-lucide="calendar" class="w-3.5 h-3.5 text-sky-400"></i>
+          <div class="absolute top-4 right-4 z-10 flex items-center gap-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-700 dark:text-slate-300 shadow-xl">
+            <i data-lucide="calendar" class="w-3.5 h-3.5 text-sky-600 dark:text-sky-400"></i>
             <span id="imgDateTag">No image loaded</span>
           </div>
 
-          <!-- Main Interactive Viewport Canvas -->
           <div id="viewport" class="flex-1 flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing p-6 relative">
             <img id="mainImage" class="max-h-full max-w-full object-contain rounded-lg shadow-2xl transition-transform duration-75 origin-center hidden pointer-events-none" />
             <div id="imagePlaceholder" class="flex flex-col items-center justify-center text-slate-500 gap-3">
-              <div class="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-600">
+              <div class="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-600">
                 <i data-lucide="image-off" class="w-8 h-8"></i>
               </div>
               <p class="text-sm font-medium">Search a Consumer ID or Meter to view spot images</p>
             </div>
           </div>
 
-          <!-- Bottom Filmstrip Carousel -->
-          <div class="h-28 bg-slate-900/90 border-t border-slate-800 px-4 flex items-center gap-3 overflow-x-auto shrink-0 z-10" id="filmstripContainer">
+          <div class="h-28 bg-white/90 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 px-4 flex items-center gap-3 overflow-x-auto shrink-0 z-10 glass-panel" id="filmstripContainer">
             <p class="text-xs text-slate-500 italic px-4">Thumbnails will appear here once images are loaded.</p>
           </div>
         </div>
 
-        <!-- Right: Consumer Profile Card & Meta Inspection Panel -->
-        <div class="w-80 border-l border-slate-800 bg-slate-900/50 flex flex-col justify-between shrink-0 p-5 overflow-y-auto">
+        <!-- Right: Consumer Profile Card & Notes -->
+        <div class="w-80 border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex flex-col justify-between shrink-0 p-5 overflow-y-auto">
           <div class="space-y-4">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Consumer Details</h3>
-              <span id="searchResultCount" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">0 found</span>
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Consumer Details</h3>
+              <span id="searchResultCount" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">0 found</span>
             </div>
 
             <!-- Profile Info Card -->
-            <div class="bg-slate-950/80 rounded-xl p-4 border border-slate-800 space-y-3">
+            <div class="bg-white dark:bg-slate-950/80 rounded-xl p-4 border border-slate-200 dark:border-slate-800 space-y-3 shadow-sm">
               <div>
-                <span class="text-[11px] text-slate-500 font-medium block">Consumer Name</span>
-                <span id="profileName" class="text-sm font-semibold text-slate-100 block truncate">-</span>
+                <span class="text-xs text-slate-500 font-medium block">Consumer Name</span>
+                <span id="profileName" class="text-sm font-semibold text-slate-900 dark:text-slate-100 block truncate">-</span>
               </div>
               <div class="grid grid-cols-2 gap-2">
                 <div>
-                  <span class="text-[11px] text-slate-500 font-medium block">Consumer ID</span>
-                  <span id="profileCid" class="text-xs font-mono font-bold text-sky-400 block truncate">-</span>
+                  <span class="text-xs text-slate-500 font-medium block">Consumer ID</span>
+                  <span id="profileCid" class="text-xs font-mono font-bold text-sky-600 dark:text-sky-400 block truncate">-</span>
                 </div>
                 <div>
-                  <span class="text-[11px] text-slate-500 font-medium block">Meter No</span>
-                  <span id="profileMeter" class="text-xs font-mono font-bold text-amber-400 block truncate">-</span>
+                  <span class="text-xs text-slate-500 font-medium block">Meter No</span>
+                  <span id="profileMeter" class="text-xs font-mono font-bold text-amber-600 dark:text-amber-400 block truncate">-</span>
                 </div>
               </div>
               <div>
-                <span class="text-[11px] text-slate-500 font-medium block">Mobile Number</span>
-                <span id="profileMobile" class="text-xs text-slate-300 block truncate">-</span>
+                <span class="text-xs text-slate-500 font-medium block">Mobile Number</span>
+                <span id="profileMobile" class="text-xs text-slate-700 dark:text-slate-300 block truncate">-</span>
               </div>
               <div>
-                <span class="text-[11px] text-slate-500 font-medium block">Address</span>
-                <p id="profileAddress" class="text-xs text-slate-300 line-clamp-2">-</p>
+                <span class="text-xs text-slate-500 font-medium block">Address</span>
+                <p id="profileAddress" class="text-xs text-slate-700 dark:text-slate-300 line-clamp-2">-</p>
               </div>
-              <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80">
+              <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200 dark:border-slate-800/80">
                 <div>
-                  <span class="text-[11px] text-slate-500 font-medium block">Load</span>
-                  <span id="profileLoad" class="text-xs font-semibold text-slate-200 block">-</span>
+                  <span class="text-xs text-slate-500 font-medium block">Load</span>
+                  <span id="profileLoad" class="text-xs font-semibold text-slate-800 dark:text-slate-200 block">-</span>
                 </div>
                 <div>
-                  <span class="text-[11px] text-slate-500 font-medium block">Class</span>
-                  <span id="profileClass" class="text-xs font-semibold text-slate-200 block">-</span>
+                  <span class="text-xs text-slate-500 font-medium block">Class</span>
+                  <span id="profileClass" class="text-xs font-semibold text-slate-800 dark:text-slate-200 block">-</span>
                 </div>
               </div>
             </div>
 
-            <!-- Fast Cycle Dates Filter -->
+            <!-- Notes Panel -->
+            <div class="bg-white dark:bg-slate-950/80 rounded-xl p-4 border border-slate-200 dark:border-slate-800 space-y-3 shadow-sm mt-4">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Inspection Note</h4>
+              <div>
+                <select id="noteCategory" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs p-2 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500">
+                  <option value="OK">OK</option>
+                  <option value="CHECK">CHECK</option>
+                  <option value="RECHECK">RECHECK</option>
+                  <option value="DEFECTIVE">DEFECTIVE</option>
+                  <option value="THEFT">THEFT</option>
+                </select>
+              </div>
+              <div>
+                <textarea id="noteRemarks" rows="3" placeholder="Add remarks..." class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs p-2 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500 resize-none"></textarea>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="saveNote()" class="flex-1 bg-sky-600 hover:bg-sky-500 text-white text-xs py-2 rounded-lg font-medium transition">Save Note</button>
+                <button onclick="deleteNote()" class="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs py-2 rounded-lg font-medium transition">Delete</button>
+              </div>
+            </div>
+
             <div>
-              <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Available Cycles</h4>
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">Available Cycles</h4>
               <div id="cyclesList" class="space-y-1 max-h-48 overflow-y-auto pr-1">
                 <span class="text-xs text-slate-500 italic">No cycles loaded</span>
               </div>
             </div>
           </div>
 
-          <!-- Quick Navigation Buttons -->
-          <div class="pt-4 border-t border-slate-800 grid grid-cols-2 gap-2">
-            <button onclick="stepImage(-1)" class="btn-secondary py-2 justify-center text-xs">
+          <div class="pt-4 border-t border-slate-200 dark:border-slate-800 grid grid-cols-2 gap-2 mt-4">
+            <button onclick="stepImage(-1)" class="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 py-2 rounded-lg flex items-center justify-center gap-1 text-xs font-medium transition">
               <i data-lucide="chevron-left" class="w-4 h-4"></i> Prev
             </button>
-            <button onclick="stepImage(1)" class="btn-secondary py-2 justify-center text-xs">
+            <button onclick="stepImage(1)" class="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 py-2 rounded-lg flex items-center justify-center gap-1 text-xs font-medium transition">
               Next <i data-lucide="chevron-right" class="w-4 h-4"></i>
             </button>
           </div>
@@ -233,21 +271,20 @@
     <section id="tab-bill" class="tab-content flex-1 p-6 overflow-y-auto hidden">
       <div class="max-w-5xl mx-auto space-y-6">
         <div>
-          <h2 class="text-xl font-bold text-slate-100">Bill Calculator Studio</h2>
-          <p class="text-xs text-slate-400">Pro-Rata, Domestic Subsidy, and Tariff Billing Engine</p>
+          <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100">Bill Calculator Studio</h2>
+          <p class="text-xs text-slate-600 dark:text-slate-400">Pro-Rata, Domestic Subsidy, and Tariff Billing Engine</p>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <!-- Form Parameters Card -->
-          <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5">
+          <div class="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-5 shadow-sm">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="text-xs font-semibold text-slate-400 block mb-1.5">Tariff Class</label>
-                <select id="billCategory" onchange="runBillCalc()" class="w-full input-field"></select>
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Tariff Class</label>
+                <select id="billCategory" onchange="runBillCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500"></select>
               </div>
               <div>
-                <label class="text-xs font-semibold text-slate-400 block mb-1.5">Billing Cycle</label>
-                <select id="billCycle" onchange="toggleBillCycle()" class="w-full input-field">
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Billing Cycle</label>
+                <select id="billCycle" onchange="toggleBillCycle()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500">
                   <option value="Quarterly">Quarterly (3 Months)</option>
                   <option value="Monthly">Monthly (1 Month)</option>
                   <option value="Pro-Rata">Pro-Rata (Custom Days)</option>
@@ -255,91 +292,139 @@
               </div>
             </div>
 
-            <!-- Pro-Rata Days / Date Picker -->
-            <div id="proRataRow" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+            <!-- Pro-Rata Form -->
+            <div id="proRataRow" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-950/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
               <div>
-                <label class="text-xs font-semibold text-slate-400 block mb-1.5">Billed Days</label>
-                <input type="number" id="billDays" value="30" oninput="runBillCalc()" class="w-full input-field" min="1">
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">From Date</label>
+                <input type="date" id="billFromDate" onchange="calculateDaysAndRun()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200">
               </div>
-              <div class="flex items-center text-xs text-slate-400 pt-5">
-                Standard pro-rata formula: (Days / 30.0) applied proportionally across slabs.
+              <div>
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">To Date</label>
+                <input type="date" id="billToDate" onchange="calculateDaysAndRun()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200">
+              </div>
+              <div>
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Calculated Days</label>
+                <input type="number" id="billDays" value="30" oninput="runBillCalc()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200" min="1">
               </div>
             </div>
 
-            <!-- Units Input -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label class="text-xs font-semibold text-slate-400 block mb-1.5">Total Billed Units (kWh)</label>
-                <input type="number" id="billUnits" value="150" oninput="runBillCalc()" class="w-full input-field font-mono font-bold text-sky-400" min="0">
+              <div id="normalUnitsContainer">
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Total Billed Units</label>
+                <input type="number" id="billUnits" value="150" oninput="runBillCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-sky-600 dark:text-sky-400 font-bold" min="0">
               </div>
               <div>
-                <label class="text-xs font-semibold text-slate-400 block mb-1.5">Contract Load</label>
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Contract Load</label>
                 <div class="flex gap-2">
-                  <input type="number" step="0.1" id="billLoad" value="1.0" oninput="runBillCalc()" class="w-full input-field font-mono" min="0.1">
-                  <select id="billLoadUnit" onchange="runBillCalc()" class="input-field w-20">
+                  <input type="number" step="0.1" id="billLoad" value="1.0" oninput="runBillCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200" min="0.1">
+                  <select id="billLoadUnit" onchange="runBillCalc()" class="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200 w-20">
                     <option value="kVA">kVA</option>
                     <option value="kW">kW</option>
                   </select>
                 </div>
               </div>
               <div>
-                <label class="text-xs font-semibold text-slate-400 block mb-1.5">MVCA Rate (P/Unit)</label>
-                <input type="number" step="0.1" id="billMvca" value="0.0" oninput="runBillCalc()" class="w-full input-field font-mono">
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">MVCA Rate (P/Unit)</label>
+                <input type="number" step="0.1" id="billMvca" value="0.0" oninput="runBillCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200">
+              </div>
+            </div>
+
+            <!-- Phase Selection -->
+            <div>
+              <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Phase / Meter Type</label>
+              <div class="flex gap-4">
+                <label class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300"><input type="radio" name="phase" value="1" checked onchange="runBillCalc()"> 1-Phase</label>
+                <label class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300"><input type="radio" name="phase" value="3" onchange="runBillCalc()"> 3-Phase</label>
+                <label class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300"><input type="radio" name="phase" value="own" onchange="runBillCalc()"> Own Meter</label>
+              </div>
+            </div>
+
+            <!-- TOD Container (Hidden by default) -->
+            <div id="todUnitsContainer" class="hidden grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 dark:bg-slate-950/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+              <div>
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Normal Units</label>
+                <input type="number" id="todNormal" value="0" oninput="runBillCalc()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2">
+              </div>
+              <div>
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Peak Units</label>
+                <input type="number" id="todPeak" value="0" oninput="runBillCalc()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2">
+              </div>
+              <div>
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Off-Peak Units</label>
+                <input type="number" id="todOffPeak" value="0" oninput="runBillCalc()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2">
               </div>
             </div>
 
             <div class="flex items-center gap-6 pt-2">
-              <label class="flex items-center gap-2 text-xs font-medium text-slate-300 cursor-pointer">
-                <input type="checkbox" id="billMeterRent" checked onchange="runBillCalc()" class="rounded border-slate-800 text-sky-500 focus:ring-0">
+              <label class="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                <input type="checkbox" id="billMeterRent" checked onchange="runBillCalc()" class="rounded border-slate-300 dark:border-slate-700 text-sky-500 focus:ring-0">
                 Include Meter Rent
               </label>
-              <label class="flex items-center gap-2 text-xs font-medium text-slate-300 cursor-pointer">
-                <input type="checkbox" id="billMonsoon" onchange="runBillCalc()" class="rounded border-slate-800 text-sky-500 focus:ring-0">
+              <label id="monsoonContainer" class="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                <input type="checkbox" id="billMonsoon" onchange="runBillCalc()" class="rounded border-slate-300 dark:border-slate-700 text-sky-500 focus:ring-0">
                 Monsoon Rebate (50% Fixed Charge)
               </label>
             </div>
           </div>
 
-          <!-- Bill Summary Receipt Card -->
-          <div class="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between shadow-2xl">
+          <div class="bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 flex flex-col justify-between shadow-lg">
             <div class="space-y-4">
-              <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Calculated Bill</h3>
-                <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-semibold">Live</span>
+              <div class="flex items-center justify-between pb-3 border-b border-slate-300 dark:border-slate-800">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Calculated Bill</h3>
+                <span class="text-xs px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-semibold">Live</span>
               </div>
 
-              <div class="space-y-2.5 text-xs">
-                <div class="flex justify-between text-slate-400">
+              <div class="space-y-2.5 text-sm">
+                <div class="flex justify-between text-slate-700 dark:text-slate-300">
                   <span>Energy Charge</span>
-                  <span id="resEnergy" class="font-mono text-slate-200">? 0.00</span>
+                  <span id="resEnergy" class="font-sans font-medium text-slate-900 dark:text-slate-100">&#8377; 0.00</span>
                 </div>
-                <div class="flex justify-between text-slate-400">
-                  <span>Fixed Demand Charge</span>
-                  <span id="resFixed" class="font-mono text-slate-200">? 0.00</span>
+                <div class="flex justify-between text-slate-700 dark:text-slate-300">
+                  <span>Fixed/Demand Charge</span>
+                  <span id="resFixed" class="font-sans font-medium text-slate-900 dark:text-slate-100">&#8377; 0.00</span>
                 </div>
-                <div class="flex justify-between text-slate-400">
+                <div class="flex justify-between text-slate-700 dark:text-slate-300">
+                  <span>Minimum Charge <span id="resMinTag" class="text-rose-500 text-xs hidden">(Applied)</span></span>
+                  <span id="resMin" class="font-sans font-medium text-slate-900 dark:text-slate-100">&#8377; 0.00</span>
+                </div>
+                <div class="flex justify-between text-slate-700 dark:text-slate-300">
+                  <span>MVCA Surcharge</span>
+                  <span id="resMvca" class="font-sans font-medium text-slate-900 dark:text-slate-100">&#8377; 0.00</span>
+                </div>
+                <div class="flex justify-between text-slate-700 dark:text-slate-300">
                   <span>Meter Rent</span>
-                  <span id="resMeter" class="font-mono text-slate-200">? 0.00</span>
+                  <span id="resMeter" class="font-sans font-medium text-slate-900 dark:text-slate-100">&#8377; 0.00</span>
                 </div>
-                <div class="flex justify-between text-slate-400">
-                  <span>MVCA Charge</span>
-                  <span id="resMvca" class="font-mono text-slate-200">? 0.00</span>
+                <div class="flex justify-between text-emerald-600 dark:text-emerald-400 pt-1">
+                  <span>Govt Subsidy/Relief</span>
+                  <span id="resRelief" class="font-sans font-medium">- &#8377; 0.00</span>
                 </div>
-                <div class="flex justify-between text-slate-400">
-                  <span>Electricity Duty (ED)</span>
-                  <span id="resEd" class="font-mono text-slate-200">? 0.00</span>
+                <div class="flex justify-between text-slate-700 dark:text-slate-300 pb-1 border-b border-slate-300 dark:border-slate-800">
+                  <span>Electricity Duty (<span id="resEdRate">0</span>%)</span>
+                  <span id="resEd" class="font-sans font-medium text-slate-900 dark:text-slate-100">&#8377; 0.00</span>
                 </div>
-                <div class="flex justify-between text-emerald-400 pt-2 border-t border-slate-800">
-                  <span>Government Relief (Subsidy)</span>
-                  <span id="resRelief" class="font-mono">- ? 0.00</span>
+                <div class="flex justify-between font-bold text-slate-900 dark:text-slate-100">
+                  <span>GROSS BILL</span>
+                  <span id="resGross" class="font-sans">&#8377; 0.00</span>
+                </div>
+                <div class="flex justify-between text-emerald-600 dark:text-emerald-400 text-xs">
+                  <span>Timely Payment Rebate (-1%)</span>
+                  <span id="resTimely" class="font-sans">- &#8377; 0.00</span>
+                </div>
+                <div class="flex justify-between text-emerald-600 dark:text-emerald-400 text-xs">
+                  <span>E-Payment Rebate (-1%)</span>
+                  <span id="resEpay" class="font-sans">- &#8377; 0.00</span>
+                </div>
+                <div class="flex justify-between text-emerald-600 dark:text-emerald-400 text-xs">
+                  <span>Special Rebate (-10p)</span>
+                  <span id="resSpecial" class="font-sans">- &#8377; 0.00</span>
                 </div>
               </div>
             </div>
 
-            <div class="pt-6 border-t border-slate-800 space-y-2">
-              <span class="text-xs text-slate-400 block">Total Net Bill</span>
-              <div class="text-3xl font-extrabold text-sky-400 font-mono tracking-tight" id="resNet">? 0</div>
-              <span class="text-[11px] text-slate-500 block">Includes all slab rates & proportional rules</span>
+            <div class="pt-6 border-t border-slate-300 dark:border-slate-800 space-y-2 mt-4">
+              <span class="text-xs text-slate-600 dark:text-slate-400 block">NET PAYABLE</span>
+              <div class="text-2xl font-extrabold text-sky-600 dark:text-sky-400 font-sans tracking-tight" id="resNet">&#8377; 0</div>
             </div>
           </div>
         </div>
@@ -348,105 +433,156 @@
 
     <!-- TAB 3: Theft Assessment Studio -->
     <section id="tab-theft" class="tab-content flex-1 p-6 overflow-y-auto hidden">
-      <div class="max-w-5xl mx-auto space-y-6">
+      <div class="max-w-6xl mx-auto space-y-6">
         <div>
-          <h2 class="text-xl font-bold text-slate-100">Theft & Unauthorized Usage Assessment</h2>
-          <p class="text-xs text-slate-400">Section 126 & 135 Electricity Act Dual-Penalty Ledger</p>
+          <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100">Theft & Unauthorized Usage Assessment</h2>
+          <p class="text-xs text-slate-600 dark:text-slate-400">Section 126 & 135 Electricity Act Dual-Penalty Ledger</p>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-5 shadow-sm">
+            <h3 class="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Parameters</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="text-xs font-semibold text-slate-400 block mb-1.5">Tariff Class</label>
-                <select id="theftCategory" onchange="runTheftCalc()" class="w-full input-field"></select>
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Tariff Class</label>
+                <select id="theftCategory" onchange="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500"></select>
               </div>
               <div>
-                <label class="text-xs font-semibold text-slate-400 block mb-1.5">Consumer Status</label>
-                <select id="theftConsumerType" onchange="runTheftCalc()" class="w-full input-field">
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Consumer Status</label>
+                <select id="theftConsumerType" onchange="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500">
                   <option value="Consumer">Registered Consumer</option>
-                  <option value="Non-Consumer">Non-Consumer (Direct Hooking / Direct Tap)</option>
+                  <option value="Non-Consumer">Non-Consumer (Direct Hooking)</option>
                 </select>
               </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="text-xs font-semibold text-slate-400 block mb-1.5">Connected Load</label>
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Connected Load</label>
                 <div class="flex gap-2">
-                  <input type="number" step="0.1" id="theftLoad" value="1.5" oninput="runTheftCalc()" class="w-full input-field font-mono" min="0.1">
-                  <select id="theftLoadUnit" onchange="runTheftCalc()" class="input-field w-20">
+                  <input type="number" step="0.1" id="theftLoad" value="1.5" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200" min="0.1">
+                  <select id="theftLoadUnit" onchange="runTheftCalc()" class="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200 w-20">
                     <option value="kVA">kVA</option>
                     <option value="kW">kW</option>
                   </select>
                 </div>
               </div>
               <div>
-                <label class="text-xs font-semibold text-slate-400 block mb-1.5">Assessment Days</label>
-                <input type="number" id="theftDays" value="365" oninput="runTheftCalc()" class="w-full input-field font-mono" min="1">
-              </div>
-              <div>
-                <label class="text-xs font-semibold text-slate-400 block mb-1.5">Hours / Day (0 to 24)</label>
-                <input type="number" step="0.5" id="theftHours" value="8" oninput="runTheftCalc()" class="w-full input-field font-mono" min="0" max="24">
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Hours / Day</label>
+                <input type="number" step="0.5" id="theftHours" value="8" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200" min="0" max="24">
               </div>
             </div>
 
             <!-- Prior Bill Adjustments -->
-            <div class="pt-3 border-t border-slate-800">
-              <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Previous Bill Adjustments (Deductions)</h4>
+            <div class="pt-3 border-t border-slate-200 dark:border-slate-800">
+              <h4 class="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-3">Prior Deductions (Paid)</h4>
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label class="text-[11px] text-slate-500 block mb-1">Energy Charge Paid (?)</label>
-                  <input type="number" id="theftAdjEnergy" value="0" oninput="runTheftCalc()" class="w-full input-field font-mono">
+                  <label class="text-xs text-slate-500 block mb-1">Energy (&#8377;)</label>
+                  <input type="number" id="theftAdjEnergy" value="0" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2">
                 </div>
                 <div>
-                  <label class="text-[11px] text-slate-500 block mb-1">Fixed Charge Paid (?)</label>
-                  <input type="number" id="theftAdjFixed" value="0" oninput="runTheftCalc()" class="w-full input-field font-mono">
+                  <label class="text-xs text-slate-500 block mb-1">Fixed (&#8377;)</label>
+                  <input type="number" id="theftAdjFixed" value="0" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2">
                 </div>
                 <div>
-                  <label class="text-[11px] text-slate-500 block mb-1">Duty Paid (?)</label>
-                  <input type="number" id="theftAdjEd" value="0" oninput="runTheftCalc()" class="w-full input-field font-mono">
+                  <label class="text-xs text-slate-500 block mb-1">Duty (&#8377;)</label>
+                  <input type="number" id="theftAdjEd" value="0" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2">
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Theft Assessment Output Card -->
-          <div class="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between shadow-2xl">
-            <div class="space-y-4">
-              <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Assessment Ledger</h3>
-                <span class="text-xs px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-semibold">2x Penal</span>
+          <div class="bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 flex flex-col justify-between shadow-lg">
+            <h3 class="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-4">Dual Ledger Output</h3>
+            
+            <div class="grid grid-cols-2 gap-4">
+              <!-- Provisional Left -->
+              <div class="border-r border-slate-300 dark:border-slate-800 pr-4 space-y-3">
+                <div class="flex items-center justify-between">
+                  <h4 class="text-xs font-bold text-sky-600 dark:text-sky-400">Provisional</h4>
+                  <div class="text-xs text-slate-500 flex flex-col items-end">
+                    <span>Days: <input type="number" id="theftProvDays" value="30" oninput="runTheftCalc()" class="w-12 bg-transparent border-b border-slate-400 text-right text-slate-800 dark:text-slate-200"></span>
+                  </div>
+                </div>
+                
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between text-slate-700 dark:text-slate-300">
+                    <span>Assessed Units</span>
+                    <span id="provUnits">0</span>
+                  </div>
+                  <div class="flex justify-between text-slate-700 dark:text-slate-300">
+                    <span>Penal Energy</span>
+                    <span id="provEnergy">&#8377; 0.00</span>
+                  </div>
+                  <div class="flex justify-between text-slate-700 dark:text-slate-300">
+                    <span>Penal Fixed</span>
+                    <span id="provFixed">&#8377; 0.00</span>
+                  </div>
+                  <div class="flex justify-between text-slate-700 dark:text-slate-300">
+                    <span>Elec. Duty</span>
+                    <span id="provEd">&#8377; 0.00</span>
+                  </div>
+                  <div class="flex justify-between font-bold border-t border-slate-300 dark:border-slate-800 pt-1">
+                    <span>Gross</span>
+                    <span id="provGross">&#8377; 0.00</span>
+                  </div>
+                  <div class="flex justify-between text-emerald-600 dark:text-emerald-400">
+                    <span>Deductions</span>
+                    <span id="provAdj">- &#8377; 0.00</span>
+                  </div>
+                  <div class="flex justify-between font-bold text-sky-600 dark:text-sky-400 pt-2 text-lg">
+                    <span>Net</span>
+                    <span id="provNet">&#8377; 0</span>
+                  </div>
+                </div>
               </div>
 
-              <div class="space-y-2.5 text-xs">
-                <div class="flex justify-between text-slate-400">
-                  <span>Assessed Units</span>
-                  <span id="theftUnits" class="font-mono text-slate-200">0 kWh</span>
+              <!-- Final Right -->
+              <div class="pl-4 space-y-3">
+                <div class="flex items-center justify-between">
+                  <h4 class="text-xs font-bold text-rose-600 dark:text-rose-400">Final (126/135)</h4>
+                  <div class="text-xs text-slate-500 flex flex-col items-end">
+                    <span>Days: <input type="number" id="theftFinalDays" value="365" oninput="runTheftCalc()" class="w-12 bg-transparent border-b border-slate-400 text-right text-slate-800 dark:text-slate-200"></span>
+                  </div>
                 </div>
-                <div class="flex justify-between text-slate-400">
-                  <span>Penal Energy (2x)</span>
-                  <span id="theftEnergy" class="font-mono text-slate-200">? 0.00</span>
-                </div>
-                <div class="flex justify-between text-slate-400">
-                  <span>Penal Fixed Demand (2x)</span>
-                  <span id="theftFixed" class="font-mono text-slate-200">? 0.00</span>
-                </div>
-                <div class="flex justify-between text-slate-400">
-                  <span>Assessed Duty (ED)</span>
-                  <span id="theftEd" class="font-mono text-slate-200">? 0.00</span>
-                </div>
-                <div class="flex justify-between text-amber-400 pt-2 border-t border-slate-800">
-                  <span>Deductions / Paid</span>
-                  <span id="theftAdjustments" class="font-mono">- ? 0.00</span>
+                
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between text-slate-700 dark:text-slate-300">
+                    <span>Assessed Units</span>
+                    <span id="finalUnits">0</span>
+                  </div>
+                  <div class="flex justify-between text-slate-700 dark:text-slate-300">
+                    <span>Penal Energy</span>
+                    <span id="finalEnergy">&#8377; 0.00</span>
+                  </div>
+                  <div class="flex justify-between text-slate-700 dark:text-slate-300">
+                    <span>Penal Fixed</span>
+                    <span id="finalFixed">&#8377; 0.00</span>
+                  </div>
+                  <div class="flex justify-between text-slate-700 dark:text-slate-300">
+                    <span>Elec. Duty</span>
+                    <span id="finalEd">&#8377; 0.00</span>
+                  </div>
+                  <div class="flex justify-between font-bold border-t border-slate-300 dark:border-slate-800 pt-1">
+                    <span>Gross</span>
+                    <span id="finalGross">&#8377; 0.00</span>
+                  </div>
+                  <div class="flex justify-between text-emerald-600 dark:text-emerald-400">
+                    <span>Deductions</span>
+                    <span id="finalAdj">- &#8377; 0.00</span>
+                  </div>
+                  <div class="flex justify-between font-bold text-rose-600 dark:text-rose-400 pt-2 text-lg">
+                    <span>Net</span>
+                    <span id="finalNet">&#8377; 0</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div class="pt-6 border-t border-slate-800 space-y-2">
-              <span class="text-xs text-slate-400 block">Final Assessment Payable</span>
-              <div class="text-3xl font-extrabold text-rose-400 font-mono tracking-tight" id="theftNet">? 0</div>
-              <span class="text-[11px] text-slate-500 block">Final sum after double-rate penalty & deductions</span>
+            <!-- Relief comparison -->
+            <div id="reliefBar" class="mt-4 p-3 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-sm font-medium text-center border border-emerald-200 dark:border-emerald-800/50">
+              Final Assessment Relief: &#8377; 0.00 (0.00%)
             </div>
           </div>
         </div>
@@ -455,43 +591,133 @@
 
     <!-- TAB 4: Tariff Class Browser -->
     <section id="tab-tariffs" class="tab-content flex-1 p-6 overflow-y-auto hidden">
-      <div class="max-w-4xl mx-auto space-y-6">
-        <div>
-          <h2 class="text-xl font-bold text-slate-100">WBSEDCL Tariff Schedules</h2>
-          <p class="text-xs text-slate-400">Current active rates, fixed demand charges, and duty slabs</p>
+      <div class="max-w-6xl mx-auto space-y-6 flex">
+        <div class="w-1/3 pr-4 border-r border-slate-300 dark:border-slate-800 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100">Tariff Classes</h2>
+            <button class="bg-sky-600 text-white p-1 rounded hover:bg-sky-500" title="Add Tariff" onclick="addTariffClass()"><i data-lucide="plus" class="w-4 h-4"></i></button>
+          </div>
+          <div id="tariffList" class="space-y-2">
+            <!-- Tariff list populated dynamically -->
+          </div>
         </div>
-        <div id="tariffCardsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Dynamic Tariff Cards -->
+        <div class="w-2/3 pl-4 space-y-4" id="tariffEditor">
+          <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100">Tariff Editor</h2>
+          <p class="text-sm text-slate-500">Select a tariff from the left to edit.</p>
         </div>
       </div>
     </section>
 
-    <!-- TAB 5: Settings & Self-Update -->
-    <section id="tab-settings" class="tab-content flex-1 p-6 overflow-y-auto hidden">
+    <!-- TAB 5: Low Cons. Audit -->
+    <section id="tab-audit" class="tab-content flex-1 p-6 overflow-y-auto hidden">
       <div class="max-w-3xl mx-auto space-y-6">
         <div>
-          <h2 class="text-xl font-bold text-slate-100">Application Settings & System</h2>
-          <p class="text-xs text-slate-400">Storage locations, database indexing, and GitHub auto-updates</p>
+          <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100">Low Consumption Audit</h2>
+          <p class="text-xs text-slate-600 dark:text-slate-400">Identify cases of meter tempering and slow meters</p>
+        </div>
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-sm text-center py-12">
+          <i data-lucide="file-spreadsheet" class="w-12 h-12 text-slate-400 mx-auto mb-4"></i>
+          <h3 class="text-lg font-bold text-slate-800 dark:text-slate-200">Load Excel Data</h3>
+          <p class="text-sm text-slate-500">Please load consumer consumption data from Excel to begin the audit.</p>
+          <button class="bg-sky-600 text-white px-4 py-2 rounded-lg text-sm mt-4 inline-block hover:bg-sky-500 transition">Import Excel</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 6: Settings & Self-Update -->
+    <section id="tab-settings" class="tab-content flex-1 p-6 overflow-y-auto hidden">
+      <div class="max-w-4xl mx-auto space-y-6">
+        <div>
+          <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100">Application Settings & System</h2>
+          <p class="text-xs text-slate-600 dark:text-slate-400">Storage locations, database indexing, and updates</p>
         </div>
 
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-          <h3 class="text-sm font-bold text-slate-200">Software Update</h3>
-          <div class="flex items-center justify-between p-4 bg-slate-950/60 rounded-xl border border-slate-800">
-            <div>
-              <span class="text-xs font-semibold text-slate-300 block">Current Installed Version</span>
-              <span class="text-xs text-slate-500">v19.4 Studio Edition</span>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-sm">
+            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200">Software Update</h3>
+            <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
+              <div>
+                <span class="text-xs font-semibold text-slate-700 dark:text-slate-300 block">Current Installed Version</span>
+                <span class="text-xs text-slate-500">v19.4 Studio Edition</span>
+              </div>
+              <button onclick="triggerUpdateCheck()" class="bg-sky-600 text-white px-3 py-1.5 rounded-lg text-xs hover:bg-sky-500 transition flex items-center gap-1">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Check Now
+              </button>
             </div>
-            <button onclick="triggerUpdateCheck()" class="btn-primary text-xs">
-              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Check Now
-            </button>
+            <div id="updateStatusBox" class="hidden p-4 rounded-xl border text-xs"></div>
           </div>
-          <div id="updateStatusBox" class="hidden p-4 rounded-xl border text-xs"></div>
+
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-sm">
+            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200">Export & Data</h3>
+            <div class="space-y-3">
+              <button onclick="exportNotes()" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 px-4 py-2 rounded-lg text-sm transition">
+                Export Notes to CSV
+              </button>
+              <button class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 px-4 py-2 rounded-lg text-sm transition">
+                Import Consumer Data
+              </button>
+              <button class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 px-4 py-2 rounded-lg text-sm transition">
+                Generate Template
+              </button>
+            </div>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-sm">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200">Network Folders</h3>
+              <button onclick="addFolder()" class="text-sky-600 dark:text-sky-400 hover:underline text-xs font-medium">Add Folder</button>
+            </div>
+            <div id="folderList" class="space-y-2 max-h-40 overflow-y-auto">
+              <!-- Dynamically added folders -->
+            </div>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-sm">
+            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200">Image Indexing</h3>
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-slate-600 dark:text-slate-400">Total Indexed: <span id="indexedCount" class="font-bold">0</span></span>
+              <button onclick="startIndexing()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs transition">
+                Re-index Images
+              </button>
+            </div>
+            <div id="indexProgress" class="hidden h-2 w-full bg-slate-200 dark:bg-slate-800 rounded overflow-hidden">
+              <div class="h-full bg-emerald-500 w-1/2"></div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
   </main>
 
-  <script src="js/app.js"></script>
+  <!-- Multi-Result Selector Modal -->
+  <div id="searchModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[80vh]">
+      <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+        <h3 class="font-bold text-slate-900 dark:text-slate-100">Multiple Consumers Found</h3>
+        <button onclick="closeSearchModal()" class="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-0 overflow-auto flex-1">
+        <table class="w-full text-left text-sm text-slate-600 dark:text-slate-400">
+          <thead class="bg-slate-50 dark:bg-slate-950/50 text-xs uppercase sticky top-0">
+            <tr>
+              <th class="px-4 py-3">CID</th>
+              <th class="px-4 py-3">Meter</th>
+              <th class="px-4 py-3">Name</th>
+              <th class="px-4 py-3">Mobile</th>
+              <th class="px-4 py-3">Action</th>
+            </tr>
+          </thead>
+          <tbody id="searchResultsTable" class="divide-y divide-slate-200 dark:divide-slate-800">
+            <!-- Dynamic rows -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js" charset="UTF-8"></script>
 </body>
 </html>

@@ -6,6 +6,7 @@ let rotationAngle = 0;
 let isPanning = false;
 let startX = 0, startY = 0, translateX = 0, translateY = 0;
 let currentTariffs = {};
+let currentConsumerId = null;
 
 // On window load
 window.addEventListener('pywebviewready', () => {
@@ -24,7 +25,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
 async function callAPI(method, ...args) {
   if (window.pywebview && window.pywebview.api && window.pywebview.api[method]) {
-    return await window.pywebview.api[method](...args);
+    try {
+      return await window.pywebview.api[method](...args);
+    } catch (e) {
+      console.error(`API ${method} error:`, e);
+      return { success: false, error: e.toString() };
+    }
   }
   console.warn(`API method ${method} called without PyWebView`);
   return { success: false, error: "PyWebView API not available" };
@@ -34,14 +40,23 @@ async function initApp() {
   const info = await callAPI('get_app_info');
   if (info && info.total_images) {
     document.getElementById('statImages').innerText = `${info.total_images} Imgs`;
+    document.getElementById('indexedCount').innerText = info.total_images;
   }
   
+  // Load folders
+  if (info && info.folders) {
+    renderFolders(info.folders);
+  } else {
+    const fRes = await callAPI('get_folder_status');
+    if (fRes && fRes.success) renderFolders(fRes.folders);
+  }
+
   // Load tariffs
   const tariffRes = await callAPI('get_tariffs');
   if (tariffRes && tariffRes.success) {
     currentTariffs = tariffRes.tariffs;
     populateTariffDropdowns();
-    renderTariffCards();
+    renderTariffEditorList();
     runBillCalc();
     runTheftCalc();
   }
@@ -57,9 +72,9 @@ function switchTab(tabId) {
 
   document.querySelectorAll('.nav-item').forEach(el => {
     if (el.dataset.tab === tabId) {
-      el.classList.add('active', 'bg-slate-800', 'text-white');
+      el.classList.add('active', 'bg-slate-100', 'dark:bg-slate-800', 'text-slate-900', 'dark:text-white');
     } else {
-      el.classList.remove('active', 'bg-slate-800', 'text-white');
+      el.classList.remove('active', 'bg-slate-100', 'dark:bg-slate-800', 'text-slate-900', 'dark:text-white');
     }
   });
   lucide.createIcons();
@@ -81,15 +96,59 @@ async function handleSearch() {
   if (!query) return;
 
   const res = await callAPI('search_consumer', query, filterType);
-  if (!res || !res.success || !res.results.length) {
+  if (!res || !res.success || !res.results || !res.results.length) {
     alert(`No matching consumers found for "${query}"`);
     return;
   }
 
-  const profile = res.results[0];
-  populateProfile(profile);
+  if (res.results.length > 1) {
+    showSearchModal(res.results);
+  } else {
+    selectConsumer(res.results[0]);
+  }
+}
 
-  // Load images for this consumer
+function showSearchModal(results) {
+  const tbody = document.getElementById('searchResultsTable');
+  tbody.innerHTML = '';
+  results.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer';
+    tr.innerHTML = `
+      <td class="px-4 py-3 font-mono text-sky-600 dark:text-sky-400">${r.consumer_id}</td>
+      <td class="px-4 py-3 font-mono">${r.meter_no || '-'}</td>
+      <td class="px-4 py-3">${r.name || '-'}</td>
+      <td class="px-4 py-3">${r.mobile_number || '-'}</td>
+      <td class="px-4 py-3"><button class="bg-sky-600 text-white px-3 py-1 rounded text-xs">Select</button></td>
+    `;
+    tr.onclick = () => {
+      selectConsumer(r);
+      closeSearchModal();
+    };
+    tbody.appendChild(tr);
+  });
+  document.getElementById('searchModal').classList.remove('hidden');
+}
+
+function closeSearchModal() {
+  document.getElementById('searchModal').classList.add('hidden');
+}
+
+async function selectConsumer(profile) {
+  currentConsumerId = profile.consumer_id;
+  populateProfile(profile);
+  
+  // Load note
+  const noteRes = await callAPI('get_consumer_note', profile.consumer_id);
+  if (noteRes && noteRes.success && noteRes.note) {
+    document.getElementById('noteCategory').value = noteRes.note;
+    document.getElementById('noteRemarks').value = noteRes.remarks || '';
+  } else {
+    document.getElementById('noteCategory').value = 'OK';
+    document.getElementById('noteRemarks').value = '';
+  }
+
+  // Load images
   await loadConsumerImages(profile.consumer_id);
 }
 
@@ -108,52 +167,94 @@ function populateProfile(p) {
   badgeText.innerText = `CID: ${p.consumer_id}`;
 }
 
+async function saveNote() {
+  if (!currentConsumerId) return alert("No consumer selected");
+  const noteType = document.getElementById('noteCategory').value;
+  const remarks = document.getElementById('noteRemarks').value;
+  
+  const res = await callAPI('save_consumer_note', currentConsumerId, noteType, remarks);
+  if (res && res.success) {
+    alert("Note saved successfully!");
+  } else {
+    alert("Failed to save note: " + (res ? res.error : "Unknown error"));
+  }
+}
+
+async function deleteNote() {
+  if (!currentConsumerId) return;
+  const res = await callAPI('delete_consumer_note', currentConsumerId);
+  if (res && res.success) {
+    document.getElementById('noteCategory').value = 'OK';
+    document.getElementById('noteRemarks').value = '';
+    alert("Note deleted.");
+  }
+}
+
 async function loadConsumerImages(consumerId) {
   const res = await callAPI('get_consumer_images', consumerId);
   if (!res || !res.success) {
-    document.getElementById('filmstripContainer').innerHTML = `<p class="text-xs text-rose-400 px-4">${res ? res.error : "Failed to load images"}</p>`;
+    document.getElementById('filmstripContainer').innerHTML = `<p class="text-xs text-rose-500 px-4">${res ? res.error : "Failed to load images"}</p>`;
     return;
   }
 
-  currentImages = res.images;
+  currentImages = res.images || [];
   currentImageIndex = 0;
-  document.getElementById('searchResultCount').innerText = `${res.total_images} photos`;
+  document.getElementById('searchResultCount').innerText = `${res.total_images || 0} photos`;
 
   // Render cycles
   const cyclesList = document.getElementById('cyclesList');
   cyclesList.innerHTML = '';
-  res.dates.forEach((dateStr, idx) => {
-    const btn = document.createElement('button');
-    btn.className = "w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800 transition flex items-center justify-between";
-    btn.innerHTML = `<span>${dateStr}</span><span class="text-[10px] text-slate-500">${res.grouped[dateStr].length} img</span>`;
-    btn.onclick = () => {
-      const targetIdx = currentImages.findIndex(img => img.date_formatted === dateStr);
-      if (targetIdx !== -1) showImage(targetIdx);
-    };
-    cyclesList.appendChild(btn);
-  });
+  if (res.dates) {
+    res.dates.forEach((dateStr) => {
+      const btn = document.createElement('button');
+      btn.className = "w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-between";
+      const count = res.grouped[dateStr] ? res.grouped[dateStr].length : 0;
+      btn.innerHTML = `<span>${dateStr}</span><span class="text-xs text-slate-500">${count} img</span>`;
+      btn.onclick = () => {
+        const targetIdx = currentImages.findIndex(img => img.date_formatted === dateStr);
+        if (targetIdx !== -1) showImage(targetIdx);
+      };
+      cyclesList.appendChild(btn);
+    });
+  }
 
   // Render filmstrip
   renderFilmstrip();
   if (currentImages.length > 0) {
     showImage(0);
+  } else {
+    document.getElementById('mainImage').classList.add('hidden');
+    document.getElementById('imagePlaceholder').classList.remove('hidden');
+    document.getElementById('imgDateTag').innerText = 'No images found';
   }
 }
 
-function renderFilmstrip() {
+async function renderFilmstrip() {
   const container = document.getElementById('filmstripContainer');
   container.innerHTML = '';
 
-  currentImages.forEach((img, idx) => {
+  for (let idx = 0; idx < currentImages.length; idx++) {
+    const img = currentImages[idx];
     const item = document.createElement('div');
-    item.className = `filmstrip-thumb flex flex-col items-center justify-center p-2 rounded-xl bg-slate-950/80 border border-slate-800 cursor-pointer min-w-[85px] h-20 shrink-0 ${idx === currentImageIndex ? 'active' : ''}`;
-    item.innerHTML = `
-      <i data-lucide="image" class="w-6 h-6 text-slate-400 mb-1"></i>
-      <span class="text-[10px] font-mono text-slate-300">${img.date_formatted}</span>
-    `;
+    item.className = `filmstrip-thumb flex flex-col items-center justify-center p-1 rounded-lg bg-white dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 cursor-pointer w-24 h-20 shrink-0 ${idx === currentImageIndex ? 'active' : ''}`;
+    
+    // Try to get thumbnail
+    const thumbRes = await callAPI('get_image_data', img.full_path, 200);
+    if (thumbRes && thumbRes.success) {
+      item.innerHTML = `
+        <img src="${thumbRes.data}" class="w-full h-12 object-cover rounded mb-1" />
+        <span class="text-xs font-mono text-slate-700 dark:text-slate-300 truncate w-full text-center">${img.date_formatted}</span>
+      `;
+    } else {
+      item.innerHTML = `
+        <i data-lucide="image" class="w-6 h-6 text-slate-400 mb-1"></i>
+        <span class="text-xs font-mono text-slate-700 dark:text-slate-300">${img.date_formatted}</span>
+      `;
+    }
+    
     item.onclick = () => showImage(idx);
     container.appendChild(item);
-  });
+  }
   lucide.createIcons();
 }
 
@@ -184,12 +285,35 @@ async function showImage(index) {
     placeholder.classList.add('hidden');
     resetZoom();
   } else {
-    placeholder.innerHTML = `<p class="text-xs text-rose-400">Failed to render image file</p>`;
+    placeholder.innerHTML = `<p class="text-xs text-rose-500">Failed to render image file</p>`;
   }
 }
 
 function stepImage(direction) {
-  showImage(currentImageIndex + direction);
+  if (currentImages.length > 0) {
+    let newIdx = currentImageIndex + direction;
+    if (newIdx < 0) newIdx = currentImages.length - 1;
+    if (newIdx >= currentImages.length) newIdx = 0;
+    showImage(newIdx);
+  }
+}
+
+async function printActiveImage() {
+  if (!currentImages.length) return;
+  await callAPI('print_image', currentImages[currentImageIndex].full_path);
+}
+
+async function saveActiveImage() {
+  if (!currentImages.length) return;
+  await callAPI('save_image_to', currentImages[currentImageIndex].full_path, '');
+}
+
+async function saveAllImages() {
+  if (!currentConsumerId) return;
+  const res = await callAPI('save_all_images', currentConsumerId, '');
+  if (res && res.success) {
+    alert(`Saved ${res.count} images successfully!`);
+  }
 }
 
 // --- Zoom & Pan Canvas ---
@@ -247,7 +371,7 @@ function setupViewportEvents() {
   });
 }
 
-// --- Bill & Theft Calculations ---
+// --- Bill Calculations ---
 function populateTariffDropdowns() {
   const bSelect = document.getElementById('billCategory');
   const tSelect = document.getElementById('theftCategory');
@@ -275,98 +399,269 @@ function toggleBillCycle() {
   runBillCalc();
 }
 
+function calculateDaysAndRun() {
+  const fd = new Date(document.getElementById('billFromDate').value);
+  const td = new Date(document.getElementById('billToDate').value);
+  if (!isNaN(fd) && !isNaN(td)) {
+    const diffTime = Math.abs(td - fd);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; 
+    document.getElementById('billDays').value = diffDays;
+  }
+  runBillCalc();
+}
+
 async function runBillCalc() {
+  const cat = document.getElementById('billCategory').value;
+  const tData = currentTariffs[cat];
+  if (!tData) return;
+  
+  // Toggle TOD / Normal units visibility based on category or phase
+  const phase = document.querySelector('input[name="phase"]:checked').value;
+  const isTod = tData.tod_applicable || cat.includes("TOD");
+  
+  if (isTod) {
+    document.getElementById('normalUnitsContainer').classList.add('hidden');
+    document.getElementById('todUnitsContainer').classList.remove('hidden');
+  } else {
+    document.getElementById('normalUnitsContainer').classList.remove('hidden');
+    document.getElementById('todUnitsContainer').classList.add('hidden');
+  }
+  
+  const isAgri = cat.toLowerCase().includes('agri');
+  if (isAgri && !isTod) document.getElementById('monsoonContainer').classList.remove('hidden');
+  else document.getElementById('monsoonContainer').classList.add('hidden');
+
+  let units = 0;
+  let todData = null;
+  if (isTod) {
+    todData = {
+      normal: parseInt(document.getElementById('todNormal').value || 0),
+      peak: parseInt(document.getElementById('todPeak').value || 0),
+      off_peak: parseInt(document.getElementById('todOffPeak').value || 0)
+    };
+    units = todData.normal + todData.peak + todData.off_peak;
+  } else {
+    units = parseInt(document.getElementById('billUnits').value || 0);
+  }
+
   const payload = {
-    category: document.getElementById('billCategory').value,
+    category: cat,
     cycle: document.getElementById('billCycle').value,
     days: parseInt(document.getElementById('billDays').value || 30),
-    units: parseInt(document.getElementById('billUnits').value || 0),
+    units: units,
+    tod_units: todData,
     load: parseFloat(document.getElementById('billLoad').value || 1.0),
     load_unit: document.getElementById('billLoadUnit').value,
     mvca: parseFloat(document.getElementById('billMvca').value || 0),
     meter_rent_applicable: document.getElementById('billMeterRent').checked,
-    is_monsoon: document.getElementById('billMonsoon').checked
+    is_monsoon: document.getElementById('billMonsoon').checked,
+    phase: phase
   };
 
   const res = await callAPI('calculate_bill', payload);
   if (res && res.success) {
     const r = res.result;
-    document.getElementById('resEnergy').innerText = `? ${r.energy_charge.toFixed(2)}`;
-    document.getElementById('resFixed').innerText = `? ${r.fixed_charge.toFixed(2)}`;
-    document.getElementById('resMeter').innerText = `? ${r.meter_rent.toFixed(2)}`;
-    document.getElementById('resMvca').innerText = `? ${r.mvca_charge.toFixed(2)}`;
-    document.getElementById('resEd').innerText = `? ${r.ed_charge.toFixed(2)} (${r.ed_percentage}%)`;
-    document.getElementById('resRelief').innerText = `- ? ${r.gov_relief.toFixed(2)}`;
-    document.getElementById('resNet').innerText = `? ${r.rounded_bill.toLocaleString('en-IN')}`;
+    document.getElementById('resEnergy').innerHTML = `\u20B9 ${r.energy_charge.toFixed(2)}`;
+    document.getElementById('resFixed').innerHTML = `\u20B9 ${r.fixed_charge.toFixed(2)}`;
+    
+    const minTag = document.getElementById('resMinTag');
+    if (r.min_charge_override) minTag.classList.remove('hidden');
+    else minTag.classList.add('hidden');
+    document.getElementById('resMin').innerHTML = `\u20B9 ${(r.minimum_charge || 0).toFixed(2)}`;
+
+    document.getElementById('resMeter').innerHTML = `\u20B9 ${r.meter_rent.toFixed(2)}`;
+    document.getElementById('resMvca').innerHTML = `\u20B9 ${r.mvca_charge.toFixed(2)}`;
+    document.getElementById('resEdRate').innerText = r.ed_percentage || 0;
+    document.getElementById('resEd').innerHTML = `\u20B9 ${r.ed_charge.toFixed(2)}`;
+    document.getElementById('resRelief').innerHTML = `- \u20B9 ${r.gov_relief.toFixed(2)}`;
+    
+    document.getElementById('resGross').innerHTML = `\u20B9 ${r.gross_bill.toFixed(2)}`;
+    document.getElementById('resTimely').innerHTML = `- \u20B9 ${(r.rebate_timely || 0).toFixed(2)}`;
+    document.getElementById('resEpay').innerHTML = `- \u20B9 ${(r.rebate_epay || 0).toFixed(2)}`;
+    document.getElementById('resSpecial').innerHTML = `- \u20B9 ${(r.rebate_special || 0).toFixed(2)}`;
+    
+    document.getElementById('resNet').innerHTML = `\u20B9 ${r.rounded_bill.toLocaleString('en-IN')}`;
   }
 }
 
+// --- Theft Calculations ---
 async function runTheftCalc() {
   const payload = {
     category: document.getElementById('theftCategory').value,
     consumer_type: document.getElementById('theftConsumerType').value,
     load: parseFloat(document.getElementById('theftLoad').value || 1.5),
     load_unit: document.getElementById('theftLoadUnit').value,
-    days: parseInt(document.getElementById('theftDays').value || 365),
+    days_prov: parseInt(document.getElementById('theftProvDays').value || 30),
+    days_final: parseInt(document.getElementById('theftFinalDays').value || 365),
     hours: parseFloat(document.getElementById('theftHours').value || 8),
     adj_energy: parseFloat(document.getElementById('theftAdjEnergy').value || 0),
     adj_fixed: parseFloat(document.getElementById('theftAdjFixed').value || 0),
     adj_ed: parseFloat(document.getElementById('theftAdjEd').value || 0)
   };
 
-  const res = await callAPI('calculate_theft', payload);
+  const isNonConsumer = payload.consumer_type === 'Non-Consumer';
+  if (isNonConsumer) {
+    document.getElementById('theftAdjEnergy').disabled = true;
+    document.getElementById('theftAdjFixed').disabled = true;
+    document.getElementById('theftAdjEd').disabled = true;
+  } else {
+    document.getElementById('theftAdjEnergy').disabled = false;
+    document.getElementById('theftAdjFixed').disabled = false;
+    document.getElementById('theftAdjEd').disabled = false;
+  }
+
+  const res = await callAPI('calculate_theft_dual', payload);
   if (res && res.success) {
-    const r = res.result;
-    document.getElementById('theftUnits').innerText = `${r.assessed_units.toLocaleString('en-IN')} kWh (${r.months} mos)`;
-    document.getElementById('theftEnergy').innerText = `? ${r.penal_energy_charge.toFixed(2)}`;
-    document.getElementById('theftFixed').innerText = `? ${r.penal_fixed_charge.toFixed(2)}`;
-    document.getElementById('theftEd').innerText = `? ${r.electricity_duty.toFixed(2)} (${r.ed_rate}%)`;
-    document.getElementById('theftAdjustments').innerText = `- ? ${r.total_adjustments.toFixed(2)}`;
-    document.getElementById('theftNet').innerText = `? ${r.rounded_assessment.toLocaleString('en-IN')}`;
+    const p = res.provisional;
+    document.getElementById('provUnits').innerText = `${p.assessed_units.toLocaleString('en-IN')} kWh`;
+    document.getElementById('provEnergy').innerHTML = `\u20B9 ${p.penal_energy_charge.toFixed(2)}`;
+    document.getElementById('provFixed').innerHTML = `\u20B9 ${p.penal_fixed_charge.toFixed(2)}`;
+    document.getElementById('provEd').innerHTML = `\u20B9 ${p.electricity_duty.toFixed(2)}`;
+    document.getElementById('provGross').innerHTML = `\u20B9 ${p.gross_assessment.toFixed(2)}`;
+    document.getElementById('provAdj').innerHTML = `- \u20B9 ${p.total_adjustments.toFixed(2)}`;
+    document.getElementById('provNet').innerHTML = `\u20B9 ${p.rounded_assessment.toLocaleString('en-IN')}`;
+
+    const f = res.final;
+    document.getElementById('finalUnits').innerText = `${f.assessed_units.toLocaleString('en-IN')} kWh`;
+    document.getElementById('finalEnergy').innerHTML = `\u20B9 ${f.penal_energy_charge.toFixed(2)}`;
+    document.getElementById('finalFixed').innerHTML = `\u20B9 ${f.penal_fixed_charge.toFixed(2)}`;
+    document.getElementById('finalEd').innerHTML = `\u20B9 ${f.electricity_duty.toFixed(2)}`;
+    document.getElementById('finalGross').innerHTML = `\u20B9 ${f.gross_assessment.toFixed(2)}`;
+    document.getElementById('finalAdj').innerHTML = `- \u20B9 ${f.total_adjustments.toFixed(2)}`;
+    document.getElementById('finalNet').innerHTML = `\u20B9 ${f.rounded_assessment.toLocaleString('en-IN')}`;
+
+    const rel = res.relief;
+    const rb = document.getElementById('reliefBar');
+    rb.innerHTML = `Final Assessment Relief: \u20B9 ${rel.diff_rs.toFixed(2)} (${rel.diff_pct.toFixed(2)}%)`;
+    if (rel.diff_pct > 25) {
+      rb.className = "mt-4 p-3 rounded-lg bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 text-sm font-medium text-center border border-rose-200 dark:border-rose-800/50";
+    } else {
+      rb.className = "mt-4 p-3 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-sm font-medium text-center border border-emerald-200 dark:border-emerald-800/50";
+    }
   }
 }
 
-function renderTariffCards() {
-  const container = document.getElementById('tariffCardsContainer');
+// --- Tariff Editor ---
+function renderTariffEditorList() {
+  const container = document.getElementById('tariffList');
   container.innerHTML = '';
-
-  Object.entries(currentTariffs).forEach(([catName, data]) => {
-    const card = document.createElement('div');
-    card.className = "p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3";
-    card.innerHTML = `
-      <div class="flex items-center justify-between">
-        <h4 class="text-sm font-bold text-slate-100">${catName}</h4>
-        <span class="text-xs px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 font-medium">?${data.fixed_charge}/kVA</span>
-      </div>
-      <div class="text-xs text-slate-400 space-y-1">
-        <p>Min Demand Floor: ?${data.min_charge}/kVA</p>
-        <p>Load Factor: ${data.load_factor || 0.5}</p>
-      </div>
-    `;
-    container.appendChild(card);
+  Object.keys(currentTariffs).forEach(cat => {
+    const div = document.createElement('div');
+    div.className = "p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800";
+    div.innerText = cat;
+    div.onclick = () => loadTariffForEdit(cat);
+    container.appendChild(div);
   });
 }
 
+function loadTariffForEdit(cat) {
+  const data = currentTariffs[cat];
+  if (!data) return;
+  const editor = document.getElementById('tariffEditor');
+  editor.innerHTML = `
+    <div class="flex justify-between items-center">
+      <h3 class="text-md font-bold text-slate-900 dark:text-slate-100">${cat}</h3>
+      <button onclick="saveTariffs()" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs hover:bg-emerald-500">Save Changes</button>
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="text-xs text-slate-600 dark:text-slate-400">Fixed Charge</label>
+        <input type="number" id="editFC" value="${data.fixed_charge}" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2" onchange="updateTariffData('${cat}', 'fixed_charge', this.value)">
+      </div>
+      <div>
+        <label class="text-xs text-slate-600 dark:text-slate-400">Min Charge</label>
+        <input type="number" id="editMin" value="${data.min_charge || 0}" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2" onchange="updateTariffData('${cat}', 'min_charge', this.value)">
+      </div>
+    </div>
+    <p class="text-xs text-slate-500 mt-2">Energy Slabs and ED slabs can be edited by modifying the backend JSON directly for now.</p>
+  `;
+}
+
+function updateTariffData(cat, field, value) {
+  currentTariffs[cat][field] = parseFloat(value);
+}
+
+async function saveTariffs() {
+  const res = await callAPI('save_tariff_data', currentTariffs);
+  if (res && res.success) alert("Tariffs saved!");
+  else alert("Failed to save tariffs");
+}
+
+// --- Settings & Utils ---
 async function triggerUpdateCheck() {
   const box = document.getElementById('updateStatusBox');
   box.classList.remove('hidden');
-  box.className = "p-4 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-300 text-xs";
+  box.className = "p-4 rounded-xl border border-sky-200 dark:border-sky-500/30 bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-300 text-xs";
   box.innerText = "Checking for updates...";
 
   const res = await callAPI('check_for_updates');
   if (res && res.success) {
     if (res.has_update) {
-      box.className = "p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs space-y-2";
+      box.className = "p-4 rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs space-y-2";
       box.innerHTML = `
-        <p class="font-bold">? New Version ${res.latest_version} Available!</p>
-        <p class="text-slate-300 whitespace-pre-line">${res.release_notes}</p>
+        <p class="font-bold">\u20B9 New Version ${res.latest_version} Available!</p>
+        <p class="whitespace-pre-line">${res.release_notes}</p>
       `;
     } else {
-      box.className = "p-4 rounded-xl border border-slate-700 bg-slate-900 text-slate-400 text-xs";
+      box.className = "p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-xs";
       box.innerText = `You are running the latest version (${res.current_version}).`;
     }
   } else {
-    box.className = "p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs";
+    box.className = "p-4 rounded-xl border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 text-xs";
     box.innerText = res ? res.error : "Failed to check update.";
+  }
+}
+
+function renderFolders(folders) {
+  const c = document.getElementById('folderList');
+  if (!c) return;
+  c.innerHTML = '';
+  folders.forEach(f => {
+    const div = document.createElement('div');
+    div.className = "flex items-center justify-between bg-slate-50 dark:bg-slate-950 p-2 rounded-lg border border-slate-200 dark:border-slate-800";
+    div.innerHTML = `
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full ${f.accessible ? 'bg-emerald-500' : 'bg-rose-500'}"></span>
+        <span class="text-xs text-slate-700 dark:text-slate-300 truncate w-48" title="${f.path}">${f.path}</span>
+      </div>
+      <button onclick="removeFolder('${f.path}')" class="text-rose-600 hover:text-rose-500 text-xs"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+    `;
+    c.appendChild(div);
+  });
+  lucide.createIcons();
+}
+
+async function addFolder() {
+  const p = prompt("Enter folder path:");
+  if (p) {
+    await callAPI('add_network_folder', p);
+    initApp(); // reload info
+  }
+}
+
+async function removeFolder(p) {
+  if (confirm(`Remove folder ${p}?`)) {
+    await callAPI('remove_network_folder', p);
+    initApp();
+  }
+}
+
+async function startIndexing() {
+  document.getElementById('indexProgress').classList.remove('hidden');
+  const res = await callAPI('start_indexing');
+  if (res && res.success) {
+    alert("Indexing started");
+    setTimeout(initApp, 2000);
+  } else {
+    alert("Failed to start indexing");
+  }
+}
+
+async function exportNotes() {
+  const res = await callAPI('export_notes_csv');
+  if (res && res.success) {
+    alert(res.message || "Exported successfully");
+  } else {
+    alert("Failed to export notes");
   }
 }

@@ -30,13 +30,11 @@ def main():
         js_api=api,
         width=1340,
         height=850,
-        min_size=(1000, 680),
-        background_color="#0f172a"
+        min_size=(1000, 680)
     )
-    api.set_window(window)
 
-    # Start the event loop using Edge WebView2 backend on Windows
-    webview.start(debug=False, gui='edgechromium')
+    # Start the event loop
+    webview.start(debug=False)
 
 if __name__ == "__main__":
     main()
