@@ -67,7 +67,7 @@ exe_tool = EXE(
     [],
     exclude_binaries=True,
     name='imagecheckgui',
-    icon='assets/spot_icon.ico',
+    icon=os.path.join(PROJECT_ROOT, 'assets', 'spot_icon.ico'),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
