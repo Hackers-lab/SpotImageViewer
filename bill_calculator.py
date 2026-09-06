@@ -1,6 +1,86 @@
+from datetime import datetime, date, timedelta
+import calendar
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
+from ttkbootstrap.dialogs import DatePickerDialog
 import tariff_manager
+
+
+class ModernDatePickerDialog(DatePickerDialog):
+    """Enhanced DatePickerDialog with instant Month/Year dropdown selectors."""
+    def _draw_titlebar(self):
+        self.prev_period = ttk.Button(master=self.frm_title, text="<<", command=self.on_prev_year, width=3, bootstyle=self.bootstyle)
+        self.prev_period.pack(side=LEFT, padx=1)
+
+        self.prev_month_btn = ttk.Button(master=self.frm_title, text="<", command=self.on_prev_month, width=2, bootstyle=self.bootstyle)
+        self.prev_month_btn.pack(side=LEFT, padx=1)
+
+        self.month_var = ttk.StringVar(value=calendar.month_name[self.date.month])
+        self.combo_month = ttk.Combobox(
+            master=self.frm_title,
+            textvariable=self.month_var,
+            values=list(calendar.month_name)[1:],
+            state="readonly",
+            width=10
+        )
+        self.combo_month.pack(side=LEFT, padx=2)
+
+        current_year = self.date.year
+        year_values = [str(y) for y in range(current_year - 25, current_year + 26)]
+        self.year_var = ttk.StringVar(value=str(current_year))
+        self.combo_year = ttk.Combobox(
+            master=self.frm_title,
+            textvariable=self.year_var,
+            values=year_values,
+            state="readonly",
+            width=6
+        )
+        self.combo_year.pack(side=LEFT, padx=2)
+
+        def on_month_select(event=None):
+            m_name = self.month_var.get()
+            month_names = list(calendar.month_name)
+            if m_name in month_names:
+                m_idx = month_names.index(m_name)
+                max_day = calendar.monthrange(self.date.year, m_idx)[1]
+                self.date = date(year=self.date.year, month=m_idx, day=min(self.date.day, max_day))
+                self.frm_dates.destroy()
+                self._draw_calendar()
+
+        def on_year_select(event=None):
+            try:
+                y_val = int(self.year_var.get())
+                max_day = calendar.monthrange(y_val, self.date.month)[1]
+                self.date = date(year=y_val, month=self.date.month, day=min(self.date.day, max_day))
+                self.frm_dates.destroy()
+                self._draw_calendar()
+            except ValueError:
+                pass
+
+        self.combo_month.bind("<<ComboboxSelected>>", on_month_select)
+        self.combo_year.bind("<<ComboboxSelected>>", on_year_select)
+
+        self.next_month_btn = ttk.Button(master=self.frm_title, text=">", command=self.on_next_month, width=2, bootstyle=self.bootstyle)
+        self.next_month_btn.pack(side=LEFT, padx=1)
+
+        self.next_period = ttk.Button(master=self.frm_title, text=">>", command=self.on_next_year, width=3, bootstyle=self.bootstyle)
+        self.next_period.pack(side=LEFT, padx=1)
+
+        for col in self._header_columns():
+            ttk.Label(
+                master=self.frm_header,
+                text=col,
+                anchor=CENTER,
+                padding=5,
+                bootstyle=(SECONDARY, INVERSE),
+            ).pack(side=LEFT, fill=X, expand=YES)
+
+    def _set_title(self):
+        if hasattr(self, 'month_var'):
+            self.month_var.set(calendar.month_name[self.date.month])
+        if hasattr(self, 'year_var'):
+            self.year_var.set(str(self.date.year))
+
 
 class BillCalculatorApp:
     def __init__(self, parent):
@@ -14,6 +94,9 @@ class BillCalculatorApp:
         self.category_var = ttk.StringVar()
         self.cycle_var = ttk.StringVar(value="Quarterly")
         self.days_var = ttk.StringVar(value="30")
+        self.from_date_var = ttk.StringVar()
+        self.to_date_var = ttk.StringVar()
+        self.date_syncing = False
         self.phase_var = ttk.StringVar(value="1-Phase")
         self.load_var = ttk.StringVar(value="0")
         self.load_unit_var = ttk.StringVar(value="KVA")
@@ -39,6 +122,12 @@ class BillCalculatorApp:
 
     def calculate_state_subsidy(self, units, category_name, phase, months_multiplier):
         if "domestic" not in category_name.lower(): return 0.0
+        # WBERC Rule: State government energy relief/subsidy applies strictly to domestic
+        # consumers whose consumption is up to 300 units/month (or proportional pro-rata/quarterly).
+        max_subsidized_units = 300.0 * months_multiplier
+        if units > max_subsidized_units:
+            return 0.0
+
         subsidy = 0.0
         u = units
         s1, s2, s3 = 34 * months_multiplier, 26 * months_multiplier, 40 * months_multiplier
@@ -50,22 +139,58 @@ class BillCalculatorApp:
         if phase == "1-Phase": subsidy += (10.0 * months_multiplier)
         return subsidy
 
+    def _parse_entry_date(self, text):
+        text = str(text or "").strip()
+        for fmt in ("%d.%m.%Y", "%d-%m-%Y", "%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y", "%Y/%m/%d"):
+            try:
+                return datetime.strptime(text, fmt).date()
+            except ValueError:
+                pass
+        return None
+
+    def on_dates_changed(self):
+        if self.date_syncing:
+            return
+        try:
+            d1 = self._parse_entry_date(self.from_date_var.get()) or self._parse_entry_date(self.from_date_picker.entry.get())
+            d2 = self._parse_entry_date(self.to_date_var.get()) or self._parse_entry_date(self.to_date_picker.entry.get())
+            if not d1 and hasattr(self.from_date_picker, 'get_date'):
+                dt = self.from_date_picker.get_date()
+                if dt: d1 = dt.date() if hasattr(dt, 'date') else dt
+            if not d2 and hasattr(self.to_date_picker, 'get_date'):
+                dt = self.to_date_picker.get_date()
+                if dt: d2 = dt.date() if hasattr(dt, 'date') else dt
+
+            if d1 and d2:
+                diff = (d2 - d1).days
+                if diff < 1:
+                    diff = 1
+                self.date_syncing = True
+                self.days_var.set(str(diff))
+                self.date_syncing = False
+        except Exception:
+            pass
+
     def update_ui_visibility(self, *args):
         cat = self.category_var.get().lower()
         cycle = self.cycle_var.get()
         
-        if cycle == "Pro-Rata": self.days_input_frame.pack(side=LEFT, padx=(10, 0))
-        else: self.days_input_frame.pack_forget()
+        if cycle == "Pro-Rata":
+            self.days_input_frame.pack(side=LEFT, padx=(10, 0))
+            self.date_picker_frame.grid()
+        else:
+            self.days_input_frame.pack_forget()
+            self.date_picker_frame.grid_remove()
 
         if "tod" in cat:
             self.frame_normal_units.grid_remove()
-            self.frame_tod_units.grid(row=6, column=0, columnspan=2, sticky=EW, pady=5)
+            self.frame_tod_units.grid(row=7, column=0, columnspan=2, sticky=EW, pady=5)
         else:
             self.frame_tod_units.grid_remove()
-            self.frame_normal_units.grid(row=6, column=0, columnspan=2, sticky=EW, pady=5)
+            self.frame_normal_units.grid(row=7, column=0, columnspan=2, sticky=EW, pady=5)
             
         if "agriculture" in cat and "tod" not in cat:
-            self.monsoon_frame.grid(row=5, column=0, columnspan=2, sticky=W, padx=10, pady=5)
+            self.monsoon_frame.grid(row=6, column=0, columnspan=2, sticky=W, padx=10, pady=5)
         else:
             self.monsoon_frame.grid_remove()
             self.monsoon_var.set(False)
@@ -212,19 +337,63 @@ class BillCalculatorApp:
         ttk.Radiobutton(cycle_frame, text="Pro-Rata", variable=self.cycle_var, value="Pro-Rata", bootstyle="info").pack(side=LEFT)
         self.days_input_frame = ttk.Frame(cycle_frame)
         ttk.Label(self.days_input_frame, text="Days:").pack(side=LEFT, padx=(0, 5))
-        ttk.Entry(self.days_input_frame, textvariable=self.days_var, width=5).pack(side=LEFT)
+        self.days_entry = ttk.Entry(self.days_input_frame, textvariable=self.days_var, width=5)
+        self.days_entry.pack(side=LEFT)
         create_input_row(1, "Billing Mode:", cycle_frame)
+
+        # Pro-Rata Date Range Picker Frame
+        self.date_picker_frame = ttk.Frame(inp_frame)
+        today = date.today()
+        default_start = today - timedelta(days=30)
+        ttk.Label(self.date_picker_frame, text="From:").pack(side=LEFT, padx=(0, 4))
+        self.from_date_picker = ttk.DateEntry(self.date_picker_frame, width=12, startdate=default_start, dateformat="%d.%m.%Y")
+        self.from_date_var.set(default_start.strftime("%d.%m.%Y"))
+        self.from_date_picker.entry.config(textvariable=self.from_date_var)
+        self.from_date_picker.pack(side=LEFT, padx=(0, 10))
+
+        ttk.Label(self.date_picker_frame, text="To:").pack(side=LEFT, padx=(0, 4))
+        self.to_date_picker = ttk.DateEntry(self.date_picker_frame, width=12, startdate=today, dateformat="%d.%m.%Y")
+        self.to_date_var.set(today.strftime("%d.%m.%Y"))
+        self.to_date_picker.entry.config(textvariable=self.to_date_var)
+        self.to_date_picker.pack(side=LEFT, padx=(0, 8))
+
+        def make_modern_date_ask(picker_widget, target_var):
+            def _ask():
+                raw = target_var.get().strip()
+                parsed = self._parse_entry_date(raw) or date.today()
+                chooser = ModernDatePickerDialog(
+                    parent=picker_widget.entry,
+                    title="Select Date",
+                    startdate=parsed,
+                    bootstyle=picker_widget._bootstyle
+                )
+                if chooser.date_selected:
+                    target_var.set(chooser.date_selected.strftime("%d.%m.%Y"))
+                    picker_widget.event_generate("<<DateEntrySelected>>")
+                    self.on_dates_changed()
+            return _ask
+
+        self.from_date_picker._on_date_ask = make_modern_date_ask(self.from_date_picker, self.from_date_var)
+        self.to_date_picker._on_date_ask = make_modern_date_ask(self.to_date_picker, self.to_date_var)
+
+        self.from_date_picker.entry.bind("<FocusOut>", lambda e: self.on_dates_changed())
+        self.to_date_picker.entry.bind("<FocusOut>", lambda e: self.on_dates_changed())
+        self.from_date_picker.entry.bind("<Return>", lambda e: self.on_dates_changed())
+        self.to_date_picker.entry.bind("<Return>", lambda e: self.on_dates_changed())
+        self.from_date_var.trace_add("write", lambda *a: self.on_dates_changed())
+        self.to_date_var.trace_add("write", lambda *a: self.on_dates_changed())
+        self.date_picker_frame.grid(row=2, column=1, sticky=W, padx=10, pady=(0, 6))
 
         phase_frame = ttk.Frame(inp_frame)
         ttk.Radiobutton(phase_frame, text="1-Phase", variable=self.phase_var, value="1-Phase").pack(side=LEFT, padx=(0, 5))
         ttk.Radiobutton(phase_frame, text="3-Phase", variable=self.phase_var, value="3-Phase").pack(side=LEFT, padx=(0, 5))
         ttk.Radiobutton(phase_frame, text="Own", variable=self.phase_var, value="Own Meter").pack(side=LEFT)
-        create_input_row(2, "Meter Type:", phase_frame)
+        create_input_row(3, "Meter Type:", phase_frame)
 
         load_frame = ttk.Frame(inp_frame)
         ttk.Entry(load_frame, textvariable=self.load_var, width=10, justify="right").pack(side=LEFT, padx=(0, 5))
         ttk.Combobox(load_frame, textvariable=self.load_unit_var, values=["KVA", "kW"], state="readonly", width=5).pack(side=LEFT)
-        create_input_row(3, "Contractual Load:", load_frame)
+        create_input_row(4, "Contractual Load:", load_frame)
 
         self.monsoon_frame = ttk.Checkbutton(inp_frame, text="Apply Monsoon Discount (Jul-Oct)", variable=self.monsoon_var, bootstyle="success-round-toggle")
 
@@ -240,7 +409,7 @@ class BillCalculatorApp:
         ttk.Entry(tod_inputs, textvariable=self.tod_p_var, width=5).pack(side=LEFT, padx=2)
         ttk.Entry(tod_inputs, textvariable=self.tod_o_var, width=5).pack(side=LEFT, padx=2)
 
-        create_input_row(7, "MVCA Rate (₹):", ttk.Entry(inp_frame, textvariable=self.mvca_var, width=14, justify="right"))
+        create_input_row(8, "MVCA Rate (₹):", ttk.Entry(inp_frame, textvariable=self.mvca_var, width=14, justify="right"))
 
         # RIGHT PANEL
         out_frame = ttk.LabelFrame(panels_frame, text=" ITEMIZED BILL BREAKDOWN ")

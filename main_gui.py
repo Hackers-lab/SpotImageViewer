@@ -265,47 +265,66 @@ def remove_network_folder():
         messagebox.showerror("Error", str(e))
 
 def index_images_thread(progress_callback, finish_callback):
-    global indexing_active
+    global indexing_active, additional_folders
     indexing_active = True
     
+    total_inserted = 0
+    scanned_files_count = 0
+    candidate_images_count = 0
+    scanned_folders = []
+    
     try:
+        # 1. Dynamically refresh registered folders so we never scan with stale memory
+        additional_folders = utils.load_additional_folders()
+        folders = [config.IMAGE_FOLDER] + additional_folders
+        
+        # Deduplicate and normalize folders
+        unique_folders = []
+        for f in folders:
+            if f and os.path.normpath(f) not in [os.path.normpath(u) for u in unique_folders]:
+                unique_folders.append(f)
+
         conn = database.get_db_connection()
         cursor = conn.cursor()
         cursor.execute("PRAGMA journal_mode=WAL;")
         cursor.execute("PRAGMA synchronous=OFF;")
 
-        folders = [config.IMAGE_FOLDER] + additional_folders
         batch_data = []
         BATCH_SIZE = 5000 
-        total_inserted = 0
 
         cursor.execute("DELETE FROM images")
-        cursor.execute("DELETE FROM directories") # Also clear directories
+        cursor.execute("DELETE FROM directories")
         conn.commit()
         
         start_time = time.time()
 
-        for folder in folders:
+        for folder in unique_folders:
             if not os.path.exists(folder):
                 continue
+            scanned_folders.append(folder)
             
             for root_dir, dirs, files in os.walk(folder):
-                # Get the directory ID for the current root_dir
+                if not files:
+                    continue
                 cursor.execute("INSERT OR IGNORE INTO directories (dir_path) VALUES (?)", (root_dir,))
                 cursor.execute("SELECT id FROM directories WHERE dir_path = ?", (root_dir,))
                 dir_id = cursor.fetchone()[0]
 
                 for filename in files:
                     try:
-                        if len(filename) < 20: continue
-                        if not filename[:8].isdigit(): continue
+                        # Original fast check for 1M+ images:
+                        # File must have at least 25 characters (DDMMYYYY[8] + MRU[8] + CID[9])
+                        if len(filename) < 25:
+                            continue
+                        if not filename[:8].isdigit():
+                            continue
                         
                         date_orig = filename[:8]
                         try:
                             dt = datetime.strptime(date_orig, "%d%m%Y")
                             date_iso = dt.strftime("%Y-%m-%d")
-                        except:
-                            continue 
+                        except ValueError:
+                            continue
 
                         mru = filename[8:16]
                         cid = filename[16:25]
@@ -329,18 +348,22 @@ def index_images_thread(progress_callback, finish_callback):
             total_inserted += len(batch_data)
         
         cursor.execute("ANALYZE;") 
-        
-        # Optimize and compress database
         cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
         cursor.execute("VACUUM;")
-        
         conn.close()
 
     except Exception as e:
         print(f"Indexing error: {e}")
+        utils.console_log(f"Indexing error: {e}")
     finally:
         indexing_active = False
-        finish_callback(total_inserted)
+        diagnostic_info = {
+            "total_inserted": total_inserted,
+            "scanned_folders": scanned_folders,
+            "scanned_files": scanned_files_count,
+            "candidate_images": candidate_images_count,
+        }
+        finish_callback(total_inserted, diagnostic_info)
 
 def add_new_note_option():
     def save_opt():
@@ -505,15 +528,15 @@ def start_indexing_process():
     def on_prog(c, t):
         root.after(0, lambda: status_label.config(text=f"Indexed: {c} ({t}s)"))
     
-    def on_done(total):
-        root.after(0, lambda: finish_indexing(total))
+    def on_done(total, diag=None):
+        root.after(0, lambda: finish_indexing(total, diag))
         
     threading.Thread(target=index_images_thread, args=(on_prog, on_done), daemon=True).start()
 
-def finish_indexing(total):
+def finish_indexing(total, diag=None):
     progress_bar.stop()
     progress_bar.pack_forget()
-    status_label.config(text=f"Total Images: {total}", bootstyle="success")
+    status_label.config(text=f"Total Indexed Images: {total}", bootstyle="success" if total > 0 else "warning")
     btn_reload.config(state="normal")
     messagebox.showinfo("Done", f"Indexing Complete.\nTotal Images: {total}")
 
@@ -1843,29 +1866,69 @@ def show_about():
 def open_help():
     documentation.show_documentation(root)
 
-def prompt_update(version, notes, link):
+def prompt_update(data):
+    version = data.get("version")
+    notes = data.get("release_notes", "")
+    link = data.get("download_url") or data.get("installer_url") or ""
     title = f"New Version Available: v{version}"
-    message = f"A new version of the application is available.\n\nRelease Notes:\n{notes}\n\nDo you want to download it now?"
-    if messagebox.askyesno(title, message):
-        webbrowser.open(link)
+    message = (
+        f"A new version of Spot Image Viewer (v{version}) is available!\n\n"
+        f"Release Notes:\n{notes}\n\n"
+        "Would you like to download and install this update automatically now?"
+    )
+    if not messagebox.askyesno(title, message):
+        return
 
-def on_update_found(version, notes, link):
-    root.after(0, lambda: prompt_update(version, notes, link))
+    # Create a modal progress window for the download and install
+    up_win = Toplevel(root)
+    up_win.title(f"Updating to v{version}")
+    up_win.geometry("400x160")
+    up_win.transient(root)
+    up_win.grab_set()
+
+    lbl = tb.Label(up_win, text=f"Downloading Spot Image Viewer v{version}...", font=("Segoe UI", 10))
+    lbl.pack(padx=20, pady=(20, 10))
+    pb = ttk.Progressbar(up_win, length=320, mode="determinate")
+    pb.pack(padx=20, pady=5)
+    lbl_pct = tb.Label(up_win, text="Starting download...", font=("Segoe UI", 9), bootstyle="secondary")
+    lbl_pct.pack(padx=20, pady=(5, 15))
+
+    def on_progress(downloaded, total):
+        pct = int((downloaded / total) * 100) if total else 0
+        root.after(0, lambda: (
+            pb.config(value=pct),
+            lbl_pct.config(text=f"{pct}% ({downloaded // 1024} KB / {total // 1024} KB)")
+        ))
+
+    def on_finished(status, res):
+        if status == "started":
+            root.after(0, lambda: (
+                up_win.destroy(),
+                messagebox.showinfo("Update Ready", "The installer will now launch to complete the update. The app will close."),
+                root.destroy(),
+                sys.exit(0)
+            ))
+        else:
+            err = res.get("error", "Unknown error")
+            root.after(0, lambda: (
+                up_win.destroy(),
+                messagebox.showerror("Update Failed", f"Auto-update failed:\n{err}\n\nOpening download link in browser instead."),
+                webbrowser.open(link) if link else None
+            ))
+
+    current_pid = os.getpid()
+    utils.perform_self_update_async(data, current_pid, on_finished, on_progress)
+
+def on_update_found(data):
+    root.after(0, lambda: prompt_update(data))
 
 def on_update_check_finished_auto(status, data):
     if status == "update_found":
-        on_update_found(
-            data.get("version"),
-            data.get("release_notes"),
-            data.get("download_url")
-        )
+        on_update_found(data)
 
 def on_update_check_finished_manual(status, data):
     if status == "update_found":
-        version = data.get("version")
-        notes = data.get("release_notes")
-        link = data.get("download_url")
-        root.after(0, lambda: prompt_update(version, notes, link))
+        on_update_found(data)
     elif status == "no_update":
         latest_version = data.get("version") if data else config.CURRENT_VERSION
         release_notes = data.get("release_notes", "No feature notes available.") if data else "No feature notes available."
