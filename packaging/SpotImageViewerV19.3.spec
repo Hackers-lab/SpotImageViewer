@@ -1,12 +1,15 @@
-﻿# -*- mode: python ; coding: utf-8 -*-
+# -*- mode: python ; coding: utf-8 -*-
+import os
+
+PROJECT_ROOT = os.path.abspath(os.path.join(SPECPATH, '..'))
 
 a_main = Analysis(
-    ['main.py'],
-    pathex=[],
+    [os.path.join(PROJECT_ROOT, 'main.py')],
+    pathex=[PROJECT_ROOT, os.path.join(PROJECT_ROOT, 'src')],
     binaries=[],
     datas=[
-        ('assets/spot_icon.ico', 'assets'),
-        ('assets/spot_icon.png', 'assets'),
+        (os.path.join(PROJECT_ROOT, 'assets', 'spot_icon.ico'), 'assets'),
+        (os.path.join(PROJECT_ROOT, 'assets', 'spot_icon.png'), 'assets'),
     ],
     hiddenimports=['ttkbootstrap', 'PIL', 'openpyxl', 'requests', 'packaging', 'darkdetect', 'customtkinter'],
     hookspath=[],
@@ -25,7 +28,7 @@ exe_main = EXE(
     [],
     exclude_binaries=True,
     name='SpotImageViewerV19.3',
-    icon='assets/spot_icon.ico',
+    icon=os.path.join(PROJECT_ROOT, 'assets', 'spot_icon.ico'),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -36,16 +39,16 @@ exe_main = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    version='version.txt',
+    version=os.path.join(SPECPATH, 'version.txt'),
 )
 
 a_tool = Analysis(
-    ['imagecheckgui.py'],
-    pathex=[],
+    [os.path.join(PROJECT_ROOT, 'src', 'tools', 'imagecheckgui.py')],
+    pathex=[PROJECT_ROOT, os.path.join(PROJECT_ROOT, 'src')],
     binaries=[],
     datas=[
-        ('assets/spot_icon.ico', 'assets'),
-        ('assets/spot_icon.png', 'assets'),
+        (os.path.join(PROJECT_ROOT, 'assets', 'spot_icon.ico'), 'assets'),
+        (os.path.join(PROJECT_ROOT, 'assets', 'spot_icon.png'), 'assets'),
     ],
     hiddenimports=['customtkinter', 'darkdetect', 'PIL', 'requests'],
     hookspath=[],

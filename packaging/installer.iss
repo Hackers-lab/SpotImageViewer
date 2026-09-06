@@ -18,11 +18,12 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\SpotImageViewer
 DisableDirPage=no
 DisableProgramGroupPage=yes
+OutputDir=..\Output
 OutputBaseFilename=SpotImageViewer_Setup
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
-SetupIconFile=assets\spot_icon.ico
+SetupIconFile=..\assets\spot_icon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 ArchitecturesInstallIn64BitMode=x64compatible
 CloseApplications=yes
@@ -36,7 +37,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; Source directory produced by PyInstaller (spec build)
-Source: "dist\SpotImageViewerV19.3\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\SpotImageViewerV19.3\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

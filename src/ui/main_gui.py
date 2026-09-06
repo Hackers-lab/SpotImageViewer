@@ -68,14 +68,23 @@ def set_windows_app_id():
 
 def ensure_app_icons():
     """Create app icon files once and return (ico_path, png_path)."""
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    assets_dir = os.path.join(base_dir, "assets")
+    cur_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.dirname(os.path.dirname(cur_dir))
+    candidates = [
+        os.path.join(root_dir, "assets"),
+        os.path.join(cur_dir, "assets"),
+    ]
+    for assets_dir in candidates:
+        png_path = os.path.join(assets_dir, "spot_icon.png")
+        ico_path = os.path.join(assets_dir, "spot_icon.ico")
+        if os.path.exists(png_path) and os.path.exists(ico_path):
+            return ico_path, png_path
+
+    # Fallback: create in primary assets directory
+    assets_dir = candidates[0]
     os.makedirs(assets_dir, exist_ok=True)
     png_path = os.path.join(assets_dir, "spot_icon.png")
     ico_path = os.path.join(assets_dir, "spot_icon.ico")
-
-    if os.path.exists(png_path) and os.path.exists(ico_path):
-        return ico_path, png_path
 
     size = 128
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
@@ -223,9 +232,15 @@ def launch_tool(script_name, tool_title):
                 subprocess.Popen([exe_path], cwd=base_dir)
                 return
 
-        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), script_name)
-        if not os.path.exists(script_path):
-            messagebox.showerror("Tool Not Found", f"{tool_title} file was not found:\n{script_path}")
+        # Check standard locations (same folder, src/tools, or root)
+        candidates = [
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), script_name),
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools", script_name),
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), script_name),
+        ]
+        script_path = next((c for c in candidates if os.path.exists(c)), None)
+        if not script_path:
+            messagebox.showerror("Tool Not Found", f"{tool_title} file was not found:\n{script_name}")
             return
 
         subprocess.Popen([sys.executable, script_path], cwd=os.path.dirname(script_path))
