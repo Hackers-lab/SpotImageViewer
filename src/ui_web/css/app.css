@@ -220,13 +220,22 @@ main > header > div:first-child {
   border: 1px solid rgba(49,168,255,.12);
 }
 
-#pageTitle { color: var(--text) !important; font-size: 11px !important; letter-spacing: -.01em; }
-main > header .text-\[10px\] { color: var(--text-3) !important; font-size: 9px !important; }
+#pageTitle { 
+  color: var(--text) !important; 
+  font-size: 11px !important; 
+  font-weight: 600 !important;
+  letter-spacing: -.01em; 
+}
+main > header .text-\[10px\] { 
+  color: var(--text-3) !important; 
+  font-size: 8.5px !important; 
+  letter-spacing: 0.05em;
+}
 
 /* ---------- SEARCH ---------- */
 #searchInput {
   height: 28px !important;
-  font-size: 11px !important;
+  font-size: 10.5px !important;
   border-radius: 5px !important;
   background: #121212 !important;
   border: 1px solid rgba(255,255,255,.11) !important;
@@ -248,14 +257,15 @@ html[data-theme="light"] #searchInput {
 #searchInput + div button,
 main > header .bg-sky-600 {
   background: var(--accent-dark) !important;
-  border-radius: 5px !important;
-  font-size: 11px !important;
-  height: 28px;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  height: 24px;
 }
 
 #searchType {
-  height: 34px !important;
-  border-radius: 6px !important;
+  height: 28px !important;
+  font-size: 10px !important;
+  border-radius: 5px !important;
   background: var(--surface-1) !important;
   border-color: var(--border-strong) !important;
   color: var(--text-2) !important;
@@ -263,9 +273,10 @@ main > header .bg-sky-600 {
 
 /* ---------- HEADER ACTIONS ---------- */
 .toolbar-btn {
-  height: 32px !important;
-  padding: 0 9px !important;
-  border-radius: 6px !important;
+  height: 28px !important;
+  padding: 0 7px !important;
+  font-size: 10px !important;
+  border-radius: 5px !important;
   background: rgba(255,255,255,.045) !important;
   border: 1px solid var(--border) !important;
   color: var(--text-2) !important;
