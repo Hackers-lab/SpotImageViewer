@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Spot Image Viewer & Verification Studio</title>
+  <title>Spot Image Viewer & Verification Studio — v19.4</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com" charset="UTF-8"></script>
   <script charset="UTF-8">
@@ -15,13 +15,13 @@
             sans: ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
           },
           fontSize: {
-            '2xs': ['0.65rem', { lineHeight: '0.85rem' }],
-            'xs': ['0.72rem', { lineHeight: '1.05rem' }],
-            'sm': ['0.80rem', { lineHeight: '1.20rem' }],
-            'base': ['0.875rem', { lineHeight: '1.30rem' }],
-            'lg': ['0.95rem', { lineHeight: '1.40rem' }],
-            'xl': ['1.10rem', { lineHeight: '1.50rem' }],
-            '2xl': ['1.30rem', { lineHeight: '1.75rem' }],
+            '2xs': ['0.60rem', { lineHeight: '0.75rem' }],
+            'xs': ['0.68rem', { lineHeight: '0.92rem' }],
+            'sm': ['0.75rem', { lineHeight: '1.05rem' }],
+            'base': ['0.82rem', { lineHeight: '1.18rem' }],
+            'lg': ['0.88rem', { lineHeight: '1.25rem' }],
+            'xl': ['1.00rem', { lineHeight: '1.35rem' }],
+            '2xl': ['1.15rem', { lineHeight: '1.50rem' }],
           }
         }
       }
@@ -30,71 +30,84 @@
   <script src="https://unpkg.com/lucide@latest" charset="UTF-8"></script>
   <link rel="stylesheet" href="css/app.css">
 </head>
-<body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex overflow-hidden h-screen w-screen select-none transition-colors duration-300">
+<body class="app-shell bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex overflow-hidden h-screen w-screen select-none transition-colors duration-300">
+
+  <!-- Photoshop-Style Left Sidebar Collapsed Vertical Tab Rail -->
+  <button id="sidebarRail" onclick="toggleSidebar()" title="Expand Navigation (Left Sidebar)" class="hidden w-8 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1b1b1b] shrink-0 flex-col items-center pt-3 gap-2.5 hover:bg-slate-50 dark:hover:bg-[#222] transition z-20 group">
+    <div class="w-6 h-6 rounded flex items-center justify-center text-slate-400 group-hover:text-sky-500">
+      <i data-lucide="chevrons-right" class="w-3.5 h-3.5"></i>
+    </div>
+    <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 group-hover:text-slate-200" style="writing-mode: vertical-rl; transform: rotate(180deg);">Navigation</span>
+  </button>
 
   <!-- Left Sidebar Navigation Rail -->
-  <aside class="w-20 md:w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 transition-all duration-300 z-20">
+  <aside id="sidebar" class="sidebar bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0 z-20">
     <div>
       <!-- Brand Logo -->
-      <div class="h-16 flex items-center px-4 md:px-6 gap-3 border-b border-slate-200 dark:border-slate-800">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
-          <i data-lucide="eye" class="w-5 h-5 text-white"></i>
+      <div class="h-16 flex items-center justify-between px-3.5 border-b border-slate-200 dark:border-slate-800 relative">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-[8px] bg-gradient-to-br from-sky-500 via-indigo-500 to-indigo-600 flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
+            <i data-lucide="eye" class="w-4 h-4 text-white"></i>
+          </div>
+          <div class="nav-label min-w-0">
+            <h1 class="font-bold text-[12px] leading-tight text-slate-900 dark:text-slate-100 tracking-wide truncate">SpotImageViewer</h1>
+            <span class="text-[9px] text-sky-600 dark:text-sky-400 font-semibold tracking-[0.12em]">v19.4 STUDIO</span>
+          </div>
         </div>
-        <div class="hidden md:block">
-          <h1 class="font-bold text-sm leading-tight text-slate-900 dark:text-slate-100 tracking-wide">SpotImageViewer</h1>
-          <span class="text-xs text-sky-600 dark:text-sky-400 font-medium tracking-wider">v19.4 STUDIO</span>
-        </div>
+        <button onclick="toggleSidebar()" id="sidebarCollapseBtn" title="Collapse sidebar" class="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-sky-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+          <i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
+        </button>
       </div>
 
       <!-- Navigation Tabs -->
-      <nav class="p-3 space-y-1.5 mt-2" id="navContainer">
-        <button onclick="switchTab('viewer')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all group active bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white" data-tab="viewer">
-          <i data-lucide="image" class="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-sky-600 dark:group-hover:text-sky-400"></i>
-          <span class="hidden md:inline font-medium text-sm">Image Viewer</span>
+      <nav class="p-3 space-y-1 mt-1" id="navContainer">
+        <button onclick="switchTab('viewer')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-white transition-all group active" data-tab="viewer" title="Image Viewer">
+          <i data-lucide="image" class="w-[18px] h-[18px] shrink-0 text-slate-500 dark:text-slate-400 group-hover:text-sky-600 dark:group-hover:text-sky-400"></i>
+          <span class="nav-label font-medium text-[13px] whitespace-nowrap">Image Viewer</span>
         </button>
-        <button onclick="switchTab('bill')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="bill">
-          <i data-lucide="zap" class="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-amber-600 dark:group-hover:text-amber-400"></i>
-          <span class="hidden md:inline font-medium text-sm">Bill Calculator</span>
+        <button onclick="switchTab('bill')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="bill" title="Bill Calculator">
+          <i data-lucide="zap" class="w-[18px] h-[18px] shrink-0 text-slate-500 dark:text-slate-400 group-hover:text-amber-600 dark:group-hover:text-amber-400"></i>
+          <span class="nav-label font-medium text-[13px] whitespace-nowrap">Bill Calculator</span>
         </button>
-        <button onclick="switchTab('theft')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="theft">
-          <i data-lucide="scale" class="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-rose-600 dark:group-hover:text-rose-400"></i>
-          <span class="hidden md:inline font-medium text-sm">Theft Assessment</span>
+        <button onclick="switchTab('theft')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="theft" title="Theft Assessment">
+          <i data-lucide="scale" class="w-[18px] h-[18px] shrink-0 text-slate-500 dark:text-slate-400 group-hover:text-rose-600 dark:group-hover:text-rose-400"></i>
+          <span class="nav-label font-medium text-[13px] whitespace-nowrap">Theft Assessment</span>
         </button>
-        <button onclick="switchTab('tariffs')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="tariffs">
-          <i data-lucide="sliders" class="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400"></i>
-          <span class="hidden md:inline font-medium text-sm">Tariff Manager</span>
+        <button onclick="switchTab('tariffs')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="tariffs" title="Tariff Manager">
+          <i data-lucide="sliders" class="w-[18px] h-[18px] shrink-0 text-slate-500 dark:text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400"></i>
+          <span class="nav-label font-medium text-[13px] whitespace-nowrap">Tariff Manager</span>
         </button>
-        <button onclick="switchTab('audit')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="audit">
-          <i data-lucide="file-spreadsheet" class="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-teal-600 dark:group-hover:text-teal-400"></i>
-          <span class="hidden md:inline font-medium text-sm">Low Cons. Audit</span>
+        <button onclick="switchTab('audit')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="audit" title="Low Cons. Audit">
+          <i data-lucide="file-spreadsheet" class="w-[18px] h-[18px] shrink-0 text-slate-500 dark:text-slate-400 group-hover:text-teal-600 dark:group-hover:text-teal-400"></i>
+          <span class="nav-label font-medium text-[13px] whitespace-nowrap">Low Cons. Audit</span>
         </button>
-        <button onclick="switchTab('tools')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="tools">
-          <i data-lucide="wrench" class="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400"></i>
-          <span class="hidden md:inline font-medium text-sm">Tools & Utilities</span>
+        <button onclick="switchTab('tools')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="tools" title="Tools & Utilities">
+          <i data-lucide="wrench" class="w-[18px] h-[18px] shrink-0 text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400"></i>
+          <span class="nav-label font-medium text-[13px] whitespace-nowrap">Tools & Utilities</span>
         </button>
-        <button onclick="switchTab('settings')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="settings">
-          <i data-lucide="settings" class="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-violet-600 dark:group-hover:text-violet-400"></i>
-          <span class="hidden md:inline font-medium text-sm">Settings & Update</span>
+        <button onclick="switchTab('settings')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="settings" title="Settings & Update">
+          <i data-lucide="settings" class="w-[18px] h-[18px] shrink-0 text-slate-500 dark:text-slate-400 group-hover:text-violet-600 dark:group-hover:text-violet-400"></i>
+          <span class="nav-label font-medium text-[13px] whitespace-nowrap">Settings & Update</span>
         </button>
       </nav>
     </div>
 
     <!-- Bottom Status / Theme Toggle -->
     <div class="p-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
-      <button onclick="toggleTheme()" class="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-medium transition">
+      <button onclick="toggleTheme()" class="w-full flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/70 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-medium transition" title="Toggle theme">
         <div class="flex items-center gap-3">
-          <i data-lucide="sun-moon" class="w-4 h-4 text-sky-600 dark:text-sky-400"></i>
-          <span class="hidden md:inline">Theme</span>
+          <i data-lucide="sun-moon" class="w-4 h-4 shrink-0 text-sky-600 dark:text-sky-400"></i>
+          <span class="nav-label whitespace-nowrap">Theme</span>
         </div>
-        <span id="themeLabel" class="hidden md:inline text-xs font-semibold text-slate-500 uppercase">DARK</span>
+        <span id="themeLabel" class="nav-label text-[10px] font-bold text-slate-500 uppercase tracking-wider">DARK</span>
       </button>
 
-      <div class="hidden md:flex items-center justify-between px-3 py-2 bg-slate-100 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800/80">
+      <div class="nav-label flex items-center justify-between px-3 py-2 bg-slate-100 dark:bg-slate-950/60 rounded-lg border border-slate-200 dark:border-slate-800/80">
         <div class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"></span>
-          <span>Database</span>
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse shrink-0"></span>
+          <span class="whitespace-nowrap">Database</span>
         </div>
-        <span id="statImages" class="text-xs font-semibold text-slate-800 dark:text-slate-200">0 Imgs</span>
+        <span id="statImages" class="text-xs font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">0 Imgs</span>
       </div>
     </div>
   </aside>
@@ -102,10 +115,22 @@
   <!-- Main Content View Area -->
   <main class="flex-1 flex flex-col min-w-0 bg-slate-100/50 dark:bg-slate-950/40 relative overflow-hidden">
 
-    <!-- Universal Top Navigation Bar -->
-    <header class="h-16 border-b border-slate-200 dark:border-slate-800/80 px-6 flex items-center justify-between gap-4 bg-white/80 dark:bg-slate-900/60 backdrop-blur-md z-10">
+    <!-- Universal Top Navigation Bar / Toolbar -->
+    <header class="h-16 border-b border-slate-200 dark:border-slate-800/80 px-5 flex items-center gap-4 bg-white/80 dark:bg-slate-900/60 backdrop-blur-md z-10 shrink-0">
+
+      <!-- Page Title / Breadcrumb -->
+      <div class="flex items-center gap-3 pr-4 border-r border-slate-200 dark:border-slate-800 shrink-0 min-w-[168px]">
+        <div id="pageTitleIcon" class="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-500/10 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0">
+          <i data-lucide="image" class="w-4 h-4"></i>
+        </div>
+        <div class="min-w-0">
+          <div class="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold leading-none">Workspace</div>
+          <h2 id="pageTitle" class="text-sm font-bold text-slate-900 dark:text-slate-100 leading-tight truncate">Image Viewer</h2>
+        </div>
+      </div>
+
       <!-- Universal Smart Search Bar -->
-      <div class="flex items-center gap-3 flex-1 max-w-xl">
+      <div class="flex items-center gap-2.5 flex-1 max-w-xl">
         <div class="relative w-full">
           <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
             <i data-lucide="search" class="w-4 h-4"></i>
@@ -114,17 +139,17 @@
             type="text" 
             id="searchInput" 
             placeholder="Search Consumer ID, Meter, Name, or Mobile..." 
-            class="w-full pl-10 pr-24 py-2 bg-white dark:bg-slate-950/80 border border-slate-300 dark:border-slate-800 rounded-xl text-sm text-slate-900 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-all"
+            class="w-full pl-10 pr-20 py-2 bg-white dark:bg-slate-950/80 border border-slate-300 dark:border-slate-800 rounded-lg text-sm text-slate-900 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-all"
             onkeydown="if(event.key === 'Enter') handleSearch()"
           />
           <div class="absolute inset-y-1 right-1 flex items-center gap-1">
-            <button onclick="handleSearch()" class="px-3 py-1 bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium rounded-lg shadow-sm transition">
+            <button onclick="handleSearch()" class="px-3 py-1 bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold rounded-md shadow-sm transition">
               Find
             </button>
           </div>
         </div>
 
-        <select id="searchType" class="bg-white dark:bg-slate-950/80 border border-slate-300 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs rounded-xl px-3 py-2 outline-none focus:border-sky-500">
+        <select id="searchType" class="bg-white dark:bg-slate-950/80 border border-slate-300 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs rounded-lg px-2.5 py-2 outline-none focus:border-sky-500 shrink-0">
           <option value="auto">Auto-Detect</option>
           <option value="cid">Consumer ID</option>
           <option value="meter">Meter No</option>
@@ -134,20 +159,22 @@
       </div>
 
       <!-- Quick Action Indicators & Tool Shortcuts -->
-      <div class="flex items-center gap-2">
-        <button onclick="launchImageCheckGUI()" title="Launch Image Check GUI Portal" class="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium transition flex items-center gap-1.5">
-          <i data-lucide="scan-eye" class="w-3.5 h-3.5 text-sky-500"></i>
-          <span class="hidden lg:inline">Image Check GUI</span>
-        </button>
-        <button onclick="switchTab('tools')" title="Fuzzy Lookup Tool" class="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium transition flex items-center gap-1.5">
-          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
-          <span class="hidden lg:inline">Fuzzy Lookup</span>
-        </button>
-
+      <div class="flex items-center gap-2 shrink-0">
         <div id="consumerBadge" class="hidden px-3 py-1.5 rounded-lg bg-sky-100 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/30 text-sky-700 dark:text-sky-400 text-xs font-semibold flex items-center gap-2">
           <i data-lucide="user-check" class="w-4 h-4"></i>
           <span id="consumerBadgeText">Active: -</span>
         </div>
+
+        <span class="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-0.5"></span>
+
+        <button onclick="launchImageCheckGUI()" title="Launch Image Check GUI Portal" class="toolbar-btn">
+          <i data-lucide="scan-eye" class="w-3.5 h-3.5 text-sky-500"></i>
+          <span class="hidden lg:inline">Image Check GUI</span>
+        </button>
+        <button onclick="switchTab('tools')" title="Fuzzy Lookup Tool" class="toolbar-btn">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
+          <span class="hidden lg:inline">Fuzzy Lookup</span>
+        </button>
       </div>
     </header>
 
@@ -204,12 +231,25 @@
           </div>
         </div>
 
+        <!-- Photoshop-Style Right Collapsed Vertical Tab Rail -->
+        <button id="detailsPanelRail" onclick="toggleDetailsPanel()" title="Expand Consumer Details" class="hidden w-8 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1b1b1b] shrink-0 flex-col items-center pt-3 gap-2.5 hover:bg-slate-50 dark:hover:bg-[#222] transition z-10 group">
+          <div class="w-6 h-6 rounded flex items-center justify-center text-slate-400 group-hover:text-sky-500">
+            <i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
+          </div>
+          <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 group-hover:text-slate-200" style="writing-mode: vertical-rl;">Consumer Details</span>
+        </button>
+
         <!-- Right: Consumer Profile Card & Notes -->
-        <div class="w-80 border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex flex-col justify-between shrink-0 p-5 overflow-y-auto">
-          <div class="space-y-4">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
-              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Consumer Details</h3>
-              <span id="searchResultCount" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">0 found</span>
+        <div id="detailsPanel" class="details-panel w-72 border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex flex-col justify-between shrink-0 p-3.5 overflow-y-auto">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+              <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Consumer Details</h3>
+              <div class="flex items-center gap-1.5">
+                <span id="searchResultCount" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">0 found</span>
+                <button onclick="toggleDetailsPanel()" title="Collapse panel" class="w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:text-sky-500 hover:bg-slate-200 dark:hover:bg-slate-800 transition">
+                  <i data-lucide="chevrons-right" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
             </div>
 
             <!-- Profile Info Card -->

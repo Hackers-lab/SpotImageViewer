@@ -17,11 +17,78 @@ window.addEventListener('pywebviewready', () => {
 // Fallback for browser testing
 window.addEventListener('DOMContentLoaded', () => {
   lucide.createIcons();
+  restoreLayoutPrefs();
   if (!window.pywebview) {
     console.warn("Running in standard browser mode (mocking API)");
     setTimeout(initApp, 300);
   }
 });
+
+// --- Collapsible Panes ---
+const TAB_META = {
+  viewer:   { title: 'Image Viewer',       icon: 'image' },
+  bill:     { title: 'Bill Calculator',    icon: 'zap' },
+  theft:    { title: 'Theft Assessment',   icon: 'scale' },
+  tariffs:  { title: 'Tariff Manager',     icon: 'sliders' },
+  audit:    { title: 'Low Cons. Audit',    icon: 'file-spreadsheet' },
+  tools:    { title: 'Tools & Utilities',  icon: 'wrench' },
+  settings: { title: 'Settings & Update',  icon: 'settings' },
+};
+
+function updatePageHeader(tabId) {
+  const meta = TAB_META[tabId];
+  if (!meta) return;
+  const titleEl = document.getElementById('pageTitle');
+  const iconEl = document.getElementById('pageTitleIcon');
+  if (titleEl) titleEl.innerText = meta.title;
+  if (iconEl) iconEl.innerHTML = `<i data-lucide="${meta.icon}" class="w-4 h-4"></i>`;
+}
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const rail = document.getElementById('sidebarRail');
+  if (!sidebar || !rail) return;
+  const collapsing = !sidebar.classList.contains('hidden-panel');
+  sidebar.classList.toggle('hidden-panel', collapsing);
+  rail.classList.toggle('hidden', !collapsing);
+  rail.classList.toggle('flex', collapsing);
+  localStorage.setItem('siv_sidebar_collapsed', collapsing ? '1' : '0');
+  lucide.createIcons();
+}
+
+function toggleDetailsPanel() {
+  const panel = document.getElementById('detailsPanel');
+  const rail = document.getElementById('detailsPanelRail');
+  if (!panel || !rail) return;
+  const collapsing = !panel.classList.contains('hidden-panel');
+  panel.classList.toggle('hidden-panel', collapsing);
+  rail.classList.toggle('hidden', !collapsing);
+  rail.classList.toggle('flex', collapsing);
+  localStorage.setItem('siv_details_collapsed', collapsing ? '1' : '0');
+  lucide.createIcons();
+}
+
+function restoreLayoutPrefs() {
+  if (localStorage.getItem('siv_sidebar_collapsed') === '1') {
+    const sidebar = document.getElementById('sidebar');
+    const rail = document.getElementById('sidebarRail');
+    if (sidebar && rail) {
+      sidebar.classList.add('hidden-panel');
+      rail.classList.remove('hidden');
+      rail.classList.add('flex');
+    }
+  }
+  if (localStorage.getItem('siv_details_collapsed') === '1') {
+    const panel = document.getElementById('detailsPanel');
+    const rail = document.getElementById('detailsPanelRail');
+    if (panel && rail) {
+      panel.classList.add('hidden-panel');
+      rail.classList.remove('hidden');
+      rail.classList.add('flex');
+    }
+  }
+  lucide.createIcons();
+}
 
 async function callAPI(method, ...args) {
   if (window.pywebview && window.pywebview.api && window.pywebview.api[method]) {
@@ -71,12 +138,9 @@ function switchTab(tabId) {
   if (activeTab) activeTab.classList.remove('hidden');
 
   document.querySelectorAll('.nav-item').forEach(el => {
-    if (el.dataset.tab === tabId) {
-      el.classList.add('active', 'bg-slate-100', 'dark:bg-slate-800', 'text-slate-900', 'dark:text-white');
-    } else {
-      el.classList.remove('active', 'bg-slate-100', 'dark:bg-slate-800', 'text-slate-900', 'dark:text-white');
-    }
+    el.classList.toggle('active', el.dataset.tab === tabId);
   });
+  updatePageHeader(tabId);
   lucide.createIcons();
 }
 
