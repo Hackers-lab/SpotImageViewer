@@ -1,20 +1,44 @@
 import os
-import customtkinter
 
 PROJECT_ROOT = os.path.abspath(os.path.join(SPECPATH, '..'))
-CTK_DIR = os.path.dirname(customtkinter.__file__)
 
 a_main = Analysis(
-    [os.path.join(PROJECT_ROOT, 'main.py')],
-    pathex=[PROJECT_ROOT, os.path.join(PROJECT_ROOT, 'src')],
+    [os.path.join(PROJECT_ROOT, 'main_web.py')],
+    pathex=[
+        PROJECT_ROOT,
+        os.path.join(PROJECT_ROOT, 'src'),
+        os.path.join(PROJECT_ROOT, 'src', 'core'),
+        os.path.join(PROJECT_ROOT, 'src', 'bridge'),
+    ],
     binaries=[],
     datas=[
         (os.path.join(PROJECT_ROOT, 'assets', 'spot_icon.ico'), 'assets'),
         (os.path.join(PROJECT_ROOT, 'assets', 'spot_icon.png'), 'assets'),
         (os.path.join(PROJECT_ROOT, 'src', 'ui_web'), os.path.join('src', 'ui_web')),
-        (CTK_DIR, 'customtkinter'),
     ],
-    hiddenimports=['ttkbootstrap', 'PIL', 'openpyxl', 'requests', 'packaging', 'darkdetect', 'customtkinter', 'webview', 'clr'],
+    hiddenimports=[
+        'config',
+        'database',
+        'utils',
+        'tariff_manager',
+        'live_osd_service',
+        'core',
+        'core.config',
+        'core.database',
+        'core.utils',
+        'core.tariff_manager',
+        'core.live_osd_service',
+        'bridge',
+        'bridge.app_api',
+        'PIL',
+        'openpyxl',
+        'requests',
+        'packaging',
+        'webview',
+        'clr',
+        'pypdf',
+        'thefuzz'
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -30,7 +54,7 @@ exe_main = EXE(
     a_main.scripts,
     [],
     exclude_binaries=True,
-    name='SpotImageViewerV19.4',
+    name='SpotImageViewerV20.0',
     icon=os.path.join(PROJECT_ROOT, 'assets', 'spot_icon.ico'),
     debug=False,
     bootloader_ignore_signals=False,
@@ -93,5 +117,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name='SpotImageViewerV19.4',
+    name='SpotImageViewerV20.0',
 )

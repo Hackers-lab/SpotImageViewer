@@ -1,13 +1,17 @@
 {
-  "version": 19.4,
-  "release_notes": "V19.4 Updates:\n\n- Modern Navigation & UI: Refactored with Windows 11 Fluent style sidebar navigation, responsive layout, and unified tool workspace.\n- Dynamic Dark / Light Themes: Coordinated one-click theme switcher across CustomTkinter and TTKBootstrap components.\n- Embedded Workspace Tools: Bill Calculator, Theft Assessment, Low Consumption Audit, and Tariff Editor can now be launched directly in-frame or detached into separate windows.\n- Bill Calculator Modern Date Range Picker: Standardized DD.MM.YYYY format with fast month/year jump controls.\n- Complete Bundled Suite: Includes SpotImageViewerV19.4.exe and imagecheckgui.exe with seamless silent auto-updater.",
-  "download_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/19.4/SpotImageViewer_Setup.exe",
-  "installer_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/19.4/SpotImageViewer_Setup.exe",
-  "zip_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/19.4/SpotImageViewerV19.4.zip",
+  "version": 20.0,
+  "release_notes": "V20.0 \u2014 Major UI Transformation & Feature Overhaul:\n\n- Complete Web UI Rewrite: Migrated from legacy Tkinter/CustomTkinter to a modern PyWebView + Edge WebView2 powered single-page app with Tailwind CSS, Lucide icons, and glassmorphic design language.\n- Photoshop-Style Workspace: VS Code inspired icon rail sidebar, collapsible accordion dock panels (Details, Dates, Notes), and full dark/light theme toggle.\n- Interactive Image Viewer: Mouse wheel zoom, click-drag pan, 90\u00b0 rotation, real thumbnail filmstrip with preview-all grid mode.\n- Bill Calculator Studio: Complete WBERC-accurate energy billing with TOD support, government subsidy slabs, meter rent by phase, timely/special/e-payment rebates, and minimum charge floor.\n- Dual-Ledger Theft Assessment: Side-by-side provisional vs final assessment with automatic relief comparison and statutory 25% limit indicator.\n- Batch Fuzzy Lookup Engine: Upload/download Excel-based name+address fuzzy matching with ancestor/relative detection, configurable thresholds, and 1-click OSD check per candidate.\n- Manual Fuzzy Lookup: Type individual rows directly in-app for instant results without file upload.\n- Live WBSEDCL OSD Integration: Real-time Outstanding Statement fetcher with PDF parsing, connection status flags (Live/Deemed/Disconnected), cached portal queries, and floating HUD widget visible in both single-image and grid-preview modes.\n- Low Consumption Audit: Automated flagging of zero/low-consumption consumers from Excel data with session persistence.\n- Tariff Manager: Full CRUD editor for energy slabs, ED slabs, fixed charges, and load factors.\n- Network Folder Management: Multi-folder image source with online/offline status indicators and background re-indexing.\n- Silent Auto-Updater: In-app update checking with one-click silent installer download and execution.\n- Bundled Suite: Includes SpotImageViewerV20.0.exe and imagecheckgui.exe with Windows Setup installer.",
+  "download_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.0/SpotImageViewer_Setup.exe",
+  "installer_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.0/SpotImageViewer_Setup.exe",
+  "zip_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.0/SpotImageViewerV20.0.zip",
   "install_args": "/VERYSILENT /NORESTART",
-  "launch_exe": "SpotImageViewer\\SpotImageViewerV19.4.exe",
-  "sha256": "737bab0b4f8d01d60ec257fe6c7920e4d715b9aca48cbfc7402111625278c938",
+  "launch_exe": "SpotImageViewer\\SpotImageViewerV20.0.exe",
+  "sha256": "",
   "previous_versions": [
+    {
+      "version": 19.4,
+      "release_notes": "V19.4 Updates:\n\n- Modern Navigation & UI: Refactored with Windows 11 Fluent style sidebar navigation, responsive layout, and unified tool workspace.\n- Dynamic Dark / Light Themes: Coordinated one-click theme switcher across CustomTkinter and TTKBootstrap components.\n- Embedded Workspace Tools: Bill Calculator, Theft Assessment, Low Consumption Audit, and Tariff Editor can now be launched directly in-frame or detached into separate windows.\n- Bill Calculator Modern Date Range Picker: Standardized DD.MM.YYYY format with fast month/year jump controls.\n- Complete Bundled Suite: Includes SpotImageViewerV19.4.exe and imagecheckgui.exe with seamless silent auto-updater."
+    },
     {
       "version": 19.3,
       "release_notes": "V19.3 Updates:\n\n- In-App Self-Updating: Automated installer packaging and silent background update execution with progress dialog.\n- Bill Calculator Modern Date Range Picker: Added modern Month and Year dropdown selectors and fast step navigation for Pro-Rata billing.\n- Standardized Date Format: Pro-Rata dates now default to and strictly format as DD.MM.YYYY.\n- WBERC Subsidy Rule Enforcement: Domestic government relief correctly caps strictly at <= 300 units/month (or proportional pro-rata/quarterly limit).\n- Fast Image Indexing Fix: Network and additional folders dynamically reloaded without stale cache, preserving ultra-fast raw slicing for 1M+ images.\n- Bundled Application Suite: Includes both SpotImageViewerV19.3.exe and imagecheckgui.exe with Windows Setup installer."
@@ -23,19 +27,6 @@
     {
       "version": 18.4,
       "release_notes": "V18.4 Updates:\n\n- Image Viewer: Scroll mouse wheel to zoom in/out on images.\n- Image Viewer: Click and drag to pan/move around when zoomed in.\n- Theft Calculator: UI redesigned to match a consistent table-aligned layout.\n- Bug fixes and visual improvements."
-    },
-    {
-      "version": 18.3,
-      "release_notes": "V18.3 Updates:\n\n- Theft Calculator now supports decimal Hours/Day input.\n- Added exact interpreted time display beside hour inputs (HH hr MM min).\n- Improved hours editing behavior to avoid auto-overwrite while typing.\n- Enforced valid Hours/Day range of 0 to 24 with normalization on focus-out.\n- Improved update check dialog when no new version is found by showing version details and feature notes."
-    },
-    {
-      "version": 18.2,
-      "release_notes": "V18.2 Updates:\n\n- Added dark mode toggle in main search controls.\n- Improved dark theme consistency across listboxes, canvases, menus, and notes/folders toggles.\n- Fixed Tariff Category dropdown text clipping in Bill Calculator by expanding combobox sizing behavior."
-    },
-    {
-      "version": 18.1,
-      "release_notes": "V18.1 Updates:\n\n- Tariff Manager now supports adding and deleting tariff classes directly from the editor.\n- Updated tariff structure includes Commercial Rate A(CM-II) and revised ED slabs.\n- Theft fixed-demand calculation updated: load floor of 1 KVA, actual load for >= 1 KVA, and month roundup for fixed demand.\n- One-time tariff migration marker added to reset old tariff JSON once for this release and preserve edits afterward."
     }
   ]
 }
-

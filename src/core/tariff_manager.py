@@ -1,6 +1,9 @@
 import json
 import os
-import config
+try:
+    from core import config
+except ImportError:
+    import config
 
 # Use the global BASE_DIR from config.py
 CONFIG_FILE = os.path.join(config.BASE_DIR, "tariff_settings.json")

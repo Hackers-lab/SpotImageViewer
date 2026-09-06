@@ -8,8 +8,8 @@ for p in (_ROOT, _SRC, os.path.join(_SRC, "core"), os.path.join(_SRC, "tools"), 
     if p not in sys.path:
         sys.path.insert(0, p)
 
-from src.ui.main_gui import run_app
+# Launch the modern PyWebView-based UI (v20.0+)
+from main_web import main
 
 if __name__ == "__main__":
-    run_app()
-   
+    main()

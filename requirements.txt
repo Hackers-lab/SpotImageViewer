@@ -2,8 +2,11 @@ pywebview>=6.0.0
 customtkinter>=6.0.0
 ttkbootstrap>=1.20.2
 pillow>=10.0.0
-openpyxl>=3.1.2
+openpyxl>=3.1.5
+numpy<2.0.0; python_version < "3.12"
 requests>=2.31.0
 packaging>=23.0
 darkdetect>=0.8.0
+pypdf>=4.0.0
+thefuzz>=0.22.0
 pyinstaller>=6.0.0

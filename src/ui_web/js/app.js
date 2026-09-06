@@ -214,6 +214,18 @@ function expandToSection(targetSectionId) {
 }
 
 function restoreLayoutPrefs() {
+  // Restore saved theme
+  const savedTheme = localStorage.getItem('siv_theme');
+  if (savedTheme) {
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    const iconEl = document.getElementById('themeIcon');
+    if (iconEl) {
+      iconEl.setAttribute('data-lucide', savedTheme === 'dark' ? 'sun' : 'moon');
+    }
+    const labelEl = document.getElementById('themeLabel');
+    if (labelEl) labelEl.innerText = savedTheme.toUpperCase();
+  }
+
   if (localStorage.getItem('siv_sidebar_collapsed') === '1') {
     const sidebar = document.getElementById('sidebar');
     if (sidebar) {
@@ -295,6 +307,13 @@ async function initApp() {
 
   // Background update check to notify user in status bar if new update arrives
   checkUpdateSilent();
+
+  // Restore previous low consumption audit session if available
+  loadAuditSession();
+
+  // Initialize interactive manual fuzzy lookup rows
+  initManualFuzzyLookup();
+
   lucide.createIcons();
 }
 
@@ -346,6 +365,7 @@ function toggleTheme() {
   const currentTheme = html.getAttribute('data-theme') || 'dark';
   const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
   html.setAttribute('data-theme', newTheme);
+  localStorage.setItem('siv_theme', newTheme);
   
   const iconEl = document.getElementById('themeIcon');
   if (iconEl) {
@@ -409,6 +429,94 @@ function closeSearchHistoryDropdown(e) {
 window.showSearchHistoryDropdown = showSearchHistoryDropdown;
 window.closeSearchHistoryDropdown = closeSearchHistoryDropdown;
 
+// --- Search Bar Clear Button & Viewer Reset ---
+function toggleSearchClearBtn() {
+  const input = document.getElementById('searchInput');
+  const btn = document.getElementById('btnSearchClear');
+  if (!btn) return;
+  if (input && input.value.length > 0) {
+    btn.classList.remove('hidden');
+  } else {
+    btn.classList.add('hidden');
+  }
+}
+
+function clearSearchInput() {
+  const input = document.getElementById('searchInput');
+  if (input) {
+    input.value = '';
+    input.focus();
+  }
+  toggleSearchClearBtn();
+  clearViewerState();
+}
+
+function clearViewerState() {
+  // Reset consumer state
+  currentConsumerId = null;
+  currentImages = [];
+  currentImageIndex = 0;
+
+  // Clear profile panel
+  ['profileName','profileCid','profileMeter','profileMobile','profileAddress','profileLoad','profileClass'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = '-';
+  });
+
+  // Clear viewport image
+  const mainImg = document.getElementById('mainImage');
+  if (mainImg) { mainImg.src = ''; mainImg.classList.add('hidden'); }
+  
+  resetZoom();
+
+  // Show placeholder
+  const placeholder = document.getElementById('imagePlaceholder');
+  if (placeholder) {
+    placeholder.classList.remove('hidden');
+    placeholder.innerHTML = `
+      <div class="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-600">
+        <i data-lucide="image-off" class="w-8 h-8"></i>
+      </div>
+      <p class="text-sm font-medium text-slate-500">Search a Consumer ID or Meter to view spot images</p>
+    `;
+    lucide.createIcons();
+  }
+
+  // Hide date tag, toggle group, overview grid
+  const dateTagContainer = document.getElementById('imgDateTagContainer');
+  if (dateTagContainer) dateTagContainer.classList.add('hidden');
+  const toggleGroup = document.getElementById('viewModeToggleGroup');
+  if (toggleGroup) toggleGroup.classList.add('hidden');
+  const overviewGrid = document.getElementById('overviewGridContainer');
+  if (overviewGrid) overviewGrid.classList.add('hidden');
+  const viewport = document.getElementById('viewport');
+  if (viewport) viewport.classList.remove('hidden');
+
+  // Clear filmstrip
+  const filmstrip = document.getElementById('filmstripContainer');
+  if (filmstrip) filmstrip.innerHTML = '<p class="text-[11px] text-slate-400 italic px-2">Thumbnails will appear here once images are loaded.</p>';
+  document.getElementById('filmstripCountBadge').innerText = '0';
+  document.getElementById('searchResultCount').innerText = '0 photos';
+
+  // Clear cycles list
+  const cyclesList = document.getElementById('cyclesList');
+  if (cyclesList) cyclesList.innerHTML = '';
+
+  // Hide Live OSD HUD
+  const hud = document.getElementById('liveOsdHud');
+  if (hud) hud.classList.add('hidden');
+
+  // Reset notes
+  const noteCategory = document.getElementById('noteCategory');
+  if (noteCategory) noteCategory.value = 'OK';
+  const noteRemarks = document.getElementById('noteRemarks');
+  if (noteRemarks) noteRemarks.value = '';
+}
+
+window.toggleSearchClearBtn = toggleSearchClearBtn;
+window.clearSearchInput = clearSearchInput;
+window.clearViewerState = clearViewerState;
+
 async function handleSearch() {
   closeSearchHistoryDropdown();
   const query = document.getElementById('searchInput').value.trim();
@@ -420,6 +528,8 @@ async function handleSearch() {
 
   const res = await callAPI('search_consumer', query, filterType);
   if (!res || !res.success || !res.results || !res.results.length) {
+    // Clear previous consumer state so stale images don't remain
+    clearViewerState();
     alert(`No matching consumers found for "${query}"`);
     return;
   }
@@ -473,6 +583,9 @@ async function selectConsumer(profile) {
 
   // Load images
   await loadConsumerImages(profile.consumer_id);
+
+  // Load Live WBSEDCL OSD & Connection Status in background
+  loadLiveOSD(profile.consumer_id);
 }
 
 function populateProfile(p) {
@@ -484,6 +597,120 @@ function populateProfile(p) {
   document.getElementById('profileLoad').innerText = p.contractual_load || '1.0 kVA';
   document.getElementById('profileClass').innerText = p.class || 'Domestic';
 }
+
+// --- Live WBSEDCL OSD & Connection Status Controller ---
+let currentLiveOsdData = null;
+
+async function loadLiveOSD(consumerId, forceRefresh = false) {
+  const cid = String(consumerId || '').trim();
+  const hud = document.getElementById('liveOsdHud');
+  const statusBadge = document.getElementById('liveOsdStatusBadge');
+  const statusText = document.getElementById('liveOsdStatusText');
+  const totalDuesEl = document.getElementById('liveOsdTotalDues');
+  const unpaidEl = document.getElementById('liveOsdUnpaid');
+  const lpscEl = document.getElementById('liveOsdLpsc');
+  const officeEl = document.getElementById('liveOsdOffice');
+  const connDateEl = document.getElementById('liveOsdConnDate');
+  const docTypeEl = document.getElementById('liveOsdDocType');
+  const cachedIndicator = document.getElementById('liveOsdCachedIndicator');
+  const btnPdf = document.getElementById('btnViewOsdPdf');
+  const refreshIcon = document.getElementById('btnRefreshOsdIcon');
+
+  if (!cid || !/^\d{9}$/.test(cid)) {
+    if (hud) hud.classList.add('hidden');
+    if (statusBadge) statusBadge.className = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-400";
+    if (statusText) statusText.innerText = "Invalid CID";
+    if (totalDuesEl) totalDuesEl.innerText = "0.00";
+    if (unpaidEl) unpaidEl.innerText = "\u20B9 0.00";
+    if (lpscEl) lpscEl.innerText = "\u20B9 0.00";
+    if (officeEl) officeEl.innerText = "-";
+    if (connDateEl) connDateEl.innerText = "-";
+    if (docTypeEl) docTypeEl.innerText = "-";
+    if (cachedIndicator) cachedIndicator.innerText = "";
+    if (btnPdf) btnPdf.classList.add('hidden');
+    currentLiveOsdData = null;
+    return;
+  }
+
+  // Show floating HUD pill in viewport
+  if (hud) hud.classList.remove('hidden');
+
+  // Set loading state
+  if (statusBadge) statusBadge.className = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 animate-pulse";
+  if (statusText) statusText.innerText = "Checking Portal...";
+  if (refreshIcon) refreshIcon.classList.add('animate-spin');
+
+  try {
+    const res = await callAPI('get_live_osd', cid, forceRefresh);
+    if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+
+    if (!res || !res.success || !res.data) {
+      if (statusBadge) statusBadge.className = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400";
+      if (statusText) statusText.innerText = res ? (res.error || "Portal unreachable") : "Offline";
+      return;
+    }
+
+    const d = res.data;
+    currentLiveOsdData = d;
+
+    // Status styling
+    let badgeClass = "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+    let dotClass = "bg-slate-400";
+
+    if (d.isLive) {
+      badgeClass = "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800";
+      dotClass = "bg-emerald-500 animate-pulse";
+    } else if (d.isDeemed) {
+      badgeClass = "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800";
+      dotClass = "bg-amber-500";
+    } else if (d.isDisconnected) {
+      badgeClass = "bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800";
+      dotClass = "bg-rose-500";
+    }
+
+    if (statusBadge) {
+      statusBadge.className = `inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${badgeClass}`;
+      statusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full ${dotClass}"></span><span id="liveOsdStatusText">${escapeHtml(d.connectionStatus || 'LIVE')}</span>`;
+    }
+
+    if (totalDuesEl) totalDuesEl.innerText = Number(d.totalDues || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (unpaidEl) unpaidEl.innerText = `\u20B9 ${Number(d.osd || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (lpscEl) lpscEl.innerText = `\u20B9 ${Number(d.lpsc || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (officeEl) officeEl.innerText = d.office || '-';
+    if (connDateEl) connDateEl.innerText = d.connDate || '-';
+    if (docTypeEl) docTypeEl.innerText = d.docType || 'OUTSTANDING REPORT';
+    if (cachedIndicator) cachedIndicator.innerText = d.cached ? '(cached)' : '(live)';
+    if (btnPdf) btnPdf.classList.remove('hidden');
+
+    lucide.createIcons();
+  } catch (err) {
+    console.error("Failed to load live OSD:", err);
+    if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+    if (statusBadge) statusBadge.className = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400";
+    if (statusText) statusText.innerText = "Error";
+  }
+}
+
+function refreshLiveOSD() {
+  if (!currentConsumerId) {
+    alert("Please select a consumer first.");
+    return;
+  }
+  loadLiveOSD(currentConsumerId, true);
+}
+
+async function viewLiveOsdPdf() {
+  if (!currentConsumerId) return;
+  const res = await callAPI('open_live_osd_pdf', currentConsumerId);
+  if (!res || !res.success) {
+    alert("Failed to open PDF: " + (res ? res.error : "Unknown error"));
+  }
+}
+
+window.loadLiveOSD = loadLiveOSD;
+window.refreshLiveOSD = refreshLiveOSD;
+window.viewLiveOsdPdf = viewLiveOsdPdf;
+
 
 async function saveNote() {
   if (!currentConsumerId) return alert("No consumer selected");
@@ -511,7 +738,27 @@ async function deleteNote() {
 async function loadConsumerImages(consumerId) {
   const res = await callAPI('get_consumer_images', consumerId);
   if (!res || !res.success) {
+    // Clear viewport fully on failure
+    currentImages = [];
+    currentImageIndex = 0;
+    resetZoom();
+    document.getElementById('mainImage').src = '';
+    document.getElementById('mainImage').classList.add('hidden');
+    const placeholder = document.getElementById('imagePlaceholder');
+    if (placeholder) {
+      placeholder.classList.remove('hidden');
+      placeholder.innerHTML = `
+        <div class="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 flex items-center justify-center text-rose-400 dark:text-rose-500">
+          <i data-lucide="image-off" class="w-8 h-8"></i>
+        </div>
+        <p class="text-sm font-medium text-rose-500">${res ? res.error : "No images found for this consumer"}</p>
+      `;
+      lucide.createIcons();
+    }
     document.getElementById('filmstripContainer').innerHTML = `<p class="text-xs text-rose-500 px-4">${res ? res.error : "Failed to load images"}</p>`;
+    document.getElementById('searchResultCount').innerText = '0 photos';
+    const toggleGroup = document.getElementById('viewModeToggleGroup');
+    if (toggleGroup) toggleGroup.classList.add('hidden');
     return;
   }
 
@@ -569,9 +816,23 @@ async function loadConsumerImages(consumerId) {
     }
   } else {
     switchImageViewMode('single');
-    document.getElementById('mainImage').classList.add('hidden');
-    document.getElementById('imagePlaceholder').classList.remove('hidden');
-    document.getElementById('imgDateTag').innerText = 'No images found';
+    resetZoom();
+    const mainImg = document.getElementById('mainImage');
+    mainImg.src = '';
+    mainImg.classList.add('hidden');
+    const placeholder = document.getElementById('imagePlaceholder');
+    if (placeholder) {
+      placeholder.classList.remove('hidden');
+      placeholder.innerHTML = `
+        <div class="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 flex items-center justify-center text-amber-400 dark:text-amber-500">
+          <i data-lucide="image-off" class="w-8 h-8"></i>
+        </div>
+        <p class="text-sm font-medium text-slate-500">This consumer has no spot images</p>
+      `;
+      lucide.createIcons();
+    }
+    const dateTagContainer = document.getElementById('imgDateTagContainer');
+    if (dateTagContainer) dateTagContainer.classList.add('hidden');
     if (toggleGroup) toggleGroup.classList.add('hidden');
   }
 }
@@ -1601,24 +1862,46 @@ async function startIndexing() {
 
     const count = stat.scanned || stat.total || 0;
     const elapsed = stat.elapsed || 0;
+    const speed = stat.speed || 0;
+    const folder = stat.current_folder || '';
+    const filesSeen = stat.files_seen || 0;
 
-    const statusStr = count > 0 ? `Indexed ${count.toLocaleString()} images (${elapsed}s)` : `Scanning directories... (${elapsed}s)`;
+    let statusStr = "";
+    let badgeStr = "";
+
+    if (count > 0) {
+      const speedStr = speed > 0 ? ` • ${speed.toLocaleString()} img/s` : '';
+      statusStr = `Indexing: ${count.toLocaleString()} images (${elapsed}s${speedStr}) ${folder ? '[' + folder + ']' : ''}`;
+      badgeStr = `${count.toLocaleString()} imgs (${elapsed}s${speed > 0 ? ' • ' + speed + '/s' : ''})`;
+    } else if (filesSeen > 0) {
+      statusStr = `Scanning: ${filesSeen.toLocaleString()} files inspected (${elapsed}s)...`;
+      badgeStr = `Scanning (${filesSeen.toLocaleString()} files)...`;
+    } else {
+      statusStr = `Scanning directories... (${elapsed}s) ${folder ? '[' + folder + ']' : ''}`;
+      badgeStr = `Scanning... (${elapsed}s)`;
+    }
+
     if (topText) {
-      topText.innerText = count > 0 ? `${count.toLocaleString()} imgs (${elapsed}s)` : `Scanning... (${elapsed}s)`;
+      topText.innerText = badgeStr;
     }
 
-    const approxPct = count > 0 ? 75 : 35;
+    // Dynamic progress bar percentage: animate smoothly across time
+    const dynamicPct = count > 0 
+      ? Math.min(95, 20 + Math.floor(Math.log10(count + 1) * 15)) 
+      : Math.min(45, 10 + (elapsed * 2));
+
     if (topTimelineBar) {
-      topTimelineBar.style.width = `${approxPct}%`;
+      topTimelineBar.style.width = `${dynamicPct}%`;
     }
-    updateStatusBar(statusStr, "loading", `${approxPct}%`);
+    updateStatusBar(statusStr, "loading", `${dynamicPct}%`);
 
     if (!stat.running) {
       clearInterval(indexingPollTimer);
       indexingPollTimer = null;
 
       if (topTimelineBar) topTimelineBar.style.width = '100%';
-      updateStatusBar(`Indexing complete: ${count.toLocaleString()} images cataloged (${elapsed}s)`, "normal", 100);
+      const finalSpeed = speed > 0 ? ` @ ${speed.toLocaleString()} img/s` : '';
+      updateStatusBar(`Indexing complete: ${count.toLocaleString()} images cataloged in ${elapsed}s${finalSpeed}`, "normal", 100);
 
       // Immediately stop spin and reset indicators
       if (icon) icon.classList.remove('animate-spin');
@@ -1631,12 +1914,16 @@ async function startIndexing() {
         if (topTimeline) topTimeline.classList.add('hidden');
         if (topTimelineBar) topTimelineBar.style.width = '0%';
         updateStatusBar("Ready", "normal");
-      }, 2500);
+      }, 3000);
 
       await initApp();
-      alert(`Image re-indexing complete!\nIndexed: ${count.toLocaleString()} images in ${elapsed}s.`);
+      if (stat.error) {
+        alert(`Image indexing encountered an error:\n${stat.error}`);
+      } else {
+        alert(`Image re-indexing complete!\n\nIndexed: ${count.toLocaleString()} images\nElapsed Time: ${elapsed}s\nAverage Speed: ${speed > 0 ? speed.toLocaleString() + ' images/sec' : 'N/A'}`);
+      }
     }
-  }, 400);
+  }, 350);
 }
 
 async function exportNotes() {
@@ -1775,7 +2062,524 @@ window.openSavedConsumerData = openSavedConsumerData;
 window.closeImportConfirmModal = closeImportConfirmModal;
 window.openImportedSourceFile = openImportedSourceFile;
 
-// --- Fuzzy Lookup Tool Engine ---
+// --- Fuzzy Lookup Tool Engine (Dual Mode: Instant Manual & Batch File) ---
+let currentFuzzyMode = 'manual'; // 'manual' | 'batch'
+let manualFuzzyRows = [
+  { name: "", co: "", address: "", mobile: "" },
+  { name: "", co: "", address: "", mobile: "" }
+];
+
+function switchFuzzyMode(mode) {
+  currentFuzzyMode = mode;
+  const btnManual = document.getElementById('fuzzyModeBtnManual');
+  const btnBatch = document.getElementById('fuzzyModeBtnBatch');
+  const contManual = document.getElementById('fuzzyContainerManual');
+  const contBatch = document.getElementById('fuzzyContainerBatch');
+
+  if (mode === 'manual') {
+    if (btnManual) {
+      btnManual.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs";
+    }
+    if (btnBatch) {
+      btnBatch.className = "px-3.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200";
+    }
+    if (contManual) contManual.classList.remove('hidden');
+    if (contBatch) contBatch.classList.add('hidden');
+  } else {
+    if (btnManual) {
+      btnManual.className = "px-3.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200";
+    }
+    if (btnBatch) {
+      btnBatch.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs";
+    }
+    if (contManual) contManual.classList.add('hidden');
+    if (contBatch) contBatch.classList.remove('hidden');
+  }
+  lucide.createIcons();
+}
+
+function initManualFuzzyLookup() {
+  const cachedEl = document.getElementById('fuzzyCachedRecordsCount');
+  const indexedCountEl = document.getElementById('indexedCount');
+  if (cachedEl && indexedCountEl) {
+    cachedEl.innerText = indexedCountEl.innerText || "0";
+  }
+  renderManualFuzzyTable();
+}
+
+function escapeHtml(val) {
+  if (val === null || val === undefined) return '';
+  return String(val)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function syncCurrentInputValues() {
+  const tbody = document.getElementById('manualFuzzyTableBody');
+  if (!tbody) return;
+  tbody.querySelectorAll('input').forEach(inp => {
+    const field = inp.getAttribute('data-field');
+    const idx = parseInt(inp.getAttribute('data-index'), 10);
+    if (manualFuzzyRows[idx] && field) {
+      manualFuzzyRows[idx][field] = inp.value;
+    }
+  });
+}
+
+function renderManualFuzzyTable() {
+  const tbody = document.getElementById('manualFuzzyTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  manualFuzzyRows.forEach((row, idx) => {
+    const tr = document.createElement('tr');
+    tr.className = "hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition group";
+    tr.innerHTML = `
+      <td class="py-1 px-1.5 text-center text-slate-400 font-mono text-[11px] font-medium">${idx + 1}</td>
+      <td class="py-1 px-1.5">
+        <input type="text" data-field="name" data-index="${idx}" value="${escapeHtml(row.name)}" placeholder="e.g. PAVAN SINGH" class="w-full px-2 py-1 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/60 text-slate-800 dark:text-slate-200 focus:border-amber-500 focus:bg-white dark:focus:bg-slate-900 outline-none text-[11px] transition">
+      </td>
+      <td class="py-1 px-1.5">
+        <input type="text" data-field="co" data-index="${idx}" value="${escapeHtml(row.co)}" placeholder="e.g. ROTON SINGHA" class="w-full px-2 py-1 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/60 text-slate-800 dark:text-slate-200 focus:border-amber-500 focus:bg-white dark:focus:bg-slate-900 outline-none text-[11px] transition">
+      </td>
+      <td class="py-1 px-1.5">
+        <input type="text" data-field="address" data-index="${idx}" value="${escapeHtml(row.address)}" placeholder="e.g. UTTAR RAMPUR, BOROI" class="w-full px-2 py-1 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/60 text-slate-800 dark:text-slate-200 focus:border-amber-500 focus:bg-white dark:focus:bg-slate-900 outline-none text-[11px] transition">
+      </td>
+      <td class="py-1 px-1.5">
+        <input type="text" data-field="mobile" data-index="${idx}" value="${escapeHtml(row.mobile)}" placeholder="10 digits" maxlength="12" class="w-full px-2 py-1 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/60 text-slate-800 dark:text-slate-200 focus:border-amber-500 focus:bg-white dark:focus:bg-slate-900 outline-none text-[11px] font-mono transition">
+      </td>
+      <td class="py-1 px-1.5 text-center">
+        <button type="button" onclick="deleteManualFuzzyRow(${idx})" class="w-6 h-6 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center justify-center transition mx-auto" title="Delete row">
+          <i data-lucide="trash-2" class="w-3 h-3"></i>
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Attach input sync listeners & Enter / Ctrl+Enter support
+  tbody.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', (e) => {
+      const field = e.target.getAttribute('data-field');
+      const idx = parseInt(e.target.getAttribute('data-index'), 10);
+      if (manualFuzzyRows[idx]) {
+        manualFuzzyRows[idx][field] = e.target.value;
+      }
+    });
+
+    inp.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        runManualFuzzyLookup();
+      }
+    });
+  });
+
+  lucide.createIcons();
+}
+
+function addManualFuzzyRow() {
+  syncCurrentInputValues();
+  manualFuzzyRows.push({ name: "", co: "", address: "", mobile: "" });
+  renderManualFuzzyTable();
+  const tbody = document.getElementById('manualFuzzyTableBody');
+  const inputs = tbody?.querySelectorAll(`input[data-index="${manualFuzzyRows.length - 1}"][data-field="name"]`);
+  if (inputs && inputs[0]) inputs[0].focus();
+}
+
+function deleteManualFuzzyRow(idx) {
+  syncCurrentInputValues();
+  if (manualFuzzyRows.length <= 1) {
+    manualFuzzyRows = [{ name: "", co: "", address: "", mobile: "" }];
+  } else {
+    manualFuzzyRows.splice(idx, 1);
+  }
+  renderManualFuzzyTable();
+}
+
+function clearManualFuzzyRows() {
+  manualFuzzyRows = [
+    { name: "", co: "", address: "", mobile: "" },
+    { name: "", co: "", address: "", mobile: "" }
+  ];
+  renderManualFuzzyTable();
+  const resBox = document.getElementById('fuzzyManualResultsBox');
+  if (resBox) resBox.classList.add('hidden');
+}
+
+function parseAndApplyFuzzyText(text) {
+  if (!text || !text.trim()) return false;
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  if (!lines.length) return false;
+
+  const parsedRows = [];
+  lines.forEach((line) => {
+    let cells = line.split('\t').map(c => c.trim());
+    if (cells.length === 1 && line.includes(',')) {
+      cells = line.split(',').map(c => c.trim());
+    }
+    const first = (cells[0] || "").toLowerCase();
+    if (first === 'name' || first === 'consumer name' || first === '#' || first === 'consumer id') {
+      return;
+    }
+    parsedRows.push({
+      name: cells[0] || "",
+      co: cells[1] || "",
+      address: cells[2] || "",
+      mobile: cells[3] || ""
+    });
+  });
+
+  if (parsedRows.length > 0) {
+    manualFuzzyRows = parsedRows;
+    renderManualFuzzyTable();
+    updateStatusBar(`Pasted ${parsedRows.length} row(s) from clipboard`, "normal");
+    return true;
+  }
+  return false;
+}
+
+async function pasteFuzzyClipboard() {
+  let clipboardText = "";
+
+  // 1. Try Python RPC bridge first (works 100% reliably in PyWebView Windows without permission prompts)
+  try {
+    const bridgeRes = await callAPI('get_system_clipboard');
+    if (bridgeRes && bridgeRes.success && bridgeRes.text) {
+      clipboardText = bridgeRes.text;
+    }
+  } catch (e) {
+    console.warn("Backend clipboard call failed:", e);
+  }
+
+  // 2. Try Web Navigator Clipboard API as secondary
+  if (!clipboardText && navigator.clipboard && navigator.clipboard.readText) {
+    try {
+      clipboardText = await navigator.clipboard.readText();
+    } catch (e) {
+      console.warn("Navigator clipboard read failed:", e);
+    }
+  }
+
+  // If text successfully retrieved, parse directly
+  if (clipboardText && clipboardText.trim()) {
+    const ok = parseAndApplyFuzzyText(clipboardText);
+    if (ok) return;
+  }
+
+  // 3. Prompt modal fallback (foolproof fallback if OS clipboard is empty or blocked)
+  showFuzzyPasteModal();
+}
+
+function showFuzzyPasteModal() {
+  const modal = document.getElementById('fuzzyPasteModal');
+  const area = document.getElementById('fuzzyPasteArea');
+  if (modal && area) {
+    area.value = '';
+    modal.classList.remove('hidden');
+    setTimeout(() => area.focus(), 50);
+  }
+}
+
+function closeFuzzyPasteModal() {
+  const modal = document.getElementById('fuzzyPasteModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function handleFuzzyModalPasteSubmit() {
+  const area = document.getElementById('fuzzyPasteArea');
+  if (area && area.value.trim()) {
+    parseAndApplyFuzzyText(area.value);
+    closeFuzzyPasteModal();
+  } else {
+    alert("Please paste data into the box first.");
+  }
+}
+
+async function runManualFuzzyLookup() {
+  syncCurrentInputValues();
+
+  // Validate that there is at least one row with a name or address
+  const validRows = manualFuzzyRows.filter(r => (r.name && r.name.trim()) || (r.address && r.address.trim()));
+  if (validRows.length === 0) {
+    alert("Please enter at least one Consumer Name or Address to perform a lookup.");
+    return;
+  }
+
+  const threshold = parseFloat(document.getElementById('fuzzyThreshold')?.value || '0.85');
+  const topN = parseInt(document.getElementById('fuzzyTopN')?.value || '5', 10);
+
+  const btn = document.getElementById('btnRunManualFuzzy');
+  const speedEl = document.getElementById('fuzzyResultsSpeed');
+  const resultsBox = document.getElementById('fuzzyManualResultsBox');
+  const badgeCount = document.getElementById('fuzzyResultsBadgeCount');
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Searching...</span>`;
+    lucide.createIcons();
+  }
+
+  const t0 = performance.now();
+  const res = await callAPI('lookup_fuzzy_rows', validRows, threshold, topN);
+  const elapsedMs = Math.round(performance.now() - t0);
+
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = `<i data-lucide="search" class="w-3.5 h-3.5"></i><span>Find Matches</span>`;
+    lucide.createIcons();
+  }
+
+  if (!res || !res.success) {
+    alert("Fuzzy Lookup failed: " + (res ? res.error : "Unknown error"));
+    return;
+  }
+
+  if (speedEl) speedEl.innerText = `${elapsedMs} ms`;
+  if (resultsBox) resultsBox.classList.remove('hidden');
+
+  let totalFound = 0;
+  res.results.forEach(r => {
+    totalFound += (r.candidates ? r.candidates.length : 0);
+  });
+
+  if (badgeCount) {
+    badgeCount.innerText = `${totalFound} candidate(s) found across ${res.results.length} query row(s)`;
+  }
+
+  renderManualFuzzyResults(res.results);
+}
+
+function renderManualFuzzyResults(queryResults) {
+  const container = document.getElementById('fuzzyResultsList');
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (!queryResults || queryResults.length === 0) {
+    container.innerHTML = `
+      <div class="p-5 text-center text-slate-500 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+        <i data-lucide="search-x" class="w-6 h-6 mx-auto mb-1.5 text-slate-400"></i>
+        <p class="text-xs font-semibold">No matches found for the entered query.</p>
+        <p class="text-[10px] text-slate-400">Try reducing the similarity threshold or checking name/C/O spelling.</p>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+
+  queryResults.forEach((qItem, qIdx) => {
+    const inp = qItem.input;
+    const candidates = qItem.candidates || [];
+
+    const card = document.createElement('div');
+    card.className = "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-xs space-y-2.5";
+
+    // Query Header
+    const inpSummary = [
+      inp.name ? `<strong class="text-slate-800 dark:text-slate-200 font-bold">${escapeHtml(inp.name)}</strong>` : null,
+      inp.co ? `<span class="text-slate-500 font-medium">C/O ${escapeHtml(inp.co)}</span>` : null,
+      inp.address ? `<span class="text-slate-600 dark:text-slate-400">${escapeHtml(inp.address)}</span>` : null,
+      inp.mobile ? `<span class="font-mono text-sky-600 dark:text-sky-400">📱 ${escapeHtml(inp.mobile)}</span>` : null,
+    ].filter(Boolean).join(' • ');
+
+    card.innerHTML = `
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-2 border-b border-slate-100 dark:border-slate-800">
+        <div class="flex items-center gap-2">
+          <span class="w-4 h-4 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-[10px]">
+            ${qIdx + 1}
+          </span>
+          <div class="text-[11px]">
+            <span class="text-slate-400 font-medium mr-1">Query:</span>
+            ${inpSummary || '<span class="text-slate-400 italic">Empty Query</span>'}
+          </div>
+        </div>
+        <div class="text-[11px]">
+          ${candidates.length > 0
+            ? `<span class="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-bold text-[10px]">${candidates.length} Ranked Match${candidates.length > 1 ? 'es' : ''}</span>`
+            : `<span class="px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400 font-semibold text-[10px]">No Matches Above Threshold</span>`
+          }
+        </div>
+      </div>
+    `;
+
+    if (candidates.length === 0) {
+      const emptyDiv = document.createElement('div');
+      emptyDiv.className = "py-3 text-center text-[11px] text-slate-400 italic";
+      emptyDiv.innerText = "No candidates matched identity and address criteria. Try lowering the threshold.";
+      card.appendChild(emptyDiv);
+    } else {
+      const tableWrapper = document.createElement('div');
+      tableWrapper.className = "overflow-x-auto rounded-lg border border-slate-100 dark:border-slate-800/80";
+
+      let rowsHtml = '';
+      candidates.forEach((cand, cIdx) => {
+        // Badge color based on final score
+        let badgeColor = "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+        if (cand.final_score >= 90) {
+          badgeColor = "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/60";
+        } else if (cand.final_score >= 75) {
+          badgeColor = "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-300 dark:border-amber-800/60";
+        }
+
+        // Relation badge: SELF vs RELATIVE
+        const isRelative = cand.relation === 'RELATIVE';
+        const relationBadge = isRelative
+          ? `<span class="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60">RELATIVE</span>`
+          : `<span class="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60">SELF</span>`;
+
+        rowsHtml += `
+          <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
+            <td class="py-1.5 px-2 text-center font-mono font-bold text-slate-400 text-[10px]">#${cIdx + 1}</td>
+            <td class="py-1.5 px-2 whitespace-nowrap">
+              <span class="px-2 py-0.5 rounded-md font-mono font-bold text-[10.5px] ${badgeColor}">
+                ${cand.final_score.toFixed(1)}%
+              </span>
+              <span class="block text-[9.5px] text-slate-400 font-medium mt-0.5">${cand.match_type}</span>
+            </td>
+            <td class="py-1.5 px-2 text-center whitespace-nowrap">
+              ${relationBadge}
+            </td>
+            <td class="py-1.5 px-2">
+              <span class="font-mono font-semibold text-sky-600 dark:text-sky-400 text-[11px]">${cand.consumer_id}</span>
+            </td>
+            <td class="py-1.5 px-2 min-w-[130px]">
+              <div class="font-bold text-slate-900 dark:text-slate-100 text-[11px]">${escapeHtml(cand.name)}</div>
+              <div class="text-[9.5px] text-slate-400">Identity: ${cand.identity_score.toFixed(0)}% (Name: ${cand.name_score.toFixed(0)}%, C/O: ${cand.co_score.toFixed(0)}%)</div>
+            </td>
+            <td class="py-1.5 px-2 min-w-[150px]">
+              <div class="text-slate-700 dark:text-slate-300 text-[11px] leading-snug">${escapeHtml(cand.address)}</div>
+              <div class="text-[9.5px] text-slate-400">Address Match: ${cand.address_score.toFixed(0)}%</div>
+            </td>
+            <td class="py-1.5 px-2 whitespace-nowrap font-mono text-[10.5px] text-slate-600 dark:text-slate-400">
+              ${cand.mobile_number ? (cand.mobile_score === 100 ? `<span class="text-emerald-600 dark:text-emerald-400 font-bold">✓ ${cand.mobile_number}</span>` : cand.mobile_number) : '-'}
+            </td>
+            <!-- Live OSD Column -->
+            <td class="py-1.5 px-2 text-center whitespace-nowrap" id="candOsdCell_${qIdx}_${cIdx}">
+              <button onclick="fetchCandidateLiveOsd('${cand.consumer_id}', ${qIdx}, ${cIdx})" class="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-[10px] font-bold transition flex items-center gap-1 shadow-xs mx-auto">
+                <i data-lucide="zap" class="w-3 h-3 text-amber-500"></i>
+                <span>Check OSD</span>
+              </button>
+            </td>
+            <td class="py-1.5 px-2 text-center whitespace-nowrap">
+              <button onclick="searchConsumerAndOpenViewer('${cand.consumer_id}')" class="px-2 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/50 hover:bg-sky-100 dark:hover:bg-sky-900/60 border border-sky-200 dark:border-sky-800 text-sky-600 dark:text-sky-400 text-[10.5px] font-semibold transition flex items-center gap-1 shadow-xs mx-auto">
+                <i data-lucide="image" class="w-3 h-3"></i>
+                <span>View Photos</span>
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+
+      tableWrapper.innerHTML = `
+        <table class="w-full text-left text-[11px] border-collapse">
+          <thead class="bg-slate-50/80 dark:bg-slate-950/50 text-slate-500 uppercase font-semibold text-[9px] tracking-wider border-b border-slate-100 dark:border-slate-800">
+            <tr>
+              <th class="py-1.5 px-2 w-8 text-center">Rank</th>
+              <th class="py-1.5 px-2 w-20">Match Score</th>
+              <th class="py-1.5 px-2 w-16 text-center">Relation</th>
+              <th class="py-1.5 px-2 w-24">Consumer ID</th>
+              <th class="py-1.5 px-2">Database Name</th>
+              <th class="py-1.5 px-2">Database Address</th>
+              <th class="py-1.5 px-2 w-24">Mobile</th>
+              <th class="py-1.5 px-2 w-28 text-center">Live OSD</th>
+              <th class="py-1.5 px-2 w-20 text-center">Viewer</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 dark:divide-slate-800/50">
+            ${rowsHtml}
+          </tbody>
+        </table>
+      `;
+      card.appendChild(tableWrapper);
+    }
+
+    container.appendChild(card);
+  });
+
+  lucide.createIcons();
+}
+
+async function fetchCandidateLiveOsd(consumerId, qIdx, cIdx) {
+  const cell = document.getElementById(`candOsdCell_${qIdx}_${cIdx}`);
+  if (!cell) return;
+
+  const cid = String(consumerId || '').trim();
+  if (!/^\d{9}$/.test(cid)) {
+    cell.innerHTML = `<span class="text-[10px] text-slate-400 italic">Invalid CID</span>`;
+    return;
+  }
+
+  cell.innerHTML = `
+    <div class="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+      <i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i>
+      <span>Checking...</span>
+    </div>
+  `;
+  lucide.createIcons();
+
+  try {
+    const res = await callAPI('get_live_osd', cid);
+    if (!res || !res.success || !res.data) {
+      cell.innerHTML = `
+        <button onclick="fetchCandidateLiveOsd('${cid}', ${qIdx}, ${cIdx})" class="px-1.5 py-0.5 rounded text-[9.5px] font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition" title="${escapeHtml(res ? res.error : 'Retry')}">
+          Failed ↻
+        </button>
+      `;
+      return;
+    }
+
+    const d = res.data;
+    let statusClass = "text-slate-500";
+    if (d.isLive) statusClass = "text-emerald-600 dark:text-emerald-400 font-bold";
+    else if (d.isDeemed) statusClass = "text-amber-600 dark:text-amber-400 font-bold";
+    else if (d.isDisconnected) statusClass = "text-rose-600 dark:text-rose-400 font-bold";
+
+    const totalFmt = Number(d.totalDues || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const duesClass = (d.totalDues > 0) ? "text-amber-600 dark:text-amber-400 font-bold" : "text-emerald-600 dark:text-emerald-400 font-medium";
+
+    cell.innerHTML = `
+      <div class="text-left py-0.5 leading-tight">
+        <div class="font-mono text-[10.5px] ${duesClass}">\u20B9 ${totalFmt}</div>
+        <div class="text-[9px] ${statusClass} flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full ${d.isLive ? 'bg-emerald-500' : (d.isDeemed ? 'bg-amber-500' : 'bg-rose-500')}"></span>
+          <span>${escapeHtml(d.connectionStatus || 'LIVE')}</span>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    cell.innerHTML = `
+      <button onclick="fetchCandidateLiveOsd('${cid}', ${qIdx}, ${cIdx})" class="px-1.5 py-0.5 rounded text-[9.5px] font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition">
+        Retry ↻
+      </button>
+    `;
+  }
+}
+
+async function searchConsumerAndOpenViewer(consumerId) {
+  if (!consumerId) return;
+  // Switch to Viewer tab
+  switchTab('viewer');
+  // Set search bar input
+  const searchInput = document.getElementById('searchBar');
+  if (searchInput) {
+    searchInput.value = consumerId;
+  }
+  // Trigger search
+  await handleSearch();
+}
+
+window.switchFuzzyMode = switchFuzzyMode;
+window.addManualFuzzyRow = addManualFuzzyRow;
+window.deleteManualFuzzyRow = deleteManualFuzzyRow;
+window.clearManualFuzzyRows = clearManualFuzzyRows;
+window.pasteFuzzyClipboard = pasteFuzzyClipboard;
+window.runManualFuzzyLookup = runManualFuzzyLookup;
+window.searchConsumerAndOpenViewer = searchConsumerAndOpenViewer;
+window.fetchCandidateLiveOsd = fetchCandidateLiveOsd;
+
 async function generateFuzzyTemplate() {
   const res = await callAPI('generate_fuzzy_template');
   if (res && res.success) {
@@ -1790,6 +2594,7 @@ let fuzzyPollTimer = null;
 async function runFuzzyLookup() {
   const threshold = parseFloat(document.getElementById('fuzzyThreshold')?.value || 0.85);
   const topN = parseInt(document.getElementById('fuzzyTopN')?.value || 5);
+  const includeOsd = Boolean(document.getElementById('fuzzyIncludeOsd')?.checked);
 
   const statusBox = document.getElementById('fuzzyStatusBox');
   const statusText = document.getElementById('fuzzyStatusText');
@@ -1803,7 +2608,7 @@ async function runFuzzyLookup() {
   if (runBtn) runBtn.disabled = true;
   if (statusText) statusText.innerText = "Selecting input file...";
 
-  const res = await callAPI('run_fuzzy_lookup', '', '', threshold, topN);
+  const res = await callAPI('run_fuzzy_lookup', '', '', threshold, topN, includeOsd);
   if (!res || !res.success) {
     if (runBtn) runBtn.disabled = false;
     if (res && res.cancelled) {
@@ -1850,6 +2655,593 @@ async function runFuzzyLookup() {
     }
   }, 400);
 }
+
+// --- Low Consumption Audit Studio Logic ---
+let auditData = [];
+let auditFilteredIndices = [];
+let auditCurrentId = null;
+let auditFilterStatusMode = 'ALL'; // 'ALL' | 'PENDING' | 'OK' | 'CHECK'
+let auditActiveImages = [];
+let auditLightboxCurrentIndex = 0;
+let auditLightboxZoom = 1.0;
+
+function setAuditFilterStatus(mode) {
+  auditFilterStatusMode = mode;
+  ['All', 'Pending', 'Ok', 'Check'].forEach(k => {
+    const btn = document.getElementById(`auditFilter${k}`);
+    if (btn) {
+      const isSelected = k.toUpperCase() === mode;
+      btn.className = `flex-1 py-1 rounded-lg text-center transition ${
+        isSelected
+          ? 'font-bold bg-slate-200 dark:bg-white/[0.12] text-slate-900 dark:text-white shadow-xs'
+          : 'font-medium text-slate-500 hover:bg-slate-100 dark:hover:bg-white/[0.05]'
+      }`;
+    }
+  });
+  filterAuditQueue();
+}
+
+function setAuditRemarkTag(tag) {
+  const input = document.getElementById('auditRemarksInput');
+  if (!input) return;
+  if (!input.value.trim()) {
+    input.value = tag;
+  } else if (!input.value.includes(tag)) {
+    input.value = `${input.value.trim()}, ${tag}`;
+  }
+  input.focus();
+}
+
+function updateDecisionStyles() {
+  // Pure UI update, lucide refreshing if needed
+  lucide.createIcons();
+}
+
+function toggleAuditPasteModal(show = true) {
+  const modal = document.getElementById('auditPasteModal');
+  if (!modal) return;
+  if (show) {
+    modal.classList.remove('hidden');
+    const textarea = document.getElementById('auditPasteTextarea');
+    if (textarea) setTimeout(() => textarea.focus(), 100);
+  } else {
+    modal.classList.add('hidden');
+  }
+  lucide.createIcons();
+}
+
+function toggleAuditGuideModal(show = true) {
+  const modal = document.getElementById('auditGuideModal');
+  if (!modal) return;
+  if (show) {
+    modal.classList.remove('hidden');
+  } else {
+    modal.classList.add('hidden');
+  }
+  lucide.createIcons();
+}
+
+async function pasteAuditFromSystemClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    const textarea = document.getElementById('auditPasteTextarea');
+    if (textarea) {
+      textarea.value = text;
+      textarea.focus();
+    }
+  } catch (err) {
+    alert("Clipboard read permission was blocked. Please press Ctrl+V directly into the text box.");
+  }
+}
+
+async function importAuditPastedText() {
+  const textarea = document.getElementById('auditPasteTextarea');
+  if (!textarea) return;
+  const raw = textarea.value.trim();
+  if (!raw) {
+    alert("Please paste consumer data before clicking Import.");
+    return;
+  }
+
+  const lines = raw.split(/\r?\n/);
+  const newItems = [];
+  let rowId = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    let parts = [];
+    if (line.includes('\t')) {
+      parts = line.split('\t');
+    } else if (line.includes('|')) {
+      parts = line.split('|');
+    } else if (line.includes(',')) {
+      parts = line.split(',');
+    } else {
+      parts = line.split(/\s+/);
+    }
+
+    parts = parts.map(p => p.trim()).filter(p => p !== '');
+    if (parts.length === 0) continue;
+
+    const cid = parts[0];
+    if (i === 0 && (cid.toLowerCase().includes('cid') || cid.toLowerCase().includes('consumer'))) {
+      continue;
+    }
+    if (cid.toLowerCase() === 'none' || cid.toLowerCase() === 'nan') continue;
+
+    const meter = parts.length > 1 ? parts[1] : '';
+    const unit = parts.length > 2 ? parts[2] : '0';
+
+    newItems.push({
+      id: rowId++,
+      cid: cid,
+      meter: meter,
+      unit: unit,
+      status: 'PENDING',
+      remarks: ''
+    });
+  }
+
+  if (newItems.length === 0) {
+    alert("No valid consumer rows detected. Format should be: ConsumerID  [MeterNo]  [BilledUnits]");
+    return;
+  }
+
+  auditData = newItems;
+  await callAPI('save_low_consumption_session', auditData);
+  toggleAuditPasteModal(false);
+  textarea.value = '';
+
+  filterAuditQueue();
+  updateStatusBar(`Loaded ${auditData.length} records into audit queue.`, "normal");
+
+  if (auditData.length > 0) {
+    selectAuditItem(auditData[0].id);
+  }
+}
+
+async function triggerLoadAuditExcel() {
+  const picked = await callAPI('pick_file', "Select Low Consumption Excel", [["Excel Files", "*.xlsx;*.xls"], ["All Files", "*.*"]]);
+  if (picked && typeof picked === 'string' && picked.trim() !== '') {
+    updateStatusBar("Reading Excel records...", "loading");
+    const res = await callAPI('parse_low_consumption_file', picked);
+    if (res && res.success) {
+      auditData = res.data || [];
+      filterAuditQueue();
+      updateStatusBar(`Loaded ${auditData.length} records from Excel.`, "normal");
+      if (auditData.length > 0) {
+        selectAuditItem(auditData[0].id);
+      }
+      return;
+    } else if (res && res.error) {
+      alert("Error parsing Excel file: " + res.error);
+      updateStatusBar("Excel load failed.", "error");
+      return;
+    }
+  }
+
+  const fileInput = document.getElementById('auditFileInput');
+  if (fileInput) fileInput.click();
+}
+
+async function handleAuditFileSelected(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (file.path) {
+    const res = await callAPI('parse_low_consumption_file', file.path);
+    if (res && res.success) {
+      auditData = res.data || [];
+      filterAuditQueue();
+      if (auditData.length > 0) selectAuditItem(auditData[0].id);
+      event.target.value = '';
+      return;
+    }
+  }
+
+  alert("To load Excel on this platform, please use 'Paste Clipboard' (copy cells from Excel and paste), or select the file via the system dialog.");
+  event.target.value = '';
+}
+
+async function loadAuditSession() {
+  const res = await callAPI('get_low_consumption_session');
+  if (res && res.success && res.data && res.data.length > 0) {
+    auditData = res.data;
+    filterAuditQueue();
+    const firstPending = auditData.find(item => item.status === 'PENDING') || auditData[0];
+    if (firstPending) {
+      selectAuditItem(firstPending.id);
+    }
+  }
+}
+
+function filterAuditQueue() {
+  const query = (document.getElementById('auditSearchInput')?.value || '').toLowerCase().trim();
+  const queueEl = document.getElementById('auditQueueList');
+  const countBadge = document.getElementById('auditCountBadge');
+  const verifiedEl = document.getElementById('auditVerifiedCount');
+  const pendingEl = document.getElementById('auditPendingCount');
+
+  if (!queueEl) return;
+
+  const verifiedCount = auditData.filter(x => x.status === 'OK' || x.status === 'CHECK').length;
+  const pendingCount = auditData.filter(x => x.status === 'PENDING').length;
+
+  if (countBadge) countBadge.innerText = `${auditData.length} records (${verifiedCount} verified)`;
+  if (verifiedEl) verifiedEl.innerHTML = `<i data-lucide="check-circle" class="w-3.5 h-3.5"></i> Verified: ${verifiedCount}`;
+  if (pendingEl) pendingEl.innerHTML = `<i data-lucide="clock" class="w-3.5 h-3.5"></i> Pending: ${pendingCount}`;
+
+  if (auditData.length === 0) {
+    queueEl.innerHTML = `
+      <div class="p-8 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
+        <i data-lucide="file-spreadsheet" class="w-8 h-8 opacity-40"></i>
+        <span>No records loaded yet. Click <b>Load Excel</b> or <b>Paste Clipboard</b> to begin.</span>
+      </div>
+    `;
+    auditFilteredIndices = [];
+    lucide.createIcons();
+    return;
+  }
+
+  auditFilteredIndices = [];
+  queueEl.innerHTML = '';
+
+  auditData.forEach(item => {
+    // Status filter
+    if (auditFilterStatusMode !== 'ALL') {
+      if (auditFilterStatusMode === 'PENDING' && item.status !== 'PENDING') return;
+      if (auditFilterStatusMode === 'OK' && item.status !== 'OK') return;
+      if (auditFilterStatusMode === 'CHECK' && item.status !== 'CHECK') return;
+    }
+
+    // Search query filter
+    const match = !query || item.cid.toLowerCase().includes(query) || (item.meter && item.meter.toLowerCase().includes(query));
+    if (!match) return;
+
+    auditFilteredIndices.push(item.id);
+    const row = document.createElement('div');
+    const isSelected = item.id === auditCurrentId;
+
+    let statusBadge = `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-100 dark:bg-white/[0.06] text-slate-400 text-[10px]" title="Pending Inspection"><i data-lucide="clock" class="w-3 h-3"></i></span>`;
+    if (item.status === 'OK') {
+      statusBadge = `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-black text-xs" title="OK / Normal"><i data-lucide="check" class="w-3.5 h-3.5"></i></span>`;
+    } else if (item.status === 'CHECK') {
+      statusBadge = `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-rose-500/20 text-rose-600 dark:text-rose-400 font-black text-xs" title="Suspicious / CHECK"><i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i></span>`;
+    }
+
+    row.className = `grid grid-cols-12 px-3 py-2.5 cursor-pointer transition-all items-center text-xs select-none ${
+      isSelected
+        ? 'bg-sky-500/10 dark:bg-sky-500/15 border-l-3 border-sky-500 font-bold text-sky-600 dark:text-sky-400'
+        : 'hover:bg-slate-100/60 dark:hover:bg-white/[0.04] text-slate-700 dark:text-slate-300'
+    }`;
+
+    row.id = `audit-row-${item.id}`;
+    row.innerHTML = `
+      <div class="col-span-2 flex justify-center">${statusBadge}</div>
+      <div class="col-span-4 font-mono truncate font-bold">${item.cid}</div>
+      <div class="col-span-4 font-mono text-slate-400 truncate text-[11px]">${item.meter || '-'}</div>
+      <div class="col-span-2 font-mono font-bold text-right text-rose-600 dark:text-rose-400">${item.unit || '0'}</div>
+    `;
+
+    row.onclick = () => selectAuditItem(item.id);
+    queueEl.appendChild(row);
+  });
+
+  lucide.createIcons();
+}
+
+async function selectAuditItem(id) {
+  auditCurrentId = id;
+  const item = auditData.find(x => x.id === id);
+  if (!item) return;
+
+  // Highlight active row in queue
+  document.querySelectorAll('#auditQueueList > div').forEach(r => {
+    const isThis = r.id === `audit-row-${id}`;
+    r.classList.toggle('bg-sky-500/10', isThis);
+    r.classList.toggle('dark:bg-sky-500/15', isThis);
+    r.classList.toggle('border-l-3', isThis);
+    r.classList.toggle('border-sky-500', isThis);
+    r.classList.toggle('font-bold', isThis);
+    r.classList.toggle('text-sky-600', isThis);
+    r.classList.toggle('dark:text-sky-400', isThis);
+  });
+
+  const activeRow = document.getElementById(`audit-row-${id}`);
+  if (activeRow) {
+    activeRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  // Update inspection banner
+  const cidEl = document.getElementById('auditActiveCid');
+  const meterEl = document.getElementById('auditActiveMeter');
+  const nameEl = document.getElementById('auditActiveName');
+  const unitsEl = document.getElementById('auditActiveUnits');
+  const remarksInput = document.getElementById('auditRemarksInput');
+  const photoCountEl = document.getElementById('auditActivePhotoCount');
+  const galleryCountEl = document.getElementById('auditGalleryCount');
+
+  if (cidEl) cidEl.innerText = item.cid;
+  if (meterEl) meterEl.innerText = `Meter: ${item.meter || '--'}`;
+  if (nameEl) nameEl.innerText = `Name: Loading...`;
+  if (unitsEl) unitsEl.innerText = item.unit || '0';
+  if (remarksInput) remarksInput.value = item.remarks || '';
+
+  // Decision radio
+  const currentStatus = item.status === 'CHECK' ? 'CHECK' : 'OK';
+  const radio = document.querySelector(`input[name="auditDecision"][value="${currentStatus}"]`);
+  if (radio) radio.checked = true;
+
+  // Load consumer profile details & images from database
+  const gallery = document.getElementById('auditGalleryGrid');
+  if (!gallery) return;
+
+  gallery.innerHTML = `
+    <div class="col-span-full py-20 flex flex-col items-center justify-center text-slate-400 gap-2">
+      <div class="w-7 h-7 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"></div>
+      <span class="text-xs font-medium">Scanning spot meter archives for CID ${item.cid}...</span>
+    </div>
+  `;
+
+  const res = await callAPI('get_consumer_images', item.cid);
+  auditActiveImages = (res && res.images) ? res.images : [];
+
+  if (nameEl) {
+    nameEl.innerText = (res && res.profile && res.profile.name) ? `Name: ${res.profile.name}` : `Name: --`;
+  }
+  if (photoCountEl) photoCountEl.innerText = `${auditActiveImages.length} Photos`;
+  if (galleryCountEl) galleryCountEl.innerText = `${auditActiveImages.length} images`;
+
+  if (!res || !res.success || !res.images || res.images.length === 0) {
+    gallery.innerHTML = `
+      <div class="col-span-full py-20 flex flex-col items-center justify-center text-slate-400 gap-2">
+        <div class="w-12 h-12 rounded-2xl bg-slate-200/50 dark:bg-white/[0.04] flex items-center justify-center text-slate-400">
+          <i data-lucide="image-off" class="w-6 h-6"></i>
+        </div>
+        <span class="text-xs font-bold text-slate-600 dark:text-slate-300">No Spot Meter Images Cataloged</span>
+        <span class="text-[11px] text-slate-400">No photos matching Consumer ID ${item.cid} were found in active image folders.</span>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+
+  gallery.innerHTML = '';
+  res.images.forEach((img, idx) => {
+    const card = document.createElement('div');
+    card.className = "group relative rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1f1f1f] p-1.5 hover:border-sky-500 hover:shadow-md transition flex flex-col items-center cursor-pointer";
+    card.innerHTML = `
+      <div class="w-full aspect-[4/3] bg-slate-100 dark:bg-black/50 rounded overflow-hidden flex items-center justify-center mb-1.5 relative">
+        <div id="audit-img-loader-${idx}" class="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"></div>
+        <img id="audit-img-${idx}" class="w-full h-full object-cover hidden group-hover:scale-105 transition-transform duration-200" />
+        <span class="absolute top-1 left-1 px-1.5 py-0.2 rounded bg-black/75 text-[9px] font-mono text-white font-bold leading-tight">#${idx + 1}</span>
+        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+          <span class="px-2 py-0.5 rounded bg-black/80 text-[10px] font-semibold text-white flex items-center gap-1">
+            <i data-lucide="maximize-2" class="w-2.5 h-2.5 text-sky-400"></i> View
+          </span>
+        </div>
+      </div>
+      <div class="w-full flex items-center justify-between text-[10.5px] px-1 font-mono">
+        <span class="font-bold text-slate-800 dark:text-slate-200">${img.date_formatted}</span>
+        <span class="text-[9.5px] text-slate-400 truncate max-w-[85px]">${img.filename}</span>
+      </div>
+    `;
+
+    card.onclick = () => openAuditImageLightbox(idx);
+    gallery.appendChild(card);
+
+    (async () => {
+      const thumb = await callAPI('get_image_data', img.full_path, 400);
+      const loader = document.getElementById(`audit-img-loader-${idx}`);
+      const imgEl = document.getElementById(`audit-img-${idx}`);
+      if (loader) loader.classList.add('hidden');
+      if (imgEl && thumb && thumb.success) {
+        imgEl.src = thumb.data;
+        imgEl.classList.remove('hidden');
+      }
+    })();
+  });
+
+  lucide.createIcons();
+}
+
+function copyAuditConsumerCid() {
+  const item = auditData.find(x => x.id === auditCurrentId);
+  if (!item) return;
+  navigator.clipboard.writeText(item.cid);
+  updateStatusBar(`Copied Consumer ID: ${item.cid}`, "normal");
+}
+
+function jumpActiveAuditToViewer() {
+  const item = auditData.find(x => x.id === auditCurrentId);
+  if (!item) return;
+  document.getElementById('searchInput').value = item.cid;
+  switchTab('viewer');
+  executeSearch();
+}
+
+// Lightbox modal functionality
+function openAuditImageLightbox(idx) {
+  if (!auditActiveImages || idx < 0 || idx >= auditActiveImages.length) return;
+  auditLightboxCurrentIndex = idx;
+  auditLightboxZoom = 1.0;
+
+  const modal = document.getElementById('auditImageLightboxModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+
+  renderAuditLightboxImage();
+  lucide.createIcons();
+}
+
+function closeAuditImageLightbox() {
+  const modal = document.getElementById('auditImageLightboxModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function renderAuditLightboxImage() {
+  const img = auditActiveImages[auditLightboxCurrentIndex];
+  if (!img) return;
+
+  const dateEl = document.getElementById('auditLightboxDate');
+  const fileEl = document.getElementById('auditLightboxFilename');
+  const imgEl = document.getElementById('auditLightboxImg');
+  const loader = document.getElementById('auditLightboxLoader');
+  const zoomLevelEl = document.getElementById('auditLightboxZoomLevel');
+
+  if (dateEl) dateEl.innerText = `${img.date_formatted} (${auditLightboxCurrentIndex + 1} of ${auditActiveImages.length})`;
+  if (fileEl) fileEl.innerText = img.filename;
+  if (zoomLevelEl) zoomLevelEl.innerText = `${Math.round(auditLightboxZoom * 100)}%`;
+
+  if (loader) loader.classList.remove('hidden');
+  if (imgEl) {
+    imgEl.classList.add('hidden');
+    imgEl.style.transform = `scale(${auditLightboxZoom})`;
+  }
+
+  const res = await callAPI('get_image_data', img.full_path, 1400);
+  if (loader) loader.classList.add('hidden');
+  if (imgEl && res && res.success) {
+    imgEl.src = res.data;
+    imgEl.classList.remove('hidden');
+  }
+}
+
+function zoomAuditLightbox(delta) {
+  auditLightboxZoom = Math.max(0.5, Math.min(3.0, auditLightboxZoom + delta));
+  const zoomLevelEl = document.getElementById('auditLightboxZoomLevel');
+  const imgEl = document.getElementById('auditLightboxImg');
+  if (zoomLevelEl) zoomLevelEl.innerText = `${Math.round(auditLightboxZoom * 100)}%`;
+  if (imgEl) imgEl.style.transform = `scale(${auditLightboxZoom})`;
+}
+
+function resetAuditLightboxZoom() {
+  auditLightboxZoom = 1.0;
+  const zoomLevelEl = document.getElementById('auditLightboxZoomLevel');
+  const imgEl = document.getElementById('auditLightboxImg');
+  if (zoomLevelEl) zoomLevelEl.innerText = '100%';
+  if (imgEl) imgEl.style.transform = 'scale(1.0)';
+}
+
+function stepAuditLightboxImage(step) {
+  if (!auditActiveImages || auditActiveImages.length === 0) return;
+  auditLightboxCurrentIndex = (auditLightboxCurrentIndex + step + auditActiveImages.length) % auditActiveImages.length;
+  auditLightboxZoom = 1.0;
+  renderAuditLightboxImage();
+}
+
+async function saveAuditDecisionAndNext() {
+  if (auditCurrentId === null) return;
+  const item = auditData.find(x => x.id === auditCurrentId);
+  if (!item) return;
+
+  const decision = document.querySelector('input[name="auditDecision"]:checked')?.value || 'OK';
+  const remarks = document.getElementById('auditRemarksInput')?.value || '';
+
+  item.status = decision;
+  item.remarks = remarks;
+
+  await callAPI('save_low_consumption_session', auditData);
+  filterAuditQueue();
+
+  advanceAuditQueue(1);
+}
+
+function skipAuditItem() {
+  advanceAuditQueue(1);
+}
+
+function advanceAuditQueue(delta = 1) {
+  if (auditFilteredIndices.length === 0) return;
+  const currPos = auditFilteredIndices.indexOf(auditCurrentId);
+  let nextPos = currPos + delta;
+  if (nextPos >= auditFilteredIndices.length) {
+    nextPos = 0;
+  } else if (nextPos < 0) {
+    nextPos = auditFilteredIndices.length - 1;
+  }
+  selectAuditItem(auditFilteredIndices[nextPos]);
+}
+
+async function exportAuditReport() {
+  if (auditData.length === 0) {
+    alert("No audit records to export. Please load an Excel or paste data first.");
+    return;
+  }
+
+  updateStatusBar("Exporting Low Consumption Audit CSV...", "loading");
+  const res = await callAPI('export_low_consumption_report', auditData);
+  if (res && res.success) {
+    updateStatusBar(`Report exported: ${res.count} records.`, "normal");
+    alert(`Audit report exported successfully!\n\nLocation:\n${res.file_path}`);
+  } else {
+    updateStatusBar("Export failed.", "error");
+    alert("Failed to export report: " + (res ? res.error : "Unknown error"));
+  }
+}
+
+// Global hotkeys for Audit Studio
+document.addEventListener('keydown', (e) => {
+  const auditTab = document.getElementById('tab-audit');
+  if (!auditTab || auditTab.classList.contains('hidden')) return;
+
+  // Lightbox keyboard navigation
+  const lightbox = document.getElementById('auditImageLightboxModal');
+  if (lightbox && !lightbox.classList.contains('hidden')) {
+    if (e.key === 'Escape') {
+      closeAuditImageLightbox();
+      return;
+    }
+    if (e.key === 'ArrowLeft') {
+      stepAuditLightboxImage(-1);
+      return;
+    }
+    if (e.key === 'ArrowRight') {
+      stepAuditLightboxImage(1);
+      return;
+    }
+  }
+
+  // Verification hotkeys
+  if (e.altKey && (e.key === 's' || e.key === 'S')) {
+    e.preventDefault();
+    saveAuditDecisionAndNext();
+  } else if (e.altKey && (e.key === 'n' || e.key === 'N')) {
+    e.preventDefault();
+    skipAuditItem();
+  } else if (e.key === 'ArrowDown' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+    e.preventDefault();
+    advanceAuditQueue(1);
+  } else if (e.key === 'ArrowUp' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+    e.preventDefault();
+    advanceAuditQueue(-1);
+  }
+});
+
+// Window-level exports for Low Consumption Audit
+window.toggleAuditPasteModal = toggleAuditPasteModal;
+window.toggleAuditGuideModal = toggleAuditGuideModal;
+window.pasteAuditFromSystemClipboard = pasteAuditFromSystemClipboard;
+window.importAuditPastedText = importAuditPastedText;
+window.triggerLoadAuditExcel = triggerLoadAuditExcel;
+window.handleAuditFileSelected = handleAuditFileSelected;
+window.filterAuditQueue = filterAuditQueue;
+window.selectAuditItem = selectAuditItem;
+window.saveAuditDecisionAndNext = saveAuditDecisionAndNext;
+window.skipAuditItem = skipAuditItem;
+window.exportAuditReport = exportAuditReport;
+window.setAuditFilterStatus = setAuditFilterStatus;
+window.setAuditRemarkTag = setAuditRemarkTag;
+window.copyAuditConsumerCid = copyAuditConsumerCid;
+window.jumpActiveAuditToViewer = jumpActiveAuditToViewer;
+window.openAuditImageLightbox = openAuditImageLightbox;
+window.closeAuditImageLightbox = closeAuditImageLightbox;
+window.zoomAuditLightbox = zoomAuditLightbox;
+window.resetAuditLightboxZoom = resetAuditLightboxZoom;
+window.stepAuditLightboxImage = stepAuditLightboxImage;
+window.updateDecisionStyles = updateDecisionStyles;
 
 // --- Status Bar Helpers ---
 function updateStatusBar(msg, type = "normal", progress = null) {
@@ -1900,3 +3292,4 @@ async function openAppWebsite() {
 
 window.updateStatusBar = updateStatusBar;
 window.openAppWebsite = openAppWebsite;
+

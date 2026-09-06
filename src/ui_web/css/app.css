@@ -406,6 +406,17 @@ html[data-theme="light"] #tab-viewer .absolute.top-4.left-4 button:hover {
   transform: rotate(180deg);
 }
 
+/* Position Live OSD HUD cleanly above the filmstrip dock with smooth transition */
+#liveOsdHud {
+  bottom: 86px;
+  transition: bottom 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#filmstripWrapper.collapsed-strip ~ #liveOsdHud,
+div:has(> #filmstripWrapper.collapsed-strip) #liveOsdHud {
+  bottom: 34px;
+}
+
 #filmstripContainer {
   height: 54px !important;
   min-height: 54px !important;
@@ -753,3 +764,42 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   backdrop-filter: blur(16px) saturate(1.25);
   -webkit-backdrop-filter: blur(16px) saturate(1.25);
 }
+
+/* ---------- LOW CONSUMPTION AUDIT STUDIO ENHANCEMENTS ---------- */
+#tab-audit {
+  animation: fadeInAudit 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeInAudit {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+#auditQueueList::-webkit-scrollbar {
+  width: 5px;
+}
+#auditQueueList::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 4px;
+}
+#auditQueueList::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
+}
+
+#auditGalleryGrid::-webkit-scrollbar {
+  width: 6px;
+}
+#auditGalleryGrid::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 4px;
+}
+
+#audit-row-active {
+  position: relative;
+}
+
+#auditImageLightboxModal {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+

@@ -2,7 +2,10 @@ import os
 import sys
 import tempfile
 import subprocess
-import database
+try:
+    from core import database
+except ImportError:
+    import database
 import json
 import urllib.request
 import threading

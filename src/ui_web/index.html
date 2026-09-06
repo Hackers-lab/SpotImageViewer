@@ -1,9 +1,16 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Spot Image Viewer & Verification Studio — v19.4</title>
+  <title>Spot Image Viewer & Verification Studio — v20.0</title>
+  <script>
+    // Restore theme BEFORE page renders to prevent flash
+    (function(){
+      var t = localStorage.getItem('siv_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -54,12 +61,17 @@
           type="text" 
           id="searchInput" 
           placeholder="Search Consumer ID, Meter, Name, or Mobile..." 
-          class="w-full pl-10 pr-16 py-1.5 bg-slate-100/70 dark:bg-[#121212] border border-slate-200 dark:border-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 transition-all shadow-inner"
-          onkeydown="if(event.key === 'Enter') handleSearch()"
+          class="w-full pl-10 pr-24 py-1.5 bg-slate-100/70 dark:bg-[#121212] border border-slate-200 dark:border-slate-800 rounded-md text-xs text-slate-900 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 transition-all shadow-inner"
+          onkeydown="if(event.key === 'Enter') handleSearch(); if(event.key === ' ' && this.value.trim() === '') { event.preventDefault(); showSearchHistoryDropdown(); }"
           onfocus="showSearchHistoryDropdown()"
+          onclick="showSearchHistoryDropdown()"
+          oninput="toggleSearchClearBtn()"
           autocomplete="off"
         />
         <div class="absolute inset-y-1 right-1 flex items-center gap-1">
+          <button id="btnSearchClear" onclick="clearSearchInput()" class="hidden p-1 text-rose-400 hover:text-rose-600 dark:text-rose-500 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition" title="Clear search">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+          </button>
           <button onclick="handleSearch()" class="px-3 py-1 bg-sky-600 hover:bg-sky-500 text-white text-[11px] font-semibold rounded transition shadow-sm">
             Find
           </button>
@@ -279,6 +291,64 @@
             <span id="imgDateTag"></span>
           </div>
 
+          <!-- Bottom-Left Floating Live OSD HUD Card (Compact Table Widget, docked neatly above the photo filmstrip) -->
+          <div id="liveOsdHud" class="hidden absolute bottom-[86px] left-5 z-30 pointer-events-auto select-none">
+            <div class="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xl p-2.5 space-y-1.5 w-[250px] transition-all hover:border-amber-500/50">
+              <!-- Header Row: Title, Status Badge & Actions -->
+              <div class="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-slate-800/80">
+                <div class="flex items-center gap-1.5">
+                  <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-500 shrink-0"></i>
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Live OSD</span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button id="btnViewOsdPdf" onclick="viewLiveOsdPdf()" class="hidden px-1.5 py-0.5 rounded bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-400 text-[9.5px] font-bold transition flex items-center gap-1 border border-rose-200/60 dark:border-rose-800/60 shadow-xs" title="Open Official OSD PDF Certificate">
+                    <i data-lucide="file-text" class="w-2.5 h-2.5 text-rose-500"></i>
+                    <span>PDF</span>
+                  </button>
+                  <button onclick="refreshLiveOSD()" class="p-0.5 rounded text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition" title="Refresh Live OSD from Portal">
+                    <i id="btnRefreshOsdIcon" data-lucide="refresh-cw" class="w-3 h-3"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Compact Key-Value Table -->
+              <table class="w-full text-[10.5px] border-collapse">
+                <tbody>
+                  <tr class="border-b border-slate-50 dark:border-slate-800/40">
+                    <td class="py-0.5 text-[9.5px] uppercase font-semibold text-slate-400">Status</td>
+                    <td class="py-0.5 text-right">
+                      <div id="liveOsdStatusBadge" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9.5px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500">
+                        <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                        <span id="liveOsdStatusText">Not Checked</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr class="border-b border-slate-50 dark:border-slate-800/40">
+                    <td class="py-0.5 text-[9.5px] uppercase font-semibold text-slate-400">Total Dues</td>
+                    <td class="py-0.5 text-right font-mono font-bold text-amber-600 dark:text-amber-400 text-[11px]">
+                      &#8377; <span id="liveOsdTotalDues">0.00</span>
+                    </td>
+                  </tr>
+                  <tr class="border-b border-slate-50 dark:border-slate-800/40">
+                    <td class="py-0.5 text-[9px] text-slate-400">Unpaid / LPSC</td>
+                    <td class="py-0.5 text-right font-mono text-[9.5px] text-slate-600 dark:text-slate-400">
+                      <span id="liveOsdUnpaid">&#8377; 0.00</span> + <span id="liveOsdLpsc">&#8377; 0.00</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="py-0.5 text-[9px] text-slate-400">Office</td>
+                    <td id="liveOsdOffice" class="py-0.5 text-right text-[9.5px] font-medium text-slate-700 dark:text-slate-300 truncate max-w-[140px]">-</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <!-- Hidden metadata elements -->
+              <span id="liveOsdConnDate" class="hidden"></span>
+              <span id="liveOsdDocType" class="hidden"></span>
+              <span id="liveOsdCachedIndicator" class="hidden"></span>
+            </div>
+          </div>
+
           <!-- 1. Single Image Zoom & Pan Viewport -->
           <div id="viewport" class="flex-1 flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing p-6 relative">
             <img id="mainImage" class="max-h-full max-w-full object-contain rounded-lg shadow-2xl transition-transform duration-75 origin-center hidden pointer-events-none" />
@@ -384,7 +454,7 @@
           </button>
         </div>
 
-        <!-- Right: Consumer Profile Card & Notes (3 Sections) -->
+        <!-- Right: Consumer Profile Card & Notes (4 Sections) -->
         <div id="detailsPanel" class="details-panel w-72 border-l border-slate-200 dark:border-slate-800/80 bg-white dark:bg-[#181818] flex flex-col justify-between shrink-0 p-3 overflow-y-auto">
           <div class="space-y-2.5">
             <!-- Top Panel Bar -->
@@ -1025,83 +1095,380 @@
     </section>
 
 
-    <!-- TAB 4: Low Cons. Audit -->
-    <section id="tab-audit" class="tab-content flex-1 p-6 overflow-y-auto hidden">
-      <div class="max-w-3xl mx-auto space-y-6">
-        <div>
-          <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100">Low Consumption Audit</h2>
-          <p class="text-xs text-slate-600 dark:text-slate-400">Identify cases of meter tempering and slow meters</p>
+    <!-- TAB 4: Low Cons. Audit Studio (Unified Industrial Studio Layout) -->
+    <section id="tab-audit" class="tab-content flex-1 flex flex-col min-h-0 bg-transparent relative overflow-hidden hidden">
+      <!-- Sub-Header Top Utility Strip -->
+      <div class="h-11 px-4 flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-[#181818]/90 backdrop-blur-md shrink-0 z-10">
+        <!-- Title & Counter -->
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">Low Consumption Verification</h2>
+          </div>
+          <span class="text-slate-300 dark:text-slate-700">|</span>
+          <span id="auditCountBadge" class="text-xs font-mono font-medium text-slate-500 dark:text-slate-400">0 records loaded</span>
         </div>
-        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-sm text-center py-12">
-          <i data-lucide="file-spreadsheet" class="w-12 h-12 text-slate-400 mx-auto mb-4"></i>
-          <h3 class="text-lg font-bold text-slate-800 dark:text-slate-200">Load Excel Data</h3>
-          <p class="text-sm text-slate-500">Please load consumer consumption data from Excel to begin the audit.</p>
-          <button class="bg-sky-600 text-white px-4 py-2 rounded-lg text-sm mt-4 inline-block hover:bg-sky-500 transition">Import Excel</button>
+
+        <!-- Integrated Action Toolbar -->
+        <div class="flex items-center gap-1.5">
+          <button onclick="toggleAuditGuideModal(true)" class="h-7 px-2.5 rounded text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#252525] border border-slate-200 dark:border-slate-700/60 flex items-center gap-1.5 transition" title="Show Excel column format specifications">
+            <i data-lucide="help-circle" class="w-3.5 h-3.5 text-sky-500"></i>
+            <span>Guide</span>
+          </button>
+          <button onclick="toggleAuditPasteModal(true)" class="h-7 px-2.5 rounded text-xs font-medium text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30 border border-sky-300/60 dark:border-sky-800/60 flex items-center gap-1.5 transition" title="Paste clipboard rows">
+            <i data-lucide="clipboard-paste" class="w-3.5 h-3.5"></i>
+            <span>Paste</span>
+          </button>
+          <button onclick="triggerLoadAuditExcel()" class="h-7 px-3 rounded text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white flex items-center gap-1.5 shadow-sm transition">
+            <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+            <span>Load Excel</span>
+          </button>
+          <button onclick="exportAuditReport()" class="h-7 px-3 rounded text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 shadow-sm transition">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            <span>Export CSV</span>
+          </button>
+          <input type="file" id="auditFileInput" accept=".xlsx,.xls" class="hidden" onchange="handleAuditFileSelected(event)">
+        </div>
+      </div>
+
+      <!-- Main Split Workstage: Left Queue (340px) + Right Inspector Canvas -->
+      <div class="flex-1 flex min-h-0 overflow-hidden">
+        
+        <!-- Left Side: Consumer Audit Queue (Clean, unified list pane) -->
+        <div class="w-80 lg:w-88 flex flex-col border-r border-slate-200 dark:border-slate-800/80 bg-white dark:bg-[#181818] shrink-0 select-none">
+          <!-- Filter Search & Status Tabs -->
+          <div class="p-2.5 border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/60 dark:bg-[#1c1c1c] space-y-2">
+            <div class="relative">
+              <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+              <input type="text" id="auditSearchInput" oninput="filterAuditQueue()" placeholder="Search Consumer ID / Meter..." class="w-full pl-8 pr-6 py-1 bg-white dark:bg-[#252525] border border-slate-200 dark:border-slate-700/60 rounded text-xs outline-none focus:border-sky-500 text-slate-800 dark:text-slate-200 placeholder-slate-400">
+              <button onclick="document.getElementById('auditSearchInput').value=''; filterAuditQueue();" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs">✕</button>
+            </div>
+
+            <!-- Segmented Filter Bar -->
+            <div class="grid grid-cols-4 gap-1 text-[11px]">
+              <button onclick="setAuditFilterStatus('ALL')" id="auditFilterAll" class="py-0.5 rounded font-bold text-center bg-slate-200 dark:bg-[#303030] text-slate-900 dark:text-white transition">All</button>
+              <button onclick="setAuditFilterStatus('PENDING')" id="auditFilterPending" class="py-0.5 rounded font-medium text-center text-slate-500 hover:bg-slate-100 dark:hover:bg-[#252525] transition">Pending</button>
+              <button onclick="setAuditFilterStatus('OK')" id="auditFilterOk" class="py-0.5 rounded font-medium text-center text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition">OK</button>
+              <button onclick="setAuditFilterStatus('CHECK')" id="auditFilterCheck" class="py-0.5 rounded font-medium text-center text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition">Check</button>
+            </div>
+          </div>
+
+          <!-- Queue Columns Header -->
+          <div class="grid grid-cols-12 px-3 py-1.5 bg-slate-100 dark:bg-[#141414] border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <span class="col-span-2 text-center">Status</span>
+            <span class="col-span-4">Consumer ID</span>
+            <span class="col-span-4">Meter No</span>
+            <span class="col-span-2 text-right">Unit</span>
+          </div>
+
+          <!-- Virtual Queue Rows -->
+          <div id="auditQueueList" class="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/40 text-xs">
+            <div class="p-8 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
+              <i data-lucide="file-spreadsheet" class="w-8 h-8 opacity-30"></i>
+              <span>No records loaded. Click <b>Load Excel</b> or <b>Paste</b> above.</span>
+            </div>
+          </div>
+
+          <!-- Queue Footer Status -->
+          <div class="h-8 px-3 border-t border-slate-200 dark:border-slate-800/80 bg-slate-50 dark:bg-[#141414] flex items-center justify-between text-[11px] font-semibold">
+            <span id="auditVerifiedCount" class="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+              <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> Verified: 0
+            </span>
+            <span id="auditPendingCount" class="text-amber-600 dark:text-amber-400 flex items-center gap-1">
+              <i data-lucide="clock" class="w-3.5 h-3.5"></i> Pending: 0
+            </span>
+          </div>
+        </div>
+
+        <!-- Right Side: Inspection & Verification Studio -->
+        <div class="flex-1 flex flex-col min-w-0 bg-transparent overflow-hidden relative">
+
+          <!-- Consumer Profile Header Bar (Integrated, Full Width) -->
+          <div class="px-5 py-3 border-b border-slate-200 dark:border-slate-800/80 bg-white/95 dark:bg-[#181818]/95 backdrop-blur-md flex flex-wrap items-center justify-between gap-4 shrink-0">
+            <!-- Consumer Core Credentials -->
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-9 h-9 rounded-lg bg-sky-500/10 text-sky-500 border border-sky-500/20 flex items-center justify-center font-bold shrink-0">
+                <i data-lucide="user" class="w-4.5 h-4.5"></i>
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-2.5">
+                  <span id="auditActiveCid" class="text-base font-black text-slate-900 dark:text-slate-100 font-mono tracking-tight">Select Consumer</span>
+                  <button onclick="copyAuditConsumerCid()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition" title="Copy Consumer ID">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                  </button>
+                  <button onclick="jumpActiveAuditToViewer()" class="text-[11px] font-semibold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 ml-1" title="Open in Main Viewer">
+                    <span>Viewer</span>
+                    <i data-lucide="external-link" class="w-3 h-3"></i>
+                  </button>
+                </div>
+                <div class="flex items-center gap-2.5 text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                  <span id="auditActiveMeter">Meter: --</span>
+                  <span class="text-slate-300 dark:text-slate-700">&bull;</span>
+                  <span id="auditActiveName" class="truncate max-w-[260px]">Name: --</span>
+                  <span class="text-slate-300 dark:text-slate-700">&bull;</span>
+                  <span id="auditActivePhotoCount">0 Photos</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Consumption Figure Tile -->
+            <div class="flex items-center gap-3 bg-slate-50 dark:bg-[#202020] border border-slate-200 dark:border-slate-700/60 px-3.5 py-1.5 rounded-lg shadow-xs shrink-0">
+              <div class="text-right">
+                <span class="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 block leading-none">Billed Consumption</span>
+                <span class="text-[10px] text-slate-500 font-medium">Recorded units</span>
+              </div>
+              <div class="flex items-baseline gap-1 pl-2.5 border-l border-slate-200 dark:border-slate-700/60">
+                <span id="auditActiveUnits" class="text-2xl font-black text-rose-600 dark:text-rose-400 font-mono leading-none">--</span>
+                <span class="text-xs font-bold text-slate-500">kWh</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gallery Strip Top Status -->
+          <div class="h-7 px-4 border-b border-slate-200 dark:border-slate-800/60 bg-slate-50/60 dark:bg-[#141414] flex items-center justify-between text-[11px] text-slate-500 shrink-0">
+            <span class="font-medium flex items-center gap-1.5">
+              <i data-lucide="images" class="w-3.5 h-3.5 text-sky-500"></i>
+              <span>Spot Meter Image History</span>
+              <span class="text-slate-400">(Latest photo first &bull; Click to enlarge)</span>
+            </span>
+            <span id="auditGalleryCount" class="font-mono text-slate-400">0 images</span>
+          </div>
+
+          <!-- Image Canvas Grid -->
+          <div class="flex-1 min-h-0 overflow-y-auto p-4 relative">
+            <div id="auditGalleryGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 content-start">
+              <div class="col-span-full py-28 flex flex-col items-center justify-center text-slate-400 gap-2">
+                <i data-lucide="image" class="w-10 h-10 opacity-25"></i>
+                <span class="text-xs italic">Select a consumer from the left list to load meter images</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Fixed Decision Bar (Photoshop/Toolbar style, sleek and unified) -->
+          <div class="h-14 px-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-[#181818] flex items-center justify-between gap-3 shrink-0 z-10">
+            <!-- Decision Toggle -->
+            <div class="flex items-center gap-1.5 bg-slate-100 dark:bg-[#202020] p-1 rounded-lg border border-slate-200 dark:border-slate-700/60 shrink-0">
+              <label class="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold cursor-pointer transition select-none has-[:checked]:bg-emerald-600 has-[:checked]:text-white text-slate-700 dark:text-slate-300">
+                <input type="radio" name="auditDecision" value="OK" checked class="hidden" onchange="updateDecisionStyles()">
+                <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
+                <span>Normal (OK)</span>
+              </label>
+              <label class="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold cursor-pointer transition select-none has-[:checked]:bg-rose-600 has-[:checked]:text-white text-slate-700 dark:text-slate-300">
+                <input type="radio" name="auditDecision" value="CHECK" class="hidden" onchange="updateDecisionStyles()">
+                <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
+                <span>CHECK</span>
+              </label>
+            </div>
+
+            <!-- Remarks Input & Tags -->
+            <div class="flex items-center gap-2 flex-1 max-w-2xl min-w-0">
+              <input type="text" id="auditRemarksInput" placeholder="Enter findings (e.g. glass broken, display blank, meter inverted)..." class="w-full bg-slate-50 dark:bg-[#222222] border border-slate-200 dark:border-slate-700/60 rounded text-xs px-3 py-1.5 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500 transition">
+              
+              <div class="hidden lg:flex items-center gap-1 shrink-0">
+                <button onclick="setAuditRemarkTag('Display Blank')" class="px-2 py-1 rounded text-[10px] font-medium bg-slate-100 dark:bg-[#282828] hover:bg-slate-200 dark:hover:bg-[#323232] text-slate-600 dark:text-slate-300 transition">Display Blank</button>
+                <button onclick="setAuditRemarkTag('Seal Broken')" class="px-2 py-1 rounded text-[10px] font-medium bg-slate-100 dark:bg-[#282828] hover:bg-slate-200 dark:hover:bg-[#323232] text-slate-600 dark:text-slate-300 transition">Seal Broken</button>
+                <button onclick="setAuditRemarkTag('Tampered')" class="px-2 py-1 rounded text-[10px] font-medium bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 transition">Tampered</button>
+              </div>
+            </div>
+
+            <!-- Fast Keyboard Actions -->
+            <div class="flex items-center gap-2 shrink-0">
+              <button onclick="skipAuditItem()" class="h-8 px-3 rounded text-xs font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-[#252525] text-slate-700 dark:text-slate-300 transition flex items-center gap-1" title="Skip item (Alt+N)">
+                <span>Skip</span>
+                <kbd class="text-[9.5px] bg-slate-200 dark:bg-[#303030] px-1 py-0.5 rounded font-mono">Alt+N</kbd>
+              </button>
+              <button onclick="saveAuditDecisionAndNext()" class="h-8 px-4 rounded text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition flex items-center gap-1.5" title="Save decision and advance (Alt+S)">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                <span>Save & Next</span>
+                <kbd class="text-[9.5px] bg-white/20 px-1 py-0.5 rounded font-mono">Alt+S</kbd>
+              </button>
+            </div>
+          </div>
+
         </div>
       </div>
     </section>
 
     <!-- TAB 5: Standalone Batch Fuzzy Lookup Engine -->
-    <section id="tab-fuzzy" class="tab-content flex-1 p-6 overflow-y-auto hidden">
-      <div class="max-w-4xl mx-auto space-y-6">
-        <div>
-          <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100">Batch Fuzzy Lookup Tool</h2>
-          <p class="text-xs text-slate-600 dark:text-slate-400">Match external customer lists against local database using RapidFuzz phonetic & token algorithms</p>
+    <section id="tab-fuzzy" class="tab-content flex-1 p-4 md:p-5 overflow-y-auto hidden">
+      <div class="max-w-6xl mx-auto space-y-4">
+        <!-- Tab Header & Mode Switcher -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
+          <div>
+            <h2 class="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <i data-lucide="sparkles" class="w-4 h-4 text-amber-500"></i>
+              Fuzzy Consumer Matching Engine
+            </h2>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400">Token & phonetic matching with identity gating (Name, C/O, Address & Mobile)</p>
+          </div>
+
+          <!-- Dual Mode Toggle Pill -->
+          <div class="inline-flex p-0.5 bg-slate-100 dark:bg-slate-800/80 rounded-lg border border-slate-200 dark:border-slate-700/60 shadow-xs shrink-0">
+            <button id="fuzzyModeBtnManual" onclick="switchFuzzyMode('manual')" class="px-2.5 py-1 rounded-md text-[11px] font-semibold transition flex items-center gap-1.5 bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs">
+              <i data-lucide="zap" class="w-3 h-3"></i>
+              <span>Instant Lookup</span>
+            </button>
+            <button id="fuzzyModeBtnBatch" onclick="switchFuzzyMode('batch')" class="px-2.5 py-1 rounded-md text-[11px] font-medium transition flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200">
+              <i data-lucide="file-spreadsheet" class="w-3 h-3"></i>
+              <span>Batch Excel File</span>
+            </button>
+          </div>
         </div>
 
-        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-5 shadow-sm">
-          <div class="flex items-center gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center text-white shadow-md shadow-amber-500/20 shrink-0">
-              <i data-lucide="sparkles" class="w-5 h-5"></i>
+        <!-- Global Parameters (Shared between both modes) -->
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-xs">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Similarity Threshold</label>
+                <span id="fuzzyThresholdVal" class="text-[11px] font-mono font-bold text-amber-600 dark:text-amber-400">85%</span>
+              </div>
+              <input type="range" id="fuzzyThreshold" min="0.50" max="1.00" step="0.05" value="0.85" oninput="document.getElementById('fuzzyThresholdVal').innerText = Math.round(this.value * 100) + '%'" class="w-full h-1 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-600">
+              <div class="flex justify-between text-[9px] text-slate-400 pt-0.5">
+                <span>Loose (50%)</span>
+                <span>Balanced (85%)</span>
+                <span>Strict (100%)</span>
+              </div>
             </div>
             <div>
-              <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">RapidFuzz Consumer Matching</h3>
-              <p class="text-xs text-slate-500 dark:text-slate-400">Loads external Excel list with Name, Address, C/O and mobile number, then outputs ranked match candidates.</p>
+              <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">Candidates per Query (Top N)</label>
+              <select id="fuzzyTopN" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 text-[11px] rounded-lg px-2.5 py-1 outline-none focus:border-amber-500 transition">
+                <option value="1">Top 1 candidate</option>
+                <option value="3">Top 3 candidates</option>
+                <option value="5" selected>Top 5 candidates</option>
+                <option value="10">Top 10 candidates</option>
+              </select>
+              <span class="text-[9.5px] text-slate-400 block pt-0.5">Ranked by combined Identity and Address score</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- MODE 1: Interactive Manual Lookup (Default) -->
+        <div id="fuzzyContainerManual" class="space-y-4">
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-xs space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-slate-800/80">
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-md bg-amber-500/15 text-amber-500 flex items-center justify-center font-bold text-xs">
+                  <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                </div>
+                <div>
+                  <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Quick Manual Input</h3>
+                  <p class="text-[10px] text-slate-500">Type or paste 1 or more rows. Press <kbd class="px-1 py-0.2 bg-slate-100 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700 font-mono text-[9px]">Ctrl+Enter</kbd> to find matches.</p>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-1.5">
+                <button onclick="addManualFuzzyRow()" class="px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 text-[11px] font-semibold transition flex items-center gap-1 shadow-xs">
+                  <i data-lucide="plus" class="w-3 h-3"></i>
+                  <span>Add Row</span>
+                </button>
+                <button onclick="pasteFuzzyClipboard()" class="px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 text-[11px] font-semibold transition flex items-center gap-1 shadow-xs" title="Paste tab-separated or Excel rows">
+                  <i data-lucide="clipboard" class="w-3 h-3"></i>
+                  <span>Paste Clipboard</span>
+                </button>
+                <button onclick="clearManualFuzzyRows()" class="px-2 py-1 rounded-md text-slate-400 hover:text-rose-600 text-[11px] font-medium transition" title="Clear All Rows">
+                  <span>Clear</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Manual Rows Table / Grid -->
+            <div class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+              <table class="w-full text-left text-[11px] border-collapse">
+                <thead class="bg-slate-50 dark:bg-slate-950/70 text-slate-500 uppercase font-semibold text-[9.5px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th class="py-1.5 px-2 w-8 text-center">#</th>
+                    <th class="py-1.5 px-2 min-w-[140px]">Consumer Name <span class="text-rose-500 font-bold">*</span></th>
+                    <th class="py-1.5 px-2 min-w-[130px]">C/O or S/O</th>
+                    <th class="py-1.5 px-2 min-w-[180px]">Address <span class="text-rose-500 font-bold">*</span></th>
+                    <th class="py-1.5 px-2 min-w-[110px]">Mobile No.</th>
+                    <th class="py-1.5 px-2 w-10 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="manualFuzzyTableBody" class="divide-y divide-slate-100 dark:divide-slate-800/60 bg-white dark:bg-slate-900">
+                  <!-- Dynamic Rows generated by JS -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Bottom Action Controls -->
+            <div class="flex items-center justify-between pt-1">
+              <div class="text-[10.5px] text-slate-500 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span>Fast in-memory index (<span id="fuzzyCachedRecordsCount">0</span> records ready)</span>
+              </div>
+
+              <button id="btnRunManualFuzzy" onclick="runManualFuzzyLookup()" class="bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white text-[11px] font-bold py-1.5 px-4 rounded-lg transition flex items-center gap-1.5 shadow-sm shadow-amber-600/20 active:scale-[0.98]">
+                <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                <span>Find Matches</span>
+              </button>
             </div>
           </div>
 
-          <div class="space-y-4">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <!-- Inline Results Container -->
+          <div id="fuzzyManualResultsBox" class="hidden space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                  <i data-lucide="list-checks" class="w-3.5 h-3.5 text-emerald-500"></i>
+                  Matching Results
+                </h3>
+                <span id="fuzzyResultsBadgeCount" class="text-[10.5px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-bold">0 found</span>
+              </div>
+              <span id="fuzzyResultsSpeed" class="text-[10px] font-mono text-slate-400">0 ms</span>
+            </div>
+
+            <div id="fuzzyResultsList" class="space-y-3">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- MODE 2: Batch Excel File Lookup -->
+        <div id="fuzzyContainerBatch" class="hidden space-y-4">
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-4 shadow-xs">
+            <div class="flex items-center gap-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800">
+              <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center text-white shadow-xs shadow-amber-500/20 shrink-0">
+                <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+              </div>
               <div>
-                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Similarity Threshold</label>
-                <div class="flex items-center gap-3">
-                  <input type="range" id="fuzzyThreshold" min="0.50" max="1.00" step="0.05" value="0.85" oninput="document.getElementById('fuzzyThresholdVal').innerText = Math.round(this.value * 100) + '%'" class="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer">
-                  <span id="fuzzyThresholdVal" class="text-xs font-mono font-bold text-amber-600 dark:text-amber-400 w-12 text-right">85%</span>
+                <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100">Batch Excel Consumer Matching</h3>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Processes entire Excel sheets with hundreds/thousands of consumers and saves a ranked results workbook.</p>
+              </div>
+            </div>
+
+            <div class="space-y-3">
+              <!-- Status / Progress Box -->
+              <div id="fuzzyStatusBox" class="hidden p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-[11px] space-y-1.5">
+                <div class="flex justify-between items-center text-slate-700 dark:text-slate-300 font-medium">
+                  <span id="fuzzyStatusText">Idle</span>
+                  <span id="fuzzyProgressCount" class="font-mono text-sky-600 dark:text-sky-400 font-semibold">0%</span>
                 </div>
-                <span class="text-[11px] text-slate-500">Recommended: 85% for balanced precision</span>
+                <div class="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div id="fuzzyProgressBar" class="h-full bg-amber-500 w-0 transition-all duration-300"></div>
+                </div>
+                <div id="fuzzyOutputLink" class="text-[11px] text-emerald-600 dark:text-emerald-400 truncate hidden pt-0.5"></div>
               </div>
-              <div>
-                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Max Candidates per Row (Top N)</label>
-                <select id="fuzzyTopN" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-slate-800 dark:text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-amber-500">
-                  <option value="1">Top 1 candidate</option>
-                  <option value="3">Top 3 candidates</option>
-                  <option value="5" selected>Top 5 candidates</option>
-                  <option value="10">Top 10 candidates</option>
-                </select>
-              </div>
-            </div>
 
-            <!-- Status / Progress Box -->
-            <div id="fuzzyStatusBox" class="hidden p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs space-y-2">
-              <div class="flex justify-between items-center text-slate-700 dark:text-slate-300 font-medium">
-                <span id="fuzzyStatusText">Idle</span>
-                <span id="fuzzyProgressCount" class="font-mono text-sky-600 dark:text-sky-400 font-semibold">0%</span>
+              <!-- Live OSD Option Toggle -->
+              <div class="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex items-start gap-2 text-[11px]">
+                <input type="checkbox" id="fuzzyIncludeOsd" class="mt-0.5 rounded text-amber-600 focus:ring-amber-500 accent-amber-600">
+                <label for="fuzzyIncludeOsd" class="cursor-pointer select-none">
+                  <span class="font-bold text-slate-800 dark:text-slate-200">Query & Write Live OSD & Connection Status into Excel</span>
+                  <span class="block text-[10px] text-slate-400">Queries the live portal for each matched candidate to include actual unpaid dues, LPSC, status & office in output. (Adds ~1.5s per matched record)</span>
+                </label>
               </div>
-              <div class="h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                <div id="fuzzyProgressBar" class="h-full bg-amber-500 w-0 transition-all duration-300"></div>
-              </div>
-              <div id="fuzzyOutputLink" class="text-xs text-emerald-600 dark:text-emerald-400 truncate hidden pt-1"></div>
-            </div>
 
-            <div class="grid grid-cols-2 gap-3 pt-2">
-              <button onclick="generateFuzzyTemplate()" class="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold py-2.5 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-sm">
-                <i data-lucide="file-spreadsheet" class="w-4 h-4 text-amber-500"></i>
-                Download Input Template (.xlsx)
-              </button>
-              <button id="btnRunFuzzy" onclick="runFuzzyLookup()" class="bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold py-2.5 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-sm">
-                <i data-lucide="play" class="w-4 h-4"></i>
-                Select File & Run Lookup
-              </button>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <button onclick="generateFuzzyTemplate()" class="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-[11px] font-semibold py-2 px-3 rounded-lg transition flex items-center justify-center gap-1.5 shadow-xs">
+                  <i data-lucide="download" class="w-3.5 h-3.5 text-amber-500"></i>
+                  <span>Download Input Template (.xlsx)</span>
+                </button>
+                <button id="btnRunFuzzy" onclick="runFuzzyLookup()" class="bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold py-2 px-3 rounded-lg transition flex items-center justify-center gap-1.5 shadow-xs shadow-amber-600/20">
+                  <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                  <span>Select File & Run Batch Lookup</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1181,7 +1548,7 @@
             <!-- Bottom Left Info -->
             <div class="p-3 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800/60 text-[11px] text-slate-500">
               <span class="font-semibold text-slate-700 dark:text-slate-300 block">Spot Image Viewer</span>
-              <span>WBSEDCL Billing Verification</span>
+              <span>Billing &amp; Verification Tool</span>
             </div>
           </div>
 
@@ -1617,7 +1984,7 @@
         <div class="p-4 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
           <div>
             <span class="font-bold text-slate-800 dark:text-slate-200 block">Spot Image Viewer & Verification Studio</span>
-            <span class="text-slate-500">Designed for WBSEDCL Billing & Inspection Workflow</span>
+            <span class="text-slate-500">Designed for Billing &amp; Inspection Workflow</span>
           </div>
           <button onclick="closeHelpModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-semibold transition">
             Close Guide
@@ -1791,6 +2158,214 @@
       <div class="p-3 bg-slate-50 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800 flex justify-end">
         <button onclick="toggleTheftBreakdownModal(false)" class="px-4 py-1.5 rounded-lg bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 text-white font-semibold text-xs transition">
           Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Low Consumption: Paste from Clipboard Modal -->
+  <div id="auditPasteModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-xl flex flex-col max-h-[85vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-950/40">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+            <i data-lucide="clipboard-paste" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Paste Data from Clipboard</h3>
+            <p class="text-xs text-slate-500">Quickly load consumer list by pasting rows</p>
+          </div>
+        </div>
+        <button onclick="toggleAuditPasteModal(false)" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-4 space-y-3 flex-1 overflow-y-auto">
+        <div class="text-xs text-slate-600 dark:text-slate-400 flex items-center justify-between">
+          <span>Expected format per line: <code class="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-sky-600 dark:text-sky-400">ConsumerID  [MeterNo]  [BilledUnits]</code></span>
+          <button onclick="pasteAuditFromSystemClipboard()" class="text-xs text-sky-600 hover:text-sky-500 dark:text-sky-400 font-semibold flex items-center gap-1">
+            <i data-lucide="clipboard" class="w-3 h-3"></i> Paste Clipboard
+          </button>
+        </div>
+
+        <textarea id="auditPasteTextarea" rows="10" placeholder="Paste data here (Tab, space, pipe or comma separated):&#10;123456789   MTR001   45&#10;987654321   MTR002   12&#10;555666777   MTR003   0" class="w-full font-mono text-xs p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:border-sky-500 text-slate-800 dark:text-slate-200 resize-none"></textarea>
+
+        <div class="flex items-center justify-between text-[11px] text-slate-500">
+          <span>Supported separators: Tabs (Excel copy), Comma (CSV), Pipe (<code class="font-mono">|</code>), or Whitespace.</span>
+        </div>
+      </div>
+
+      <div class="p-3 bg-slate-50 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
+        <button onclick="toggleAuditPasteModal(false)" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs transition">
+          Cancel
+        </button>
+        <button onclick="importAuditPastedText()" class="px-4 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs transition flex items-center gap-1.5 shadow-sm">
+          <i data-lucide="check" class="w-3.5 h-3.5"></i>
+          Import Data
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Low Consumption: Column Header Guide Modal -->
+  <div id="auditGuideModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-950/40">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Excel Column Header Guide</h3>
+            <p class="text-xs text-slate-500">File format & column arrangement specifications</p>
+          </div>
+        </div>
+        <button onclick="toggleAuditGuideModal(false)" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs text-slate-700 dark:text-slate-300 overflow-y-auto">
+        <p class="text-xs leading-relaxed">
+          When loading an Excel (<code class="font-mono text-sky-600">.xlsx / .xls</code>) or pasting tabular data into the <b>Low Consumption Audit</b> studio, arrange your columns in the following order:
+        </p>
+
+        <!-- Columns Table -->
+        <div class="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+          <div class="grid grid-cols-12 bg-slate-100 dark:bg-slate-950 p-2.5 font-bold text-[11px] text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
+            <span class="col-span-2 text-center">Col</span>
+            <span class="col-span-4">Field Name</span>
+            <span class="col-span-3">Type</span>
+            <span class="col-span-3">Requirement</span>
+          </div>
+          <div class="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+            <div class="grid grid-cols-12 p-2.5 items-center">
+              <span class="col-span-2 font-mono text-center font-bold text-sky-600">A (1)</span>
+              <span class="col-span-4 font-semibold text-slate-900 dark:text-slate-100">Consumer ID</span>
+              <span class="col-span-3 text-slate-500">9-digit number</span>
+              <span class="col-span-3"><span class="px-2 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[10px] font-bold">Mandatory</span></span>
+            </div>
+            <div class="grid grid-cols-12 p-2.5 items-center bg-slate-50/40 dark:bg-slate-950/20">
+              <span class="col-span-2 font-mono text-center font-bold text-sky-600">B (2)</span>
+              <span class="col-span-4 font-semibold text-slate-900 dark:text-slate-100">Meter Number</span>
+              <span class="col-span-3 text-slate-500">Alphanumeric</span>
+              <span class="col-span-3"><span class="px-2 py-0.5 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-bold">Optional</span></span>
+            </div>
+            <div class="grid grid-cols-12 p-2.5 items-center">
+              <span class="col-span-2 font-mono text-center font-bold text-sky-600">C (3)</span>
+              <span class="col-span-4 font-semibold text-slate-900 dark:text-slate-100">Billed Units</span>
+              <span class="col-span-3 text-slate-500">Number / Float</span>
+              <span class="col-span-3"><span class="px-2 py-0.5 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-bold">Optional (Default 0)</span></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sample Row Box -->
+        <div class="p-3 bg-slate-50 dark:bg-slate-950/50 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1.5">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Example Excel Row:</span>
+          <div class="font-mono text-xs bg-white dark:bg-slate-900 p-2 rounded border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 flex justify-between">
+            <span>Row 1: <b>502148901</b></span>
+            <span>|</span>
+            <span><b>SP902144</b></span>
+            <span>|</span>
+            <span><b>18</b></span>
+          </div>
+        </div>
+
+        <!-- Helpful Tips -->
+        <div class="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-1 text-[11px] text-amber-700 dark:text-amber-300">
+          <div class="font-bold flex items-center gap-1">
+            <i data-lucide="info" class="w-3.5 h-3.5"></i> Notes & Tips:
+          </div>
+          <ul class="list-disc list-inside space-y-0.5 text-[11px] text-slate-600 dark:text-slate-400">
+            <li>Header row (e.g. <i>Consumer ID, Meter No, Billed Units</i>) is automatically detected and skipped.</li>
+            <li>Any blank or invalid consumer rows are automatically ignored.</li>
+            <li>Your audit session is auto-saved as you verify each item.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="p-3 bg-slate-50 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+        <button onclick="toggleAuditGuideModal(false)" class="px-4 py-1.5 rounded-lg bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 text-white font-semibold text-xs transition">
+          Got it
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audit Full Image Lightbox Modal -->
+  <div id="auditImageLightboxModal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="relative w-full max-w-4xl h-[90vh] flex flex-col bg-slate-950 border border-white/10 rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+      <!-- Lightbox Header -->
+      <div class="px-4 py-2.5 bg-black/60 border-b border-white/10 flex items-center justify-between text-white shrink-0">
+        <div class="flex items-center gap-3">
+          <span id="auditLightboxDate" class="font-mono font-bold text-sm text-sky-400">Date</span>
+          <span class="text-xs text-slate-400 font-mono" id="auditLightboxFilename">Filename</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="zoomAuditLightbox(-0.25)" class="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs transition" title="Zoom Out (-)">
+            <i data-lucide="zoom-out" class="w-4 h-4"></i>
+          </button>
+          <button onclick="resetAuditLightboxZoom()" class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-mono transition" title="Reset Zoom">
+            <span id="auditLightboxZoomLevel">100%</span>
+          </button>
+          <button onclick="zoomAuditLightbox(0.25)" class="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs transition" title="Zoom In (+)">
+            <i data-lucide="zoom-in" class="w-4 h-4"></i>
+          </button>
+          <span class="w-px h-4 bg-white/20 mx-1"></span>
+          <button onclick="stepAuditLightboxImage(-1)" class="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs transition" title="Previous Image (←)">
+            <i data-lucide="chevron-left" class="w-4 h-4"></i>
+          </button>
+          <button onclick="stepAuditLightboxImage(1)" class="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs transition" title="Next Image (→)">
+            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+          </button>
+          <span class="w-px h-4 bg-white/20 mx-1"></span>
+          <button onclick="closeAuditImageLightbox()" class="p-1.5 rounded-lg bg-rose-600/80 hover:bg-rose-600 text-white text-xs transition" title="Close (Esc)">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Lightbox Canvas -->
+      <div id="auditLightboxViewport" class="flex-1 flex items-center justify-center p-4 overflow-hidden relative cursor-grab active:cursor-grabbing select-none bg-radial from-slate-900 to-black">
+        <div id="auditLightboxLoader" class="w-8 h-8 border-3 border-sky-400 border-t-transparent rounded-full animate-spin"></div>
+        <img id="auditLightboxImg" class="max-w-full max-h-full object-contain transition-transform duration-100 hidden rounded shadow-2xl" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Fuzzy Paste Clipboard Fallback Modal -->
+  <div id="fuzzyPasteModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-500 flex items-center justify-center">
+            <i data-lucide="clipboard-paste" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">Paste Table Rows</h3>
+            <p class="text-[11px] text-slate-500">Paste lines copied from Excel or text (tab or comma separated)</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeFuzzyPasteModal()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1 rounded-lg">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-4 space-y-3">
+        <textarea id="fuzzyPasteArea" rows="6" placeholder="PAVAN SINGH&#9;ROTON SINGHA&#9;UTTAR RAMPUR, BOROI&#9;9876543210" class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 font-mono text-xs outline-none focus:border-amber-500 transition"></textarea>
+        <div class="flex justify-between items-center text-[11px] text-slate-400">
+          <span>Format: Name [tab] C/O [tab] Address [tab] Mobile</span>
+        </div>
+      </div>
+
+      <div class="p-3 bg-slate-50 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
+        <button type="button" onclick="closeFuzzyPasteModal()" class="px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 text-xs font-semibold transition">
+          Cancel
+        </button>
+        <button type="button" onclick="applyFuzzyPasteFromModal()" class="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition shadow-xs">
+          Insert Rows
         </button>
       </div>
     </div>

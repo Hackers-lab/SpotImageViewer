@@ -1,6 +1,9 @@
 import sqlite3
 import json
-import config
+try:
+    from core import config
+except ImportError:
+    import config
 
 
 def _add_column_if_missing(cursor, table_name, column_name, column_def):
@@ -36,8 +39,17 @@ def init_db():
                 UNIQUE(filename, dir_id)
             )
         ''')
+
+        # Robust schema migration for existing databases:
+        # If user had an older schema missing 'filename', 'dir_id', or 'date_iso', add them!
+        _add_column_if_missing(cursor, "images", "filename", "TEXT")
+        _add_column_if_missing(cursor, "images", "dir_id", "INTEGER")
+        _add_column_if_missing(cursor, "images", "date_iso", "TEXT")
+        _add_column_if_missing(cursor, "images", "mru", "TEXT")
+
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_cid ON images (consumer_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_date_iso ON images (date_iso)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_dir_id ON images (dir_id)')
         
         # Other tables...
         cursor.execute('''

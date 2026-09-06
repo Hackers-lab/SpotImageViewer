@@ -20,9 +20,27 @@ try:
     from rapidfuzz import fuzz as rapidfuzz_fuzz
 except ImportError:
     rapidfuzz_fuzz = None
+
+# Patch numpy attributes if newer numpy is present so openpyxl doesn't crash on import
+try:
+    import numpy as _np
+    if not hasattr(_np, 'short'):
+        _np.short = _np.int16
+    if not hasattr(_np, 'ushort'):
+        _np.ushort = _np.uint16
+    if not hasattr(_np, 'int_'):
+        _np.int_ = _np.int64
+    if not hasattr(_np, 'uint_'):
+        _np.uint_ = _np.uint64
+except Exception:
+    pass
+
 import openpyxl
 
-from core import config, database, utils, tariff_manager
+try:
+    from core import config, database, utils, tariff_manager, live_osd_service
+except ImportError:
+    import config, database, utils, tariff_manager, live_osd_service
 
 class AppAPI:
     """
@@ -146,14 +164,29 @@ class AppAPI:
         try:
             conn = database.get_db_connection()
             cur = conn.cursor()
-            cur.execute("""
-                SELECT i.date_original, i.mru, d.dir_path, i.filename 
-                FROM images i 
-                JOIN directories d ON i.dir_id = d.id 
-                WHERE i.consumer_id = ? 
-                ORDER BY i.date_iso DESC
-            """, (cid,))
-            rows = cur.fetchall()
+            # Support both normalized (dir_id -> directories) schema and legacy (full_path) schema
+            try:
+                cur.execute("""
+                    SELECT i.date_original, i.mru, d.dir_path, i.filename 
+                    FROM images i 
+                    JOIN directories d ON i.dir_id = d.id 
+                    WHERE i.consumer_id = ? 
+                    ORDER BY i.date_iso DESC
+                """, (cid,))
+                rows = cur.fetchall()
+            except sqlite3.OperationalError:
+                # Legacy table fallback if directories table doesn't exist or column differs
+                cur.execute("PRAGMA table_info(images)")
+                cols = [c[1] for c in cur.fetchall()]
+                if 'full_path' in cols:
+                    cur.execute("SELECT date_original, mru, full_path FROM images WHERE consumer_id = ? ORDER BY date_original DESC", (cid,))
+                    raw_rows = cur.fetchall()
+                    rows = [(r[0], r[1], os.path.dirname(r[2]), os.path.basename(r[2])) for r in raw_rows]
+                elif 'filename' in cols and 'dir_id' not in cols:
+                    cur.execute("SELECT date_original, mru, '', filename FROM images WHERE consumer_id = ?", (cid,))
+                    rows = cur.fetchall()
+                else:
+                    rows = []
             conn.close()
 
             if not rows:
@@ -924,14 +957,21 @@ class AppAPI:
         self._indexing_state["running"] = True
         self._indexing_state["scanned"] = 0
         self._indexing_state["total"] = 0
+        self._indexing_state["files_seen"] = 0
         self._indexing_state["elapsed"] = 0
+        self._indexing_state["speed"] = 0
+        self._indexing_state["eta_seconds"] = None
         self._indexing_state["current_folder"] = ""
+        self._indexing_state["error"] = None
         
         def _index():
             start = time.time()
             total_inserted = 0
             scanned_files_count = 0
             try:
+                # 0. Ensure schema is fully up-to-date
+                database.init_db()
+
                 # 1. Dynamically fetch registered folders
                 additional_folders = database.get_additional_folders()
                 folders = [config.IMAGE_FOLDER] + (additional_folders or [])
@@ -949,18 +989,36 @@ class AppAPI:
                 cursor.execute("DELETE FROM directories")
                 conn.commit()
 
+                # In-memory directory lookup cache to eliminate repeated SELECT queries
+                dir_cache = {}
+                next_dir_id = 1
+
+                # Check if existing directories table has autoincrement id
+                cursor.execute("SELECT MAX(id) FROM directories")
+                max_id_row = cursor.fetchone()
+                if max_id_row and max_id_row[0]:
+                    next_dir_id = max_id_row[0] + 1
+
                 batch_data = []
-                BATCH_SIZE = 2000
+                BATCH_SIZE = 5000
 
                 for folder in unique_folders:
-                    self._indexing_state["current_folder"] = folder
+                    self._indexing_state["current_folder"] = os.path.basename(folder) or folder
                     for root_dir, dirs, files in os.walk(folder):
                         if not files:
                             continue
-                        cursor.execute("INSERT OR IGNORE INTO directories (dir_path) VALUES (?)", (root_dir,))
-                        cursor.execute("SELECT id FROM directories WHERE dir_path = ?", (root_dir,))
-                        dir_row = cursor.fetchone()
-                        dir_id = dir_row[0] if dir_row else 1
+
+                        # Resolve directory ID via in-memory cache
+                        if root_dir not in dir_cache:
+                            cursor.execute("INSERT OR IGNORE INTO directories (dir_path) VALUES (?)", (root_dir,))
+                            cursor.execute("SELECT id FROM directories WHERE dir_path = ?", (root_dir,))
+                            row = cursor.fetchone()
+                            if row:
+                                dir_cache[root_dir] = row[0]
+                            else:
+                                dir_cache[root_dir] = next_dir_id
+                                next_dir_id += 1
+                        dir_id = dir_cache[root_dir]
 
                         for filename in files:
                             scanned_files_count += 1
@@ -990,9 +1048,13 @@ class AppAPI:
                                     conn.commit()
                                     total_inserted += len(batch_data)
                                     batch_data = []
+                                    elapsed = max(1, int(time.time() - start))
+                                    speed = int(total_inserted / elapsed)
                                     self._indexing_state["scanned"] = total_inserted
                                     self._indexing_state["total"] = total_inserted
-                                    self._indexing_state["elapsed"] = int(time.time() - start)
+                                    self._indexing_state["files_seen"] = scanned_files_count
+                                    self._indexing_state["elapsed"] = elapsed
+                                    self._indexing_state["speed"] = speed
                             except Exception:
                                 continue
 
@@ -1008,11 +1070,16 @@ class AppAPI:
                 cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
                 conn.close()
 
+                elapsed = max(1, int(time.time() - start))
+                speed = int(total_inserted / elapsed) if total_inserted else 0
                 self._indexing_state["scanned"] = total_inserted
                 self._indexing_state["total"] = total_inserted
-                self._indexing_state["elapsed"] = int(time.time() - start)
+                self._indexing_state["files_seen"] = scanned_files_count
+                self._indexing_state["elapsed"] = elapsed
+                self._indexing_state["speed"] = speed
             except Exception as e:
-                print(f"[Error in Indexing Worker]: {e}")
+                print(f"[Error in Indexing Worker]: {e}", flush=True)
+                self._indexing_state["error"] = str(e)
             finally:
                 self._indexing_state["running"] = False
 
@@ -1141,18 +1208,29 @@ class AppAPI:
                     subprocess.Popen([exe_path], cwd=base_dir)
                     return {"success": True, "message": "Image Check GUI launched (bundled executable)."}
 
-            tools_dir = os.path.join(config.BASE_DIR, "tools")
-            src_tools_dir = os.path.join(config.BASE_DIR, "src", "tools")
+            # Search in project workspace directory first, then fallback paths
+            current_dir = os.path.dirname(os.path.abspath(__file__))  # src/bridge
+            src_dir = os.path.dirname(current_dir)                    # src
+            project_root = os.path.dirname(src_dir)                   # repo root
+            
             candidates = [
-                os.path.join(src_tools_dir, "imagecheckgui.py"),
-                os.path.join(tools_dir, "imagecheckgui.py"),
+                os.path.join(src_dir, "tools", "imagecheckgui.py"),
+                os.path.join(project_root, "src", "tools", "imagecheckgui.py"),
+                os.path.join(project_root, "tools", "imagecheckgui.py"),
+                os.path.join(project_root, "imagecheckgui.py"),
+                os.path.join(config.BASE_DIR, "tools", "imagecheckgui.py"),
+                os.path.join(config.BASE_DIR, "src", "tools", "imagecheckgui.py"),
                 os.path.join(config.BASE_DIR, "imagecheckgui.py"),
+                os.path.join(project_root, "dist", f"SpotImageViewerV{config.CURRENT_VERSION}", "imagecheckgui.exe"),
             ]
             script_path = next((c for c in candidates if os.path.exists(c)), None)
             if not script_path:
                 return {"success": False, "error": "imagecheckgui.py was not found in tools directory."}
 
-            subprocess.Popen([sys.executable, script_path], cwd=os.path.dirname(script_path))
+            if script_path.endswith(".exe"):
+                subprocess.Popen([script_path], cwd=os.path.dirname(script_path))
+            else:
+                subprocess.Popen([sys.executable, script_path], cwd=os.path.dirname(script_path))
             return {"success": True, "message": f"Image Check GUI launched from {os.path.basename(script_path)}."}
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -1199,7 +1277,361 @@ class AppAPI:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def run_fuzzy_lookup(self, input_path="", output_path="", threshold=0.85, top_n=5):
+    # --- Fuzzy Lookup Shared Helpers & Prepped DB Cache ---
+    _cached_prepped_fuzzy_db = None
+    _cached_fuzzy_lock = threading.Lock()
+
+    @staticmethod
+    def _normalize_fuzzy_text(value):
+        text = str(value or "").upper()
+        text = re.sub(r"[^A-Z0-9 ]+", " ", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        return text
+
+    @staticmethod
+    def _strip_fuzzy_prefixes(value):
+        text = AppAPI._normalize_fuzzy_text(value)
+        pattern = r"^(?:C\s*O|S\s*O|D\s*O|W\s*O|CARE\s*OF|SON\s*OF|DAUGHTER\s*OF|WIFE\s*OF|LATE|LT|SRI|SMT|MD|MR|MRS|DR)\s+"
+        while True:
+            subbed = re.sub(pattern, "", text)
+            if subbed == text:
+                break
+            text = subbed.strip()
+        return text
+
+    @staticmethod
+    def _extract_co_and_name(text, is_address=False):
+        if not text:
+            return "", ""
+
+        ADDR_KEYWORDS = {
+            "VILL", "VILLAGE", "PO", "P O", "PS", "P S", "DIST", "DISTRICT",
+            "PIN", "PINCODE", "ROAD", "STREET", "LANE", "SARANI", "PARA",
+            "WARD", "HOLDING", "HOUSE", "NEAR", "BEHIND", "OPP", "OPPOSITE",
+            "GP", "PANCHAYAT", "MUNICIPALITY", "BLOCK", "SECTOR", "PLOT", "FLAT", "APARTMENT"
+        }
+
+        if is_address:
+            parts = [p.strip() for p in re.split(r"[,;]+", str(text)) if p.strip()]
+            if parts:
+                first_seg = AppAPI._normalize_fuzzy_text(parts[0])
+                pattern = r"\b(?:S\s*O|D\s*O|W\s*O|C\s*O|CARE\s*OF|SON\s*OF|DAUGHTER\s*OF|WIFE\s*OF)\b"
+                m = re.search(pattern, first_seg)
+                if m:
+                    co_part = AppAPI._strip_fuzzy_prefixes(first_seg[m.end():])
+                    remaining_addr = ", ".join(parts[1:]).strip() if len(parts) > 1 else ""
+                    return AppAPI._strip_fuzzy_prefixes(remaining_addr), co_part
+
+                first_words = first_seg.split()
+                has_addr_kw = any(w in ADDR_KEYWORDS for w in first_words)
+                has_digit = any(w.isdigit() for w in first_words)
+                if 2 <= len(first_words) <= 4 and not has_addr_kw and not has_digit:
+                    co_part = AppAPI._strip_fuzzy_prefixes(first_seg)
+                    remaining_addr = ", ".join(parts[1:]).strip() if len(parts) > 1 else ""
+                    return AppAPI._strip_fuzzy_prefixes(remaining_addr), co_part
+
+        cleaned = AppAPI._normalize_fuzzy_text(text)
+        pattern = r"\b(?:S\s*O|D\s*O|W\s*O|C\s*O|CARE\s*OF|SON\s*OF|DAUGHTER\s*OF|WIFE\s*OF)\b"
+        m = re.search(pattern, cleaned)
+        if m:
+            main_part = AppAPI._strip_fuzzy_prefixes(cleaned[:m.start()])
+            co_part = AppAPI._strip_fuzzy_prefixes(cleaned[m.end():])
+            return main_part, co_part
+
+        return AppAPI._strip_fuzzy_prefixes(cleaned), ""
+
+    @staticmethod
+    def _normalize_mobile_10(value):
+        digits = re.sub(r"\D", "", str(value or ""))
+        if len(digits) == 12 and digits.startswith("91"):
+            digits = digits[2:]
+        return digits if len(digits) == 10 else ""
+
+    @staticmethod
+    def _tokenize_for_lookup(text):
+        return [t for t in AppAPI._normalize_fuzzy_text(text).split(" ") if len(t) >= 2]
+
+    @staticmethod
+    def _token_level_sim(s1, s2):
+        t1 = [w for w in s1.split() if len(w) >= 2]
+        t2 = [w for w in s2.split() if len(w) >= 2]
+        if not t1 or not t2:
+            return 0.0
+        matches1 = sum(1 for w1 in t1 if any(SequenceMatcher(None, w1, w2).ratio() >= 0.80 for w2 in t2))
+        matches2 = sum(1 for w2 in t2 if any(SequenceMatcher(None, w2, w1).ratio() >= 0.80 for w1 in t1))
+        return ((matches1 / len(t1)) + (matches2 / len(t2))) / 2.0
+
+    @staticmethod
+    def _match_single_field(a, b):
+        a_clean = AppAPI._strip_fuzzy_prefixes(a)
+        b_clean = AppAPI._strip_fuzzy_prefixes(b)
+        if not a_clean or not b_clean:
+            return 0.0
+        if a_clean == b_clean:
+            return 100.0
+
+        if rapidfuzz_fuzz is not None:
+            ratio = float(rapidfuzz_fuzz.ratio(a_clean, b_clean))
+            token_sort = float(rapidfuzz_fuzz.token_sort_ratio(a_clean, b_clean))
+            token_set = float(rapidfuzz_fuzz.token_set_ratio(a_clean, b_clean))
+            partial = float(rapidfuzz_fuzz.partial_ratio(a_clean, b_clean))
+            score = (0.25 * ratio) + (0.35 * token_set) + (0.25 * token_sort) + (0.15 * partial)
+        else:
+            seq = SequenceMatcher(None, a_clean, b_clean).ratio() * 100.0
+            tok = AppAPI._token_level_sim(a_clean, b_clean) * 100.0
+            sub = 0.0
+            if a_clean in b_clean and len(a_clean.split()) >= 2:
+                sub = 90.0
+            elif b_clean in a_clean and len(b_clean.split()) >= 2:
+                sub = 90.0
+            score = max(seq, tok, sub)
+        return min(100.0, score)
+
+    def _get_prepped_fuzzy_db(self):
+        with AppAPI._cached_fuzzy_lock:
+            if AppAPI._cached_prepped_fuzzy_db is not None:
+                return AppAPI._cached_prepped_fuzzy_db
+
+            db_profiles = utils.get_all_consumer_profiles()
+            if not db_profiles:
+                return None
+
+            prepped_db = []
+            mobile_index = defaultdict(set)
+            prefix_index = defaultdict(set)
+            token_index = defaultdict(set)
+
+            for idx, row in enumerate(db_profiles):
+                db_name = str(row.get("name", "") or "").strip()
+                db_address = str(row.get("address", "") or "").strip()
+                db_name_main, db_name_co = self._extract_co_and_name(db_name, is_address=False)
+                db_addr_main, db_addr_co = self._extract_co_and_name(db_address, is_address=True)
+
+                db_combined_raw = f"{db_name} {db_address}".strip()
+                combined_norm = self._normalize_fuzzy_text(db_combined_raw)
+                combined_tokens = set(self._tokenize_for_lookup(combined_norm))
+                mobile_norm = self._normalize_mobile_10(row.get("mobile_number", ""))
+
+                prepped_db.append({
+                    "consumer_id": str(row.get("consumer_id", "") or ""),
+                    "name": db_name,
+                    "address": db_address,
+                    "name_main": db_name_main,
+                    "name_co": db_name_co,
+                    "addr_main": db_addr_main,
+                    "addr_co": db_addr_co,
+                    "mobile_number": str(row.get("mobile_number", "") or ""),
+                    "mobile_norm": mobile_norm,
+                    "combined_norm": combined_norm,
+                    "tokens": combined_tokens,
+                })
+
+                if mobile_norm:
+                    mobile_index[mobile_norm].add(idx)
+
+                for tok in combined_tokens:
+                    if len(tok) >= 3:
+                        prefix_index[tok[:3]].add(idx)
+                    if len(tok) >= 4:
+                        token_index[tok].add(idx)
+
+            cache_data = (prepped_db, mobile_index, prefix_index, token_index)
+            AppAPI._cached_prepped_fuzzy_db = cache_data
+            return cache_data
+
+    def _score_single_fuzzy_query(self, input_name, input_co, input_address, input_mobile, threshold=0.85, top_n=5):
+        prepped = self._get_prepped_fuzzy_db()
+        if not prepped:
+            return []
+
+        prepped_db, mobile_index, prefix_index, token_index = prepped
+
+        input_name = str(input_name or "").strip()
+        input_co = str(input_co or "").strip()
+        input_address = str(input_address or "").strip()
+        input_mobile = str(input_mobile or "").strip()
+
+        if not (input_name or input_co or input_address or input_mobile):
+            return []
+
+        input_combined = self._normalize_fuzzy_text(f"{input_name} {input_co} {input_address}")
+        input_mobile_norm = self._normalize_mobile_10(input_mobile)
+        input_tokens = [t for t in self._tokenize_for_lookup(input_combined) if len(t) >= 3]
+
+        candidate_ids = set()
+        if input_mobile_norm:
+            candidate_ids.update(mobile_index.get(input_mobile_norm, set()))
+
+        for tok in input_tokens[:6]:
+            candidate_ids.update(prefix_index.get(tok[:3], set()))
+
+        longest_tokens = sorted({t for t in input_tokens if len(t) >= 4}, key=len, reverse=True)[:4]
+        for tok in longest_tokens:
+            candidate_ids.update(token_index.get(tok, set()))
+
+        if not candidate_ids and input_tokens:
+            for tok in input_tokens:
+                candidate_ids.update(prefix_index.get(tok[:3], set()))
+
+        if not candidate_ids:
+            candidate_ids = set(range(len(prepped_db)))
+
+        candidates = []
+        for cand_idx in candidate_ids:
+            db_row = prepped_db[cand_idx]
+            mobile_score = 100.0 if (input_mobile_norm and db_row["mobile_norm"] == input_mobile_norm) else 0.0
+
+            # Token overlap pre-check if mobile does not match
+            if input_tokens and db_row["tokens"] and mobile_score != 100.0:
+                overlap = len(set(input_tokens).intersection(db_row["tokens"]))
+                if overlap == 0:
+                    continue
+
+            # 1. Evaluate Name match
+            name_targets = [t for t in [db_row["name"], db_row["name_main"], db_row["addr_co"]] if t]
+            name_score = max((self._match_single_field(input_name, t) for t in name_targets), default=0.0) if input_name else 0.0
+
+            # 2. Evaluate C/O match
+            co_targets = [t for t in [db_row["name_co"], db_row["addr_co"], db_row["name"]] if t]
+            co_score = max((self._match_single_field(input_co, t) for t in co_targets), default=0.0) if input_co else 0.0
+
+            # Cross-check: If input_name matches DB C/O or vice-versa
+            if input_name and db_row["name_co"]:
+                name_score = max(name_score, self._match_single_field(input_name, db_row["name_co"]))
+            if input_co and db_row["name_main"]:
+                co_score = max(co_score, self._match_single_field(input_co, db_row["name_main"]))
+
+            # 3. Calculate Identity Score
+            if input_name and input_co:
+                if name_score >= 60.0 and co_score >= 60.0:
+                    identity_score = (name_score * 0.60) + (co_score * 0.40)
+                elif name_score >= 75.0:
+                    identity_score = (name_score * 0.85) + (co_score * 0.15)
+                elif co_score >= 80.0:
+                    identity_score = (co_score * 0.70) + (name_score * 0.30)
+                else:
+                    identity_score = max(name_score, co_score * 0.70)
+            elif input_name:
+                identity_score = name_score
+            elif input_co:
+                identity_score = co_score
+            else:
+                identity_score = 0.0
+
+            # 4. Evaluate Address match
+            addr_targets = [t for t in [db_row["address"], db_row["addr_main"]] if t]
+            address_score = max((self._match_single_field(input_address, t) for t in addr_targets), default=0.0) if input_address else 0.0
+
+            # 5. Composite Scoring & Identity Gating
+            if mobile_score == 100.0:
+                final_score = 100.0 if identity_score >= 50.0 else max(95.0, identity_score)
+            else:
+                # GATE: If neither name nor C/O matches with >= 50%, candidate is disqualified!
+                if (input_name or input_co) and identity_score < 50.0:
+                    final_score = identity_score * 0.40
+                else:
+                    if input_address:
+                        final_score = (identity_score * 0.60) + (address_score * 0.40)
+                    else:
+                        final_score = identity_score
+
+            final_score = round(min(100.0, max(0.0, final_score)), 2)
+
+            if final_score >= (threshold * 100.0) or mobile_score == 100.0:
+                # Determine Relation: SELF vs RELATIVE
+                # If input_co matched the DB owner's name strongly (>= 75%) and input_name didn't match as strongly, it's a RELATIVE
+                if input_co and co_score >= 75.0 and name_score < co_score - 10.0:
+                    relation = "RELATIVE"
+                elif name_score >= 60.0:
+                    relation = "SELF"
+                elif input_co and co_score >= 70.0:
+                    relation = "RELATIVE"
+                else:
+                    relation = "SELF" if name_score >= co_score else "RELATIVE"
+
+                if mobile_score == 100.0 and final_score >= (threshold * 100.0):
+                    match_type = "Both"
+                elif mobile_score == 100.0:
+                    match_type = "Mobile Exact"
+                else:
+                    match_type = "Fuzzy Identity"
+
+                candidates.append({
+                    "consumer_id": db_row["consumer_id"],
+                    "name": db_row["name"],
+                    "address": db_row["address"],
+                    "mobile_number": db_row["mobile_number"],
+                    "identity_score": round(identity_score, 2),
+                    "name_score": round(name_score, 2),
+                    "co_score": round(co_score, 2),
+                    "address_score": round(address_score, 2),
+                    "mobile_score": round(mobile_score, 2),
+                    "final_score": final_score,
+                    "match_type": match_type,
+                    "relation": relation
+                })
+
+        candidates.sort(key=lambda x: (x["final_score"], x["identity_score"], x["mobile_score"]), reverse=True)
+        return candidates[:top_n]
+
+    def lookup_fuzzy_rows(self, rows, threshold=0.85, top_n=5):
+        """
+        Interactive synchronous API for 1 or more rows typed or pasted in UI.
+        Returns immediate ranked candidates for inline rendering.
+        """
+        try:
+            try:
+                threshold = float(threshold)
+            except Exception:
+                threshold = 0.85
+            threshold = max(0.0, min(1.0, threshold))
+
+            try:
+                top_n = int(top_n)
+            except Exception:
+                top_n = 5
+            top_n = max(1, min(50, top_n))
+
+            if not isinstance(rows, list) or not rows:
+                return {"success": False, "error": "No input rows provided."}
+
+            prepped = self._get_prepped_fuzzy_db()
+            if not prepped:
+                return {"success": False, "error": "Consumer database is empty. Please import consumer data first."}
+
+            output_results = []
+            for item in rows:
+                if not isinstance(item, dict):
+                    continue
+                in_name = str(item.get("name", "") or "").strip()
+                in_co = str(item.get("co", "") or "").strip()
+                in_address = str(item.get("address", "") or "").strip()
+                in_mobile = str(item.get("mobile", "") or item.get("mobile_number", "") or "").strip()
+
+                candidates = self._score_single_fuzzy_query(
+                    input_name=in_name,
+                    input_co=in_co,
+                    input_address=in_address,
+                    input_mobile=in_mobile,
+                    threshold=threshold,
+                    top_n=top_n
+                )
+
+                output_results.append({
+                    "input": {
+                        "name": in_name,
+                        "co": in_co,
+                        "address": in_address,
+                        "mobile": in_mobile
+                    },
+                    "candidates": candidates
+                })
+
+            return {"success": True, "total_rows": len(output_results), "results": output_results}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def run_fuzzy_lookup(self, input_path="", output_path="", threshold=0.85, top_n=5, include_live_osd=False):
         if self._fuzzy_state["running"]:
             return {"success": False, "error": "Fuzzy lookup is already currently running."}
 
@@ -1231,6 +1663,8 @@ class AppAPI:
                 top_n = 5
             top_n = max(1, min(200, top_n))
 
+            do_live_osd = bool(include_live_osd)
+
             self._fuzzy_state["running"] = True
             self._fuzzy_state["processed"] = 0
             self._fuzzy_state["total"] = 0
@@ -1239,95 +1673,13 @@ class AppAPI:
             self._fuzzy_state["output_path"] = output_path
             self._fuzzy_state["error"] = ""
 
-            def _normalize_fuzzy_text(value):
-                text = str(value or "").upper()
-                text = re.sub(r"[^A-Z0-9 ]+", " ", text)
-                text = re.sub(r"\s+", " ", text).strip()
-                return text
-
-            def _normalize_mobile_10(value):
-                digits = re.sub(r"\D", "", str(value or ""))
-                if len(digits) == 12 and digits.startswith("91"):
-                    digits = digits[2:]
-                return digits if len(digits) == 10 else ""
-
-            def _tokenize_for_lookup(text):
-                return [t for t in _normalize_fuzzy_text(text).split(" ") if len(t) >= 2]
-
-            def _fast_text_similarity(a, b):
-                if not a or not b:
-                    return 0.0
-                tokens_a = set(_tokenize_for_lookup(a))
-                tokens_b = set(_tokenize_for_lookup(b))
-
-                def token_sim(x, y):
-                    if rapidfuzz_fuzz is not None:
-                        return float(rapidfuzz_fuzz.ratio(x, y)) / 100.0
-                    return SequenceMatcher(None, x, y).ratio()
-
-                if tokens_a:
-                    covered = 0
-                    for ta in tokens_a:
-                        best = 0.0
-                        for tb in tokens_b:
-                            s = token_sim(ta, tb)
-                            if s > best:
-                                best = s
-                        if best >= 0.80:
-                            covered += 1
-                    coverage_input = covered / len(tokens_a)
-                else:
-                    coverage_input = 0.0
-
-                if rapidfuzz_fuzz is not None:
-                    ratio_score = float(rapidfuzz_fuzz.ratio(a, b))
-                    sort_score = float(rapidfuzz_fuzz.token_sort_ratio(a, b))
-                    partial_score = float(rapidfuzz_fuzz.partial_ratio(a, b))
-                    set_score = float(rapidfuzz_fuzz.token_set_ratio(a, b))
-                    blended = (0.20 * ratio_score) + (0.20 * sort_score) + (0.25 * partial_score) + (0.35 * set_score)
-                    adjusted = blended * (0.55 + (0.90 * coverage_input))
-                    return min(100.0, adjusted)
-                return SequenceMatcher(None, a, b).ratio() * 100.0
-
             def _worker():
                 start_time = time.time()
                 try:
-                    db_profiles = utils.get_all_consumer_profiles()
-                    if not db_profiles:
+                    prepped = self._get_prepped_fuzzy_db()
+                    if not prepped:
                         self._fuzzy_state["error"] = "No consumer data found. Please update consumer database first."
                         return
-
-                    prepped_db = []
-                    mobile_index = defaultdict(set)
-                    prefix_index = defaultdict(set)
-                    token_index = defaultdict(set)
-
-                    for idx, row in enumerate(db_profiles):
-                        db_name = str(row.get("name", ""))
-                        db_address = str(row.get("address", ""))
-                        db_combined_raw = f"{db_name} {db_address}".strip()
-                        combined_norm = _normalize_fuzzy_text(db_combined_raw)
-                        combined_tokens = set(_tokenize_for_lookup(combined_norm))
-                        mobile_norm = _normalize_mobile_10(row.get("mobile_number", ""))
-
-                        prepped_db.append({
-                            "consumer_id": str(row.get("consumer_id", "")),
-                            "name": db_name,
-                            "address": db_address,
-                            "mobile_number": str(row.get("mobile_number", "")),
-                            "mobile_norm": mobile_norm,
-                            "combined_norm": combined_norm,
-                            "tokens": combined_tokens,
-                        })
-
-                        if mobile_norm:
-                            mobile_index[mobile_norm].add(idx)
-
-                        for tok in combined_tokens:
-                            if len(tok) >= 3:
-                                prefix_index[tok[:3]].add(idx)
-                            if len(tok) >= 4:
-                                token_index[tok].add(idx)
 
                     wb_in = openpyxl.load_workbook(input_path)
                     sh_in = wb_in.active
@@ -1340,6 +1692,7 @@ class AppAPI:
                         "co": "co",
                         "c/o": "co",
                         "careof": "co",
+                        "care of": "co",
                         "address": "address",
                         "mobile": "mobile",
                         "mobilenumber": "mobile",
@@ -1382,12 +1735,25 @@ class AppAPI:
                         "Matched Name",
                         "Matched Address",
                         "Matched Mobile",
-                        "Combined Text Match %",
+                        "Relation",
+                        "Identity Match %",
+                        "Name Match %",
+                        "C/O Match %",
+                        "Address Match %",
                         "Mobile Exact Match %",
                         "Final Score %",
                         "Match Type",
                         "Rank",
                     ]
+                    if do_live_osd:
+                        out_headers.extend([
+                            "Live Connection Status",
+                            "Live OSD (Rs)",
+                            "Live LPSC (Rs)",
+                            "Total Payable Dues (Rs)",
+                            "Service Conn Date",
+                            "Office Name",
+                        ])
                     out_sh.append(out_headers)
 
                     for in_row in data_rows:
@@ -1405,80 +1771,73 @@ class AppAPI:
                         if not (input_name or input_co or input_address or input_mobile):
                             continue
 
-                        input_combined = _normalize_fuzzy_text(f"{input_name} {input_co} {input_address}")
-                        input_mobile_norm = _normalize_mobile_10(input_mobile)
-                        input_tokens = [t for t in _tokenize_for_lookup(input_combined) if len(t) >= 3]
-
-                        candidate_ids = set()
-                        if input_mobile_norm:
-                            candidate_ids.update(mobile_index.get(input_mobile_norm, set()))
-
-                        for tok in input_tokens[:6]:
-                            candidate_ids.update(prefix_index.get(tok[:3], set()))
-
-                        longest_tokens = sorted({t for t in input_tokens if len(t) >= 4}, key=len, reverse=True)[:4]
-                        for tok in longest_tokens:
-                            candidate_ids.update(token_index.get(tok, set()))
-
-                        if not candidate_ids and input_tokens:
-                            for tok in input_tokens:
-                                candidate_ids.update(prefix_index.get(tok[:3], set()))
-
-                        if not candidate_ids:
-                            candidate_ids = set(range(len(prepped_db)))
-
-                        candidates = []
-                        for cand_idx in candidate_ids:
-                            db_row = prepped_db[cand_idx]
-                            text_score = 0.0
-                            if input_combined and db_row["combined_norm"]:
-                                if input_tokens and db_row["tokens"]:
-                                    overlap = len(set(input_tokens).intersection(db_row["tokens"]))
-                                    if overlap == 0 and (not input_mobile_norm or db_row["mobile_norm"] != input_mobile_norm):
-                                        continue
-                                text_score = _fast_text_similarity(input_combined, db_row["combined_norm"])
-
-                            mobile_score = 100.0 if (input_mobile_norm and db_row["mobile_norm"] == input_mobile_norm) else 0.0
-                            final_score = max(text_score, mobile_score)
-
-                            if text_score >= (threshold * 100.0) or mobile_score == 100.0:
-                                candidates.append({
-                                    "db": db_row,
-                                    "text_score": text_score,
-                                    "mobile_score": mobile_score,
-                                    "final_score": final_score,
-                                })
-
-                        candidates.sort(key=lambda x: (x["final_score"], x["text_score"], x["mobile_score"]), reverse=True)
-                        candidates = candidates[:top_n]
+                        candidates = self._score_single_fuzzy_query(
+                            input_name=input_name,
+                            input_co=input_co,
+                            input_address=input_address,
+                            input_mobile=input_mobile,
+                            threshold=threshold,
+                            top_n=top_n
+                        )
 
                         if not candidates:
-                            out_sh.append([
+                            empty_row = [
                                 input_name, input_co, input_address, input_mobile,
                                 "", "", "", "",
-                                "0.00", "0.00", "0.00", "No Match", ""
-                            ])
+                                "-", "0.00", "0.00", "0.00", "0.00", "0.00", "0.00",
+                                "No Match", ""
+                            ]
+                            if do_live_osd:
+                                empty_row.extend(["-", "0.00", "0.00", "0.00", "-", "-"])
+                            out_sh.append(empty_row)
                             continue
 
                         rank = 1
                         for c in candidates:
-                            db_row = c["db"]
-                            if c["mobile_score"] == 100.0 and c["text_score"] >= (threshold * 100.0):
-                                match_type = "Both"
-                            elif c["mobile_score"] == 100.0:
-                                match_type = "Mobile Exact"
-                            else:
-                                match_type = "Fuzzy Text"
-
-                            out_sh.append([
+                            c_cid = str(c["consumer_id"]).strip()
+                            row_data = [
                                 input_name, input_co, input_address, input_mobile,
-                                db_row["consumer_id"], db_row["name"], db_row["address"], db_row["mobile_number"],
-                                f"{c['text_score']:.2f}", f"{c['mobile_score']:.2f}", f"{c['final_score']:.2f}",
-                                match_type, rank
-                            ])
+                                c["consumer_id"], c["name"], c["address"], c["mobile_number"],
+                                c.get("relation", "SELF"),
+                                f"{c['identity_score']:.2f}", f"{c['name_score']:.2f}", f"{c['co_score']:.2f}",
+                                f"{c['address_score']:.2f}", f"{c['mobile_score']:.2f}", f"{c['final_score']:.2f}",
+                                c["match_type"], rank
+                            ]
+
+                            if do_live_osd:
+                                osd_info = {"status": "-", "osd": 0.0, "lpsc": 0.0, "total": 0.0, "date": "-", "office": "-"}
+                                if len(c_cid) == 9 and c_cid.isdigit():
+                                    try:
+                                        self._fuzzy_state["status"] = f"Fetching live OSD for CID {c_cid}..."
+                                        live_res = live_osd_service.get_live_osd_data(c_cid)
+                                        if live_res and live_res.get("success") and live_res.get("data"):
+                                            ld = live_res["data"]
+                                            osd_info = {
+                                                "status": ld.get("connectionStatus", "-"),
+                                                "osd": float(ld.get("osd", 0.0)),
+                                                "lpsc": float(ld.get("lpsc", 0.0)),
+                                                "total": float(ld.get("totalDues", 0.0)),
+                                                "date": ld.get("connDate", "-"),
+                                                "office": ld.get("office", "-"),
+                                            }
+                                    except Exception:
+                                        pass
+
+                                row_data.extend([
+                                    osd_info["status"],
+                                    f"{osd_info['osd']:.2f}",
+                                    f"{osd_info['lpsc']:.2f}",
+                                    f"{osd_info['total']:.2f}",
+                                    osd_info["date"],
+                                    osd_info["office"],
+                                ])
+
+                            out_sh.append(row_data)
                             rank += 1
 
-                    widths = [24, 24, 36, 16, 18, 26, 36, 16, 20, 18, 14, 14, 10]
+                    widths = [24, 24, 36, 16, 18, 26, 36, 16, 14, 16, 14, 14, 16, 18, 14, 16, 10]
+                    if do_live_osd:
+                        widths.extend([22, 16, 16, 22, 18, 26])
                     for idx, width in enumerate(widths, start=1):
                         col = openpyxl.utils.get_column_letter(idx)
                         out_sh.column_dimensions[col].width = width
@@ -1621,6 +1980,7 @@ class AppAPI:
 
             utils.update_meter_mapping(d)
             database.set_info_value("consumer_data_updated_at", datetime.now().strftime("%d-%m-%Y %H:%M"))
+            AppAPI._cached_prepped_fuzzy_db = None
             return {"success": True, "count": len(d), "file_path": file_path}
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -1709,5 +2069,143 @@ class AppAPI:
             return {"success": True, "count": len(rows), "path": dest_path}
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    # --- Low Consumption Audit Studio ---
+    def get_low_consumption_session(self):
+        """Retrieve saved low consumption audit session if exists."""
+        session_file = os.path.join(config.BASE_DIR, "verification_session.json")
+        try:
+            if os.path.exists(session_file):
+                with open(session_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                return {"success": True, "data": data, "count": len(data)}
+            return {"success": True, "data": [], "count": 0}
+        except Exception as e:
+            return {"success": False, "error": str(e), "data": []}
+
+    def save_low_consumption_session(self, data):
+        """Save verification session state."""
+        session_file = os.path.join(config.BASE_DIR, "verification_session.json")
+        try:
+            with open(session_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def parse_low_consumption_file(self, file_path=""):
+        """Parse Excel file for low consumption audit."""
+        try:
+            if not file_path or not os.path.exists(file_path):
+                return {"success": False, "error": "File not found."}
+            wb = openpyxl.load_workbook(file_path, data_only=True)
+            sheet = wb.active
+            rows = list(sheet.iter_rows(values_only=True))
+            if not rows:
+                return {"success": False, "error": "Excel sheet is empty."}
+
+            items = []
+            # Check if row 0 looks like header
+            start_idx = 0
+            first_row_str = " ".join([str(c or "").lower() for c in rows[0]])
+            if any(k in first_row_str for k in ["consumer", "cid", "meter", "unit", "cons"]):
+                start_idx = 1
+
+            for idx, r in enumerate(rows[start_idx:]):
+                if not any(r):
+                    continue
+                cid = str(r[0] or "").strip()
+                if not cid or cid.lower() in ("none", "nan"):
+                    continue
+                meter = str(r[1] or "").strip() if len(r) > 1 else ""
+                unit = str(r[2] or "").strip() if len(r) > 2 else "0"
+                items.append({
+                    "id": idx,
+                    "cid": cid,
+                    "meter": meter,
+                    "unit": unit,
+                    "status": "PENDING",
+                    "remarks": ""
+                })
+
+            if not items:
+                return {"success": False, "error": "No valid consumer rows found in file."}
+
+            self.save_low_consumption_session(items)
+            return {"success": True, "data": items, "count": len(items)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def export_low_consumption_report(self, items):
+        """Export audit report to CSV and open destination folder."""
+        try:
+            if not items:
+                return {"success": False, "error": "No audit records to export."}
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            dest_file = os.path.join(config.BASE_DIR, f"Low_Consumption_Audit_{timestamp}.csv")
+            fieldnames = ["id", "cid", "meter", "unit", "status", "remarks"]
+            with open(dest_file, "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
+                writer.writeheader()
+                writer.writerows(items)
+
+            self.open_file_external(dest_file)
+            return {"success": True, "file_path": dest_file, "count": len(items)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def get_system_clipboard(self):
+        """Retrieve plain text from system clipboard using tkinter fallback."""
+        try:
+            import tkinter as tk
+            root = tk.Tk()
+            root.withdraw()
+            try:
+                text = root.clipboard_get()
+            except Exception:
+                text = ""
+            finally:
+                root.destroy()
+            return {"success": True, "text": text}
+        except Exception as e:
+            return {"success": False, "error": str(e), "text": ""}
+
+    # --- Live WBSEDCL OSD & Connection Status ---
+    def get_live_osd(self, consumer_id, force_refresh=False):
+        """
+        Fetches live Outstanding Dues (OSD), LPSC surcharge, total payable dues,
+        and connection status directly from WBSEDCL portal.
+        """
+        try:
+            cid = str(consumer_id).strip()
+            if not re.match(r"^\d{9}$", cid):
+                return {"success": False, "error": f"Invalid Consumer ID '{cid}'. Must be a 9-digit number."}
+
+            res = live_osd_service.get_live_osd_data(cid, include_pdf_base64=True, force_refresh=bool(force_refresh))
+            return res
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def open_live_osd_pdf(self, consumer_id):
+        """
+        Fetches live OSD PDF and opens it in Windows default PDF viewer.
+        """
+        try:
+            cid = str(consumer_id).strip()
+            if not re.match(r"^\d{9}$", cid):
+                return {"success": False, "error": "Invalid Consumer ID. Must be 9 digits."}
+
+            pdf_bytes = live_osd_service.fetch_live_osd_pdf(cid)
+            temp_dir = os.path.join(config.BASE_DIR, "temp_osd")
+            os.makedirs(temp_dir, exist_ok=True)
+            pdf_path = os.path.join(temp_dir, f"WBSEDCL_OSD_{cid}.pdf")
+            with open(pdf_path, "wb") as f:
+                f.write(pdf_bytes)
+
+            self.open_file_external(pdf_path)
+            return {"success": True, "file_path": pdf_path}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
 
 
