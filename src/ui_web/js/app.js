@@ -68,6 +68,25 @@ function toggleDetailsPanel() {
   lucide.createIcons();
 }
 
+function copyDetail(elementId, btn) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  const text = el.innerText.trim();
+  if (!text || text === '-' || text === 'Not Recorded' || text === 'None') return;
+
+  navigator.clipboard.writeText(text).then(() => {
+    if (btn) {
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = `<i data-lucide="check" class="w-2.5 h-2.5 text-emerald-500"></i>`;
+      lucide.createIcons();
+      setTimeout(() => {
+        btn.innerHTML = originalHtml;
+        lucide.createIcons();
+      }, 1200);
+    }
+  }).catch(err => console.warn('Copy error:', err));
+}
+
 function toggleSection(sectionId) {
   const body = document.getElementById(`body-${sectionId}`);
   const icon = document.getElementById(`icon-${sectionId}`);
@@ -148,8 +167,8 @@ async function callAPI(method, ...args) {
 
 async function initApp() {
   const info = await callAPI('get_app_info');
-  if (info && info.total_images) {
-    document.getElementById('statImages').innerText = `${info.total_images} Imgs`;
+  if (info && info.total_images !== undefined) {
+    document.getElementById('statImages').innerText = `${info.total_images.toLocaleString()}`;
     document.getElementById('indexedCount').innerText = info.total_images;
   }
   
@@ -183,6 +202,19 @@ function switchTab(tabId) {
   document.querySelectorAll('.nav-item').forEach(el => {
     el.classList.toggle('active', el.dataset.tab === tabId);
   });
+
+  // Limit search bar and viewer actions strictly to Image Viewer tab
+  const viewerActions = document.getElementById('viewerHeaderActions');
+  if (viewerActions) {
+    if (tabId === 'viewer') {
+      viewerActions.classList.remove('hidden');
+      viewerActions.classList.add('flex');
+    } else {
+      viewerActions.classList.add('hidden');
+      viewerActions.classList.remove('flex');
+    }
+  }
+
   updatePageHeader(tabId);
   lucide.createIcons();
 }
@@ -192,7 +224,15 @@ function toggleTheme() {
   const currentTheme = html.getAttribute('data-theme') || 'dark';
   const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
   html.setAttribute('data-theme', newTheme);
-  document.getElementById('themeLabel').innerText = newTheme.toUpperCase();
+  
+  const iconEl = document.getElementById('themeIcon');
+  if (iconEl) {
+    iconEl.setAttribute('data-lucide', newTheme === 'dark' ? 'sun' : 'moon');
+  }
+  const labelEl = document.getElementById('themeLabel');
+  if (labelEl) {
+    labelEl.innerText = newTheme.toUpperCase();
+  }
   lucide.createIcons();
 }
 
@@ -370,7 +410,13 @@ async function showImage(index) {
   currentImageIndex = index;
   const item = currentImages[index];
 
-  document.getElementById('imgDateTag').innerText = `${item.date_formatted} (${item.filename})`;
+  const dateTag = document.getElementById('imgDateTag');
+  const dateContainer = document.getElementById('imgDateTagContainer');
+  if (dateTag) dateTag.innerText = `${item.date_formatted} (${item.filename})`;
+  if (dateContainer) {
+    dateContainer.classList.remove('hidden');
+    dateContainer.classList.add('flex');
+  }
 
   // Update active state on filmstrip
   document.querySelectorAll('.filmstrip-thumb').forEach((el, i) => {

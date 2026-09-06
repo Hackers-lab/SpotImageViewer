@@ -24,7 +24,7 @@
   --text-2: #c0c0c0;
   --text-3: #888888;
   --canvas: #101010;
-  --sidebar-w: 200px;
+  --sidebar-w: 175px;
   --rail-w: 32px;
   --topbar-h: 42px;
   --radius-lg: 6px;
@@ -96,15 +96,15 @@ html[data-theme="light"] main {
 .sidebar {
   width: var(--sidebar-w) !important;
   min-width: var(--sidebar-w) !important;
-  background: #1b1b1b !important;
-  border-right: 1px solid rgba(255,255,255,.075) !important;
+  background: #181818 !important;
+  border-right: 1px solid rgba(255,255,255,.07) !important;
   transition: width .22s cubic-bezier(.2,.8,.2,1) !important;
-  box-shadow: 8px 0 30px rgba(0,0,0,.08);
+  box-shadow: none !important;
 }
 
 html[data-theme="light"] .sidebar {
-  background: #f8f9fb !important;
-  border-right-color: rgba(15,23,42,.10) !important;
+  background: #ffffff !important;
+  border-right-color: rgba(15,23,42,.08) !important;
 }
 
 .sidebar.collapsed {
@@ -114,67 +114,61 @@ html[data-theme="light"] .sidebar {
 
 .sidebar > div:first-child > div:first-child {
   height: var(--topbar-h) !important;
-  padding: 0 14px !important;
+  padding: 0 12px !important;
   border-bottom: 1px solid var(--border) !important;
 }
 
-.sidebar .w-9.h-9 {
-  width: 32px !important;
-  height: 32px !important;
-  border-radius: 8px !important;
-  background: linear-gradient(135deg, #31a8ff, #635bff) !important;
-  box-shadow: 0 8px 20px rgba(49,168,255,.22) !important;
-}
-
-.sidebar nav#navContainer { padding: 12px 9px !important; margin-top: 0 !important; }
+.sidebar nav#navContainer { padding: 8px 6px !important; margin-top: 0 !important; }
 
 .nav-item {
-  height: 38px !important;
-  padding: 0 11px !important;
-  margin: 2px 0 !important;
-  border-radius: 6px !important;
-  color: #a8a8a8 !important;
-  font-size: 12px !important;
+  height: 32px !important;
+  padding: 0 9px !important;
+  margin: 1px 0 !important;
+  border-radius: 4px !important;
+  color: #909090 !important;
+  font-size: 11.5px !important;
   border: 1px solid transparent !important;
   position: relative;
 }
 
-html[data-theme="light"] .nav-item { color: #5f6670 !important; }
+html[data-theme="light"] .nav-item { color: #64748b !important; }
 
 .nav-item:hover {
-  color: #f4f4f4 !important;
-  background: #292929 !important;
-  border-color: rgba(255,255,255,.045) !important;
+  color: #f1f5f9 !important;
+  background: #232323 !important;
+  border-color: transparent !important;
 }
 
 html[data-theme="light"] .nav-item:hover {
-  color: #20242a !important;
-  background: #e9edf2 !important;
+  color: #0f172a !important;
+  background: #f1f5f9 !important;
 }
 
 .nav-item.active {
-  color: #fff !important;
-  background: linear-gradient(90deg, rgba(49,168,255,.18), rgba(49,168,255,.07)) !important;
-  border-color: rgba(49,168,255,.17) !important;
+  color: #ffffff !important;
+  background: #282828 !important;
+  border-color: rgba(255,255,255,.08) !important;
 }
 
 html[data-theme="light"] .nav-item.active {
-  color: #0869a8 !important;
-  background: linear-gradient(90deg, rgba(49,168,255,.14), rgba(49,168,255,.035)) !important;
-  border-color: rgba(49,168,255,.18) !important;
+  color: #0f172a !important;
+  background: #e2e8f0 !important;
+  border-color: rgba(15,23,42,.12) !important;
 }
 
 .nav-item.active::before {
-  left: -9px !important;
-  top: 8px !important;
-  bottom: 8px !important;
+  left: 0px !important;
+  top: 6px !important;
+  bottom: 6px !important;
   width: 2px !important;
   background: var(--accent) !important;
-  box-shadow: 0 0 10px rgba(49,168,255,.55);
+  border-radius: 2px;
 }
 
-.nav-item i { width: 16px !important; height: 16px !important; color: #777 !important; }
-.nav-item.active i, .nav-item:hover i { color: var(--accent) !important; }
+.nav-item i { width: 14px !important; height: 14px !important; color: #707070 !important; }
+.nav-item.active i { color: var(--accent) !important; }
+.nav-item:hover i { color: #cccccc !important; }
+html[data-theme="light"] .nav-item:hover i { color: #334155 !important; }
 
 .sidebar > div:last-child {
   padding: 9px !important;
@@ -192,83 +186,65 @@ html[data-theme="light"] .nav-item.active {
 }
 
 /* ---------- TOP BAR ---------- */
-main > header {
-  height: var(--topbar-h) !important;
-  min-height: var(--topbar-h) !important;
-  padding: 0 10px !important;
-  gap: 8px !important;
-  background: rgba(28,28,28,.94) !important;
+.app-topbar,
+header.app-topbar {
+  height: 44px !important;
+  min-height: 44px !important;
+  padding: 0 14px !important;
+  background: rgba(24,24,24,.96) !important;
   border-bottom: 1px solid var(--border) !important;
-  box-shadow: 0 1px 0 rgba(0,0,0,.25), 0 4px 16px rgba(0,0,0,.08);
   backdrop-filter: blur(18px) saturate(1.2) !important;
 }
 
-html[data-theme="light"] main > header { background: rgba(250,251,252,.94) !important; }
-
-main > header > div:first-child {
-  min-width: 140px !important;
-  padding-right: 10px !important;
-  border-right-color: var(--border) !important;
-}
-
-#pageTitleIcon {
-  width: 24px !important;
-  height: 24px !important;
-  border-radius: 5px !important;
-  background: rgba(49,168,255,.10) !important;
-  color: var(--accent) !important;
-  border: 1px solid rgba(49,168,255,.12);
-}
-
-#pageTitle { 
-  color: var(--text) !important; 
-  font-size: 11px !important; 
-  font-weight: 600 !important;
-  letter-spacing: -.01em; 
-}
-main > header .text-\[10px\] { 
-  color: var(--text-3) !important; 
-  font-size: 8.5px !important; 
-  letter-spacing: 0.05em;
+html[data-theme="light"] .app-topbar,
+html[data-theme="light"] header.app-topbar { 
+  background: rgba(255,255,255,.96) !important; 
+  border-bottom-color: rgba(15,23,42,.08) !important;
 }
 
 /* ---------- SEARCH ---------- */
 #searchInput {
-  height: 28px !important;
-  font-size: 10.5px !important;
-  border-radius: 5px !important;
-  background: #121212 !important;
-  border: 1px solid rgba(255,255,255,.11) !important;
+  height: 32px !important;
+  font-size: 12px !important;
+  border-radius: 6px !important;
+  background: #111111 !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
   color: #f4f4f4 !important;
-  box-shadow: inset 0 1px 2px rgba(0,0,0,.22);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.25);
 }
 
 html[data-theme="light"] #searchInput {
-  background: #fff !important;
-  border-color: rgba(15,23,42,.13) !important;
-  color: #17191d !important;
+  background: #f8fafc !important;
+  border-color: rgba(15,23,42,.14) !important;
+  color: #0f172a !important;
 }
 
 #searchInput:focus {
-  border-color: rgba(49,168,255,.72) !important;
-  box-shadow: 0 0 0 3px rgba(49,168,255,.11), inset 0 1px 2px rgba(0,0,0,.18) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(49,168,255,.15), inset 0 1px 2px rgba(0,0,0,.18) !important;
 }
 
 #searchInput + div button,
-main > header .bg-sky-600 {
+header .bg-sky-600 {
   background: var(--accent-dark) !important;
   border-radius: 4px !important;
-  font-size: 10px !important;
-  height: 24px;
+  font-size: 11px !important;
+  height: 26px;
 }
 
 #searchType {
-  height: 28px !important;
-  font-size: 10px !important;
-  border-radius: 5px !important;
-  background: var(--surface-1) !important;
-  border-color: var(--border-strong) !important;
+  height: 32px !important;
+  font-size: 11.5px !important;
+  border-radius: 6px !important;
+  background: #111111 !important;
+  border-color: rgba(255,255,255,.12) !important;
   color: var(--text-2) !important;
+}
+
+html[data-theme="light"] #searchType {
+  background: #f8fafc !important;
+  border-color: rgba(15,23,42,.14) !important;
+  color: #334155 !important;
 }
 
 /* ---------- HEADER ACTIONS ---------- */
@@ -319,20 +295,6 @@ html[data-theme="light"] #viewport {
     linear-gradient(-45deg, transparent 75%, rgba(0,0,0,.035) 75%) !important;
 }
 
-#viewport::after {
-  content: "IMAGE INSPECTION VIEWPORT";
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  color: rgba(255,255,255,.18);
-  font-size: 9px;
-  letter-spacing: .18em;
-  font-weight: 700;
-  pointer-events: none;
-}
-
-html[data-theme="light"] #viewport::after { color: rgba(15,23,42,.22); }
 
 #mainImage {
   border-radius: 2px !important;
