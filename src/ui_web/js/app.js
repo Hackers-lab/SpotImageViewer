@@ -78,7 +78,7 @@ function toggleSection(sectionId) {
   }
 }
 
-function expandToSection(sectionId) {
+function expandToSection(targetSectionId) {
   const panel = document.getElementById('detailsPanel');
   const rail = document.getElementById('detailsPanelRail');
   if (panel && rail) {
@@ -87,15 +87,24 @@ function expandToSection(sectionId) {
     rail.classList.remove('flex');
     localStorage.setItem('siv_details_collapsed', '0');
   }
-  // Open the targeted section if closed
-  const body = document.getElementById(`body-${sectionId}`);
-  const icon = document.getElementById(`icon-${sectionId}`);
-  if (body && body.classList.contains('hidden')) {
-    body.classList.remove('hidden');
-    if (icon) icon.style.transform = 'rotate(0deg)';
-  }
+
+  // Accordion behavior: open ONLY the targeted section, close the other two
+  const allSections = ['section-profile', 'section-notes', 'section-cycles'];
+  allSections.forEach(secId => {
+    const body = document.getElementById(`body-${secId}`);
+    const icon = document.getElementById(`icon-${secId}`);
+    if (!body) return;
+    if (secId === targetSectionId) {
+      body.classList.remove('hidden');
+      if (icon) icon.style.transform = 'rotate(0deg)';
+    } else {
+      body.classList.add('hidden');
+      if (icon) icon.style.transform = 'rotate(-90deg)';
+    }
+  });
+
   // Scroll to section smoothly
-  const secEl = document.getElementById(sectionId);
+  const secEl = document.getElementById(targetSectionId);
   if (secEl) {
     secEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
