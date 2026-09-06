@@ -1,13 +1,17 @@
 {
-  "version": 19.3,
-  "release_notes": "V19.3 Updates:\n\n- In-App Self-Updating: Automated installer packaging and silent background update execution with progress dialog.\n- Bill Calculator Modern Date Range Picker: Added modern Month and Year dropdown selectors and fast step navigation for Pro-Rata billing.\n- Standardized Date Format: Pro-Rata dates now default to and strictly format as DD.MM.YYYY.\n- WBERC Subsidy Rule Enforcement: Domestic government relief correctly caps strictly at <= 300 units/month (or proportional pro-rata/quarterly limit).\n- Fast Image Indexing Fix: Network and additional folders dynamically reloaded without stale cache, preserving ultra-fast raw slicing for 1M+ images.\n- Bundled Application Suite: Includes both SpotImageViewerV19.3.exe and imagecheckgui.exe with Windows Setup installer.",
-  "download_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/19.3/SpotImageViewer_Setup.exe",
-  "installer_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/19.3/SpotImageViewer_Setup.exe",
-  "zip_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/19.3/SpotImageViewerV19.3.zip",
+  "version": 19.4,
+  "release_notes": "V19.4 Updates:\n\n- Modern Navigation & UI: Refactored with Windows 11 Fluent style sidebar navigation, responsive layout, and unified tool workspace.\n- Dynamic Dark / Light Themes: Coordinated one-click theme switcher across CustomTkinter and TTKBootstrap components.\n- Embedded Workspace Tools: Bill Calculator, Theft Assessment, Low Consumption Audit, and Tariff Editor can now be launched directly in-frame or detached into separate windows.\n- Bill Calculator Modern Date Range Picker: Standardized DD.MM.YYYY format with fast month/year jump controls.\n- Complete Bundled Suite: Includes SpotImageViewerV19.4.exe and imagecheckgui.exe with seamless silent auto-updater.",
+  "download_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/19.4/SpotImageViewer_Setup.exe",
+  "installer_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/19.4/SpotImageViewer_Setup.exe",
+  "zip_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/19.4/SpotImageViewerV19.4.zip",
   "install_args": "/VERYSILENT /NORESTART",
-  "launch_exe": "SpotImageViewer\\SpotImageViewerV19.3.exe",
-  "sha256": "435012536c63f864f5fa190b79f9d85df9705d78b9089294fbc94b978eb0817a",
+  "launch_exe": "SpotImageViewer\\SpotImageViewerV19.4.exe",
+  "sha256": "737bab0b4f8d01d60ec257fe6c7920e4d715b9aca48cbfc7402111625278c938",
   "previous_versions": [
+    {
+      "version": 19.3,
+      "release_notes": "V19.3 Updates:\n\n- In-App Self-Updating: Automated installer packaging and silent background update execution with progress dialog.\n- Bill Calculator Modern Date Range Picker: Added modern Month and Year dropdown selectors and fast step navigation for Pro-Rata billing.\n- Standardized Date Format: Pro-Rata dates now default to and strictly format as DD.MM.YYYY.\n- WBERC Subsidy Rule Enforcement: Domestic government relief correctly caps strictly at <= 300 units/month (or proportional pro-rata/quarterly limit).\n- Fast Image Indexing Fix: Network and additional folders dynamically reloaded without stale cache, preserving ultra-fast raw slicing for 1M+ images.\n- Bundled Application Suite: Includes both SpotImageViewerV19.3.exe and imagecheckgui.exe with Windows Setup installer."
+    },
     {
       "version": 19.2,
       "release_notes": "V19.2 Updates:\n\n- Integrated WBSedcl Meter Verification tool (Image Check GUI) directly into the main app Tools menu.\n- Configured multi-executable compilation workflow to bundle both Spot Image Viewer and the Image Check GUI tool.\n- Upgraded application suite release to V19.2."
