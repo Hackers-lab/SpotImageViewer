@@ -835,48 +835,48 @@
     </section>
 
     <!-- TAB 3: Theft Assessment Studio -->
-    <section id="tab-theft" class="tab-content flex-1 p-4 lg:p-6 overflow-y-auto hidden">
-      <div class="max-w-5xl mx-auto space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
+    <section id="tab-theft" class="tab-content flex-1 p-6 lg:p-8 overflow-y-auto hidden">
+      <div class="max-w-6xl mx-auto space-y-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 pb-1">
           <div>
-            <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100">Theft & Unauthorized Usage Assessment</h2>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Section 126 & 135 Electricity Act Assessment Ledger</p>
+            <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100">Theft & Unauthorized Usage Assessment</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Section 126 & 135 Electricity Act Assessment Ledger</p>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-3">
             <!-- Reverse Load Calculator Button -->
-            <button onclick="toggleReverseLoadModal(true)" class="h-8 px-3 rounded-lg text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 shadow-sm flex items-center gap-1.5 transition">
-              <i data-lucide="calculator" class="w-3.5 h-3.5"></i>
+            <button onclick="toggleReverseLoadModal(true)" class="h-9 px-3.5 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 shadow-sm flex items-center gap-2 transition">
+              <i data-lucide="calculator" class="w-4 h-4"></i>
               <span>Calculate Load from Bill</span>
             </button>
             <!-- Show Calculation Details Button -->
-            <button onclick="toggleTheftBreakdownModal(true)" class="h-8 px-3 rounded-lg text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-sm flex items-center gap-1.5 transition">
-              <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+            <button onclick="toggleTheftBreakdownModal(true)" class="h-9 px-3.5 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-sm flex items-center gap-2 transition">
+              <i data-lucide="file-text" class="w-4 h-4"></i>
               <span>Show Calculation Details</span>
             </button>
           </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           <!-- Parameters (5 cols) -->
-          <div class="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3.5 shadow-sm">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Offender Parameters</h3>
-            <div class="space-y-3">
+          <div class="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 space-y-5 shadow-sm">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 pb-2 border-b border-slate-100 dark:border-slate-800/80">Offender Parameters</h3>
+            <div class="space-y-4">
               <div>
-                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">Tariff Class</label>
-                <select id="theftCategory" onchange="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2.5 py-1.5 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500"></select>
+                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1.5">Tariff Class</label>
+                <select id="theftCategory" onchange="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs px-3 py-2 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500"></select>
               </div>
               <div>
-                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">Offender Type</label>
-                <select id="theftConsumerType" onchange="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2.5 py-1.5 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500">
+                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1.5">Offender Type</label>
+                <select id="theftConsumerType" onchange="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs px-3 py-2 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500">
                   <option value="Consumer">Registered Consumer</option>
                   <option value="Non-Consumer">Non-Consumer (Direct Theft)</option>
                 </select>
               </div>
               <div>
-                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">Connected Load</label>
-                <div class="flex gap-1.5">
-                  <input type="number" step="0.1" id="theftLoad" value="1.5" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2.5 py-1.5 text-slate-800 dark:text-slate-200" min="0.1">
-                  <select id="theftLoadUnit" onchange="runTheftCalc()" class="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-1.5 py-1.5 text-slate-800 dark:text-slate-200 w-16 shrink-0">
+                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1.5">Connected Load</label>
+                <div class="flex gap-2">
+                  <input type="number" step="0.1" id="theftLoad" value="1.5" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs px-3 py-2 text-slate-800 dark:text-slate-200" min="0.1">
+                  <select id="theftLoadUnit" onchange="runTheftCalc()" class="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs px-2.5 py-2 text-slate-800 dark:text-slate-200 w-20 shrink-0">
                     <option value="kVA">kVA</option>
                     <option value="kW">kW</option>
                   </select>
@@ -885,138 +885,138 @@
             </div>
 
             <!-- Prior Bill Adjustments -->
-            <div class="pt-2.5 border-t border-slate-200 dark:border-slate-800">
-              <h4 class="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">Paid Bill Deductions (₹)</h4>
-              <div class="grid grid-cols-3 gap-2">
+            <div class="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
+              <h4 class="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Paid Bill Deductions (₹)</h4>
+              <div class="grid grid-cols-3 gap-2.5">
                 <div>
                   <label class="text-[11px] text-slate-500 block mb-1">Energy</label>
-                  <input type="number" id="theftAdjEnergy" value="0" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2 py-1 text-slate-800 dark:text-slate-200">
+                  <input type="number" id="theftAdjEnergy" value="0" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs px-2.5 py-1.5 text-slate-800 dark:text-slate-200">
                 </div>
                 <div>
                   <label class="text-[11px] text-slate-500 block mb-1">Fixed</label>
-                  <input type="number" id="theftAdjFixed" value="0" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2 py-1 text-slate-800 dark:text-slate-200">
+                  <input type="number" id="theftAdjFixed" value="0" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs px-2.5 py-1.5 text-slate-800 dark:text-slate-200">
                 </div>
                 <div>
                   <label class="text-[11px] text-slate-500 block mb-1">Duty</label>
-                  <input type="number" id="theftAdjEd" value="0" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2 py-1 text-slate-800 dark:text-slate-200">
+                  <input type="number" id="theftAdjEd" value="0" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs px-2.5 py-1.5 text-slate-800 dark:text-slate-200">
                 </div>
               </div>
             </div>
           </div>
 
           <!-- Dual Ledger (7 cols) -->
-          <div class="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm space-y-3">
-            <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+          <div class="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Assessment Breakdown</h3>
-              <span class="text-[11px] px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300 font-semibold">Provisional & Final</span>
+              <span class="text-xs px-2.5 py-0.5 rounded-full bg-sky-100 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300 font-semibold">Provisional & Final</span>
             </div>
             
-            <div class="grid grid-cols-2 gap-3.5">
+            <div class="grid grid-cols-2 gap-5 sm:gap-6">
               <!-- Provisional Left -->
-              <div class="border-r border-slate-200 dark:border-slate-800 pr-3.5 space-y-2.5">
-                <div class="pb-1.5 border-b border-slate-200 dark:border-slate-800 space-y-1">
+              <div class="border-r border-slate-200 dark:border-slate-800 pr-5 sm:pr-6 space-y-3.5">
+                <div class="pb-2.5 border-b border-slate-200 dark:border-slate-800 space-y-2">
                   <div class="flex items-center justify-between">
-                    <h4 class="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase">Provisional</h4>
+                    <h4 class="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wide">Provisional</h4>
                     <span id="provHoursLabel" class="text-[11px] text-slate-500 font-mono">(24h 00m)</span>
                   </div>
-                  <div class="grid grid-cols-2 gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+                  <div class="grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-400">
                     <div>
-                      <span class="text-[10px] block">Days</span>
-                      <input type="number" id="theftProvDays" value="365" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-xs">
+                      <span class="text-[10px] block mb-1 font-medium">Days</span>
+                      <input type="number" id="theftProvDays" value="365" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-semibold">
                     </div>
                     <div>
-                      <span class="text-[10px] block">Hrs/Day</span>
-                      <input type="number" step="0.5" id="theftProvHours" value="24" min="0" max="24" oninput="validateHoursAndRun(this)" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-xs">
+                      <span class="text-[10px] block mb-1 font-medium">Hrs/Day</span>
+                      <input type="number" step="0.5" id="theftProvHours" value="24" min="0" max="24" oninput="validateHoursAndRun(this)" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-semibold">
                     </div>
                   </div>
                 </div>
                 
-                <div class="space-y-1.5 text-xs">
-                  <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                <div class="space-y-2 text-xs">
+                  <div class="flex justify-between text-slate-600 dark:text-slate-400 py-0.5">
                     <span>Units</span>
                     <span id="provUnits" class="font-semibold text-slate-800 dark:text-slate-200">0 kWh</span>
                   </div>
-                  <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                  <div class="flex justify-between text-slate-600 dark:text-slate-400 py-0.5">
                     <span>Energy Charge</span>
                     <span id="provEnergy" class="font-semibold text-slate-800 dark:text-slate-200">&#8377; 0.00</span>
                   </div>
-                  <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                  <div class="flex justify-between text-slate-600 dark:text-slate-400 py-0.5">
                     <span>Fixed / Demand Charge</span>
                     <span id="provFixed" class="font-semibold text-slate-800 dark:text-slate-200">&#8377; 0.00</span>
                   </div>
-                  <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                  <div class="flex justify-between text-slate-600 dark:text-slate-400 py-0.5">
                     <span>Duty (ED)</span>
                     <span id="provEd" class="font-semibold text-slate-800 dark:text-slate-200">&#8377; 0.00</span>
                   </div>
-                  <div class="flex justify-between font-bold border-t border-slate-200 dark:border-slate-800 pt-1 text-slate-800 dark:text-slate-200">
+                  <div class="flex justify-between font-bold border-t border-slate-200 dark:border-slate-800 pt-2 text-slate-800 dark:text-slate-200">
                     <span>Gross</span>
                     <span id="provGross">&#8377; 0.00</span>
                   </div>
-                  <div class="flex justify-between text-emerald-600 dark:text-emerald-400">
+                  <div class="flex justify-between text-emerald-600 dark:text-emerald-400 py-0.5">
                     <span>Deductions</span>
                     <span id="provAdj">- &#8377; 0.00</span>
                   </div>
-                  <div class="flex justify-between items-center font-bold text-sky-600 dark:text-sky-400 pt-1 border-t border-slate-200 dark:border-slate-800 bg-sky-50/50 dark:bg-sky-950/30 p-1.5 rounded">
+                  <div class="flex justify-between items-center font-bold text-sky-600 dark:text-sky-400 pt-2 border-t border-slate-200 dark:border-slate-800 bg-sky-50/60 dark:bg-sky-950/40 p-2 rounded-xl mt-1">
                     <span class="text-xs">NET</span>
-                    <span id="provNet" class="text-sm font-black">&#8377; 0</span>
+                    <span id="provNet" class="text-base font-black">&#8377; 0</span>
                   </div>
                 </div>
               </div>
 
               <!-- Final Right -->
-              <div class="space-y-2.5">
-                <div class="pb-1.5 border-b border-slate-200 dark:border-slate-800 space-y-1">
+              <div class="space-y-3.5">
+                <div class="pb-2.5 border-b border-slate-200 dark:border-slate-800 space-y-2">
                   <div class="flex items-center justify-between">
-                    <h4 class="text-xs font-bold text-rose-600 dark:text-rose-400 uppercase">Final (Hearing)</h4>
+                    <h4 class="text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wide">Final (Hearing)</h4>
                     <span id="finalHoursLabel" class="text-[11px] text-slate-500 font-mono">(19h 00m)</span>
                   </div>
-                  <div class="grid grid-cols-2 gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+                  <div class="grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-400">
                     <div>
-                      <span class="text-[10px] block">Days</span>
-                      <input type="number" id="theftFinalDays" value="365" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-xs">
+                      <span class="text-[10px] block mb-1 font-medium">Days</span>
+                      <input type="number" id="theftFinalDays" value="365" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-semibold">
                     </div>
                     <div>
-                      <span class="text-[10px] block">Hrs/Day</span>
-                      <input type="number" step="0.5" id="theftFinalHours" value="19" min="0" max="24" oninput="validateHoursAndRun(this)" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-xs">
+                      <span class="text-[10px] block mb-1 font-medium">Hrs/Day</span>
+                      <input type="number" step="0.5" id="theftFinalHours" value="19" min="0" max="24" oninput="validateHoursAndRun(this)" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-semibold">
                     </div>
                   </div>
                 </div>
                 
-                <div class="space-y-1.5 text-xs">
-                  <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                <div class="space-y-2 text-xs">
+                  <div class="flex justify-between text-slate-600 dark:text-slate-400 py-0.5">
                     <span>Units</span>
                     <span id="finalUnits" class="font-semibold text-slate-800 dark:text-slate-200">0 kWh</span>
                   </div>
-                  <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                  <div class="flex justify-between text-slate-600 dark:text-slate-400 py-0.5">
                     <span>Energy Charge</span>
                     <span id="finalEnergy" class="font-semibold text-slate-800 dark:text-slate-200">&#8377; 0.00</span>
                   </div>
-                  <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                  <div class="flex justify-between text-slate-600 dark:text-slate-400 py-0.5">
                     <span>Fixed / Demand Charge</span>
                     <span id="finalFixed" class="font-semibold text-slate-800 dark:text-slate-200">&#8377; 0.00</span>
                   </div>
-                  <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                  <div class="flex justify-between text-slate-600 dark:text-slate-400 py-0.5">
                     <span>Duty (ED)</span>
                     <span id="finalEd" class="font-semibold text-slate-800 dark:text-slate-200">&#8377; 0.00</span>
                   </div>
-                  <div class="flex justify-between font-bold border-t border-slate-200 dark:border-slate-800 pt-1 text-slate-800 dark:text-slate-200">
+                  <div class="flex justify-between font-bold border-t border-slate-200 dark:border-slate-800 pt-2 text-slate-800 dark:text-slate-200">
                     <span>Gross</span>
                     <span id="finalGross">&#8377; 0.00</span>
                   </div>
-                  <div class="flex justify-between text-emerald-600 dark:text-emerald-400">
+                  <div class="flex justify-between text-emerald-600 dark:text-emerald-400 py-0.5">
                     <span>Deductions</span>
                     <span id="finalAdj">- &#8377; 0.00</span>
                   </div>
-                  <div class="flex justify-between items-center font-bold text-rose-600 dark:text-rose-400 pt-1 border-t border-slate-200 dark:border-slate-800 bg-rose-50/50 dark:bg-rose-950/30 p-1.5 rounded">
+                  <div class="flex justify-between items-center font-bold text-rose-600 dark:text-rose-400 pt-2 border-t border-slate-200 dark:border-slate-800 bg-rose-50/60 dark:bg-rose-950/40 p-2 rounded-xl mt-1">
                     <span class="text-xs">NET</span>
-                    <span id="finalNet" class="text-sm font-black">&#8377; 0</span>
+                    <span id="finalNet" class="text-base font-black">&#8377; 0</span>
                   </div>
                 </div>
               </div>
             </div>
 
             <!-- Relief comparison banner -->
-            <div id="reliefBar" class="mt-2.5 p-2.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold text-center border border-emerald-200 dark:border-emerald-800/50">
+            <div id="reliefBar" class="mt-3 p-3 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold text-center border border-emerald-200 dark:border-emerald-800/50">
               Final Assessment Relief: &#8377; 0.00 (0.00%)
             </div>
           </div>
