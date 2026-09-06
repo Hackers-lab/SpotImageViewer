@@ -12,6 +12,15 @@ import shutil
 import csv
 import threading
 import time
+import re
+import subprocess
+from collections import defaultdict
+from difflib import SequenceMatcher
+try:
+    from rapidfuzz import fuzz as rapidfuzz_fuzz
+except ImportError:
+    rapidfuzz_fuzz = None
+import openpyxl
 
 from core import config, database, utils, tariff_manager
 
@@ -644,16 +653,31 @@ class AppAPI:
             return {"success": False, "error": str(e)}
 
     # --- Image Operations ---
-    def save_image_to(self, file_path, dest_path):
+    def save_image_to(self, file_path, dest_path=""):
         try:
+            if not dest_path:
+                default_name = os.path.basename(file_path)
+                dest_path = self.pick_save_file(
+                    title="Save Image As",
+                    default_filename=default_name,
+                    file_types=[("JPEG Images (*.jpg;*.jpeg)", "*.jpg;*.jpeg"), ("All Files (*.*)", "*.*")]
+                )
+            if not dest_path:
+                return {"success": False, "cancelled": True}
+
             os.makedirs(os.path.dirname(dest_path), exist_ok=True)
             shutil.copy2(file_path, dest_path)
-            return {"success": True}
+            return {"success": True, "path": dest_path}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def save_all_images(self, consumer_id, dest_dir):
+    def save_all_images(self, consumer_id, dest_dir=""):
         try:
+            if not dest_dir:
+                dest_dir = self.pick_folder(title=f"Select Destination Folder for Consumer {consumer_id} Photos")
+            if not dest_dir:
+                return {"success": False, "cancelled": True}
+
             os.makedirs(dest_dir, exist_ok=True)
             images_data = self.get_consumer_images(consumer_id)
             if not images_data.get("success"):
@@ -666,7 +690,7 @@ class AppAPI:
                     dst = os.path.join(dest_dir, f"{consumer_id}_{img['filename']}")
                     shutil.copy2(src, dst)
                     count += 1
-            return {"success": True, "count": count}
+            return {"success": True, "count": count, "path": dest_dir}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -767,14 +791,605 @@ class AppAPI:
     def get_indexing_status(self):
         return {"success": True, **self._indexing_state}
 
-    def export_notes_csv(self, dest_path):
+    def export_notes_csv(self, dest_path=""):
         try:
+            if not dest_path:
+                dest_path = self.pick_save_file(
+                    title="Export Notes to CSV",
+                    default_filename="consumer_notes_export.csv",
+                    file_types=[("CSV Files (*.csv)", "*.csv"), ("All Files (*.*)", "*.*")]
+                )
+            if not dest_path:
+                return {"success": False, "cancelled": True}
+
             notes = database.get_all_notes()
             with open(dest_path, "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
                 writer.writerow(["Consumer ID", "Note", "Remarks"])
                 for cid, data in notes.items():
                     writer.writerow([cid, data["note"], data["remarks"]])
-            return {"success": True}
+            return {"success": True, "path": dest_path}
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    # --- Native File & Folder Dialogs ---
+    def pick_file(self, title="Select File", file_types=None):
+        """Open native file dialog to select a file."""
+        try:
+            if self.window and hasattr(self.window, "create_file_dialog"):
+                import webview
+                file_filter = ()
+                if file_types:
+                    file_filter = tuple(file_types) if isinstance(file_types, (list, tuple)) else (str(file_types),)
+                res = self.window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=False, file_types=file_filter)
+                if res and len(res) > 0:
+                    return res[0]
+                return ""
+            
+            # Tkinter fallback
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes('-topmost', True)
+            tk_types = [("Excel Files", "*.xlsx *.xls"), ("All Files", "*.*")]
+            if file_types and isinstance(file_types, list):
+                tk_types = []
+                for ft in file_types:
+                    if isinstance(ft, (list, tuple)) and len(ft) >= 2:
+                        tk_types.append((ft[0], ft[1]))
+                    elif isinstance(ft, str):
+                        tk_types.append(("Files", ft))
+            chosen = filedialog.askopenfilename(title=title, filetypes=tk_types or [("All Files", "*.*")])
+            root.destroy()
+            return chosen or ""
+        except Exception as e:
+            print(f"[Error in pick_file]: {e}")
+            return ""
+
+    def pick_save_file(self, title="Save File", default_filename="export.xlsx", file_types=None):
+        """Open native file dialog to pick a save path."""
+        try:
+            if self.window and hasattr(self.window, "create_file_dialog"):
+                import webview
+                file_filter = ()
+                if file_types:
+                    file_filter = tuple(file_types) if isinstance(file_types, (list, tuple)) else (str(file_types),)
+                res = self.window.create_file_dialog(webview.FileDialog.SAVE, save_filename=default_filename, file_types=file_filter)
+                if res and len(res) > 0:
+                    return res[0] if isinstance(res, (list, tuple)) else str(res)
+                return ""
+
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes('-topmost', True)
+            chosen = filedialog.asksaveasfilename(
+                title=title,
+                initialfile=default_filename,
+                filetypes=file_types or [("All Files", "*.*")]
+            )
+            root.destroy()
+            return chosen or ""
+        except Exception as e:
+            print(f"[Error in pick_save_file]: {e}")
+            return ""
+
+    def pick_folder(self, title="Select Folder"):
+        """Open native folder dialog."""
+        try:
+            if self.window and hasattr(self.window, "create_file_dialog"):
+                import webview
+                res = self.window.create_file_dialog(webview.FileDialog.FOLDER)
+                if res and len(res) > 0:
+                    return res[0]
+                return ""
+
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes('-topmost', True)
+            chosen = filedialog.askdirectory(title=title)
+            root.destroy()
+            return chosen or ""
+        except Exception as e:
+            print(f"[Error in pick_folder]: {e}")
+            return ""
+
+    # --- Tool Launcher: Image Check GUI ---
+    def launch_image_check_gui(self):
+        """Spawns the standalone Image Check GUI tool."""
+        try:
+            if getattr(sys, 'frozen', False):
+                base_dir = os.path.dirname(sys.executable)
+                exe_name = "imagecheckgui.exe"
+                exe_path = os.path.join(base_dir, exe_name)
+                if os.path.exists(exe_path):
+                    subprocess.Popen([exe_path], cwd=base_dir)
+                    return {"success": True, "message": "Image Check GUI launched (bundled executable)."}
+
+            tools_dir = os.path.join(config.BASE_DIR, "tools")
+            src_tools_dir = os.path.join(config.BASE_DIR, "src", "tools")
+            candidates = [
+                os.path.join(src_tools_dir, "imagecheckgui.py"),
+                os.path.join(tools_dir, "imagecheckgui.py"),
+                os.path.join(config.BASE_DIR, "imagecheckgui.py"),
+            ]
+            script_path = next((c for c in candidates if os.path.exists(c)), None)
+            if not script_path:
+                return {"success": False, "error": "imagecheckgui.py was not found in tools directory."}
+
+            subprocess.Popen([sys.executable, script_path], cwd=os.path.dirname(script_path))
+            return {"success": True, "message": f"Image Check GUI launched from {os.path.basename(script_path)}."}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    # --- Fuzzy Lookup Tool Engine ---
+    _fuzzy_state = {
+        "running": False,
+        "processed": 0,
+        "total": 0,
+        "elapsed": 0,
+        "status": "idle",
+        "output_path": "",
+        "error": ""
+    }
+
+    def get_fuzzy_status(self):
+        return {"success": True, **self._fuzzy_state}
+
+    def generate_fuzzy_template(self, save_path=""):
+        try:
+            if not save_path:
+                save_path = self.pick_save_file(
+                    title="Save Fuzzy Lookup Template",
+                    default_filename="fuzzy_lookup_input_template.xlsx",
+                    file_types=[("Excel Files (*.xlsx)", "*.xlsx")]
+                )
+            if not save_path:
+                return {"success": False, "cancelled": True}
+
+            wb = openpyxl.Workbook()
+            sheet = wb.active
+            sheet.title = "FuzzyLookupInput"
+            sheet.append(["NAME", "C/O", "ADDRESS", "MOBILE NUMBER"])
+            sheet.append(["", "", "", ""])
+            sheet.freeze_panes = "A2"
+
+            widths = [28, 28, 42, 18]
+            for idx, width in enumerate(widths, start=1):
+                col = openpyxl.utils.get_column_letter(idx)
+                sheet.column_dimensions[col].width = width
+
+            wb.save(save_path)
+            return {"success": True, "path": save_path}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def run_fuzzy_lookup(self, input_path="", output_path="", threshold=0.85, top_n=5):
+        if self._fuzzy_state["running"]:
+            return {"success": False, "error": "Fuzzy lookup is already currently running."}
+
+        try:
+            if not input_path:
+                input_path = self.pick_file(
+                    title="Select Fuzzy Lookup Input Excel",
+                    file_types=[("Excel Files (*.xlsx;*.xls)", "*.xlsx;*.xls")]
+                )
+            if not input_path:
+                return {"success": False, "cancelled": True}
+
+            if not output_path:
+                input_dir = os.path.dirname(os.path.abspath(input_path))
+                output_path = os.path.join(input_dir, "fuzzy_lookup_results.xlsx")
+                if os.path.exists(output_path):
+                    ts = time.strftime("%Y%m%d_%H%M%S")
+                    output_path = os.path.join(input_dir, f"fuzzy_lookup_results_{ts}.xlsx")
+
+            try:
+                threshold = float(threshold)
+            except Exception:
+                threshold = 0.85
+            threshold = max(0.0, min(1.0, threshold))
+
+            try:
+                top_n = int(top_n)
+            except Exception:
+                top_n = 5
+            top_n = max(1, min(200, top_n))
+
+            self._fuzzy_state["running"] = True
+            self._fuzzy_state["processed"] = 0
+            self._fuzzy_state["total"] = 0
+            self._fuzzy_state["elapsed"] = 0
+            self._fuzzy_state["status"] = "Preparing consumer database..."
+            self._fuzzy_state["output_path"] = output_path
+            self._fuzzy_state["error"] = ""
+
+            def _normalize_fuzzy_text(value):
+                text = str(value or "").upper()
+                text = re.sub(r"[^A-Z0-9 ]+", " ", text)
+                text = re.sub(r"\s+", " ", text).strip()
+                return text
+
+            def _normalize_mobile_10(value):
+                digits = re.sub(r"\D", "", str(value or ""))
+                if len(digits) == 12 and digits.startswith("91"):
+                    digits = digits[2:]
+                return digits if len(digits) == 10 else ""
+
+            def _tokenize_for_lookup(text):
+                return [t for t in _normalize_fuzzy_text(text).split(" ") if len(t) >= 2]
+
+            def _fast_text_similarity(a, b):
+                if not a or not b:
+                    return 0.0
+                tokens_a = set(_tokenize_for_lookup(a))
+                tokens_b = set(_tokenize_for_lookup(b))
+
+                def token_sim(x, y):
+                    if rapidfuzz_fuzz is not None:
+                        return float(rapidfuzz_fuzz.ratio(x, y)) / 100.0
+                    return SequenceMatcher(None, x, y).ratio()
+
+                if tokens_a:
+                    covered = 0
+                    for ta in tokens_a:
+                        best = 0.0
+                        for tb in tokens_b:
+                            s = token_sim(ta, tb)
+                            if s > best:
+                                best = s
+                        if best >= 0.80:
+                            covered += 1
+                    coverage_input = covered / len(tokens_a)
+                else:
+                    coverage_input = 0.0
+
+                if rapidfuzz_fuzz is not None:
+                    ratio_score = float(rapidfuzz_fuzz.ratio(a, b))
+                    sort_score = float(rapidfuzz_fuzz.token_sort_ratio(a, b))
+                    partial_score = float(rapidfuzz_fuzz.partial_ratio(a, b))
+                    set_score = float(rapidfuzz_fuzz.token_set_ratio(a, b))
+                    blended = (0.20 * ratio_score) + (0.20 * sort_score) + (0.25 * partial_score) + (0.35 * set_score)
+                    adjusted = blended * (0.55 + (0.90 * coverage_input))
+                    return min(100.0, adjusted)
+                return SequenceMatcher(None, a, b).ratio() * 100.0
+
+            def _worker():
+                start_time = time.time()
+                try:
+                    db_profiles = utils.get_all_consumer_profiles()
+                    if not db_profiles:
+                        self._fuzzy_state["error"] = "No consumer data found. Please update consumer database first."
+                        return
+
+                    prepped_db = []
+                    mobile_index = defaultdict(set)
+                    prefix_index = defaultdict(set)
+                    token_index = defaultdict(set)
+
+                    for idx, row in enumerate(db_profiles):
+                        db_name = str(row.get("name", ""))
+                        db_address = str(row.get("address", ""))
+                        db_combined_raw = f"{db_name} {db_address}".strip()
+                        combined_norm = _normalize_fuzzy_text(db_combined_raw)
+                        combined_tokens = set(_tokenize_for_lookup(combined_norm))
+                        mobile_norm = _normalize_mobile_10(row.get("mobile_number", ""))
+
+                        prepped_db.append({
+                            "consumer_id": str(row.get("consumer_id", "")),
+                            "name": db_name,
+                            "address": db_address,
+                            "mobile_number": str(row.get("mobile_number", "")),
+                            "mobile_norm": mobile_norm,
+                            "combined_norm": combined_norm,
+                            "tokens": combined_tokens,
+                        })
+
+                        if mobile_norm:
+                            mobile_index[mobile_norm].add(idx)
+
+                        for tok in combined_tokens:
+                            if len(tok) >= 3:
+                                prefix_index[tok[:3]].add(idx)
+                            if len(tok) >= 4:
+                                token_index[tok].add(idx)
+
+                    wb_in = openpyxl.load_workbook(input_path)
+                    sh_in = wb_in.active
+                    rows = list(sh_in.iter_rows(values_only=True))
+                    if not rows:
+                        raise ValueError("Input Excel sheet is empty.")
+
+                    header_map = {
+                        "name": "name",
+                        "co": "co",
+                        "c/o": "co",
+                        "careof": "co",
+                        "address": "address",
+                        "mobile": "mobile",
+                        "mobilenumber": "mobile",
+                        "mobile number": "mobile",
+                    }
+
+                    first_row = rows[0]
+                    idx_map = {}
+                    for i, v in enumerate(first_row):
+                        if v is None:
+                            continue
+                        key = str(v).strip().lower().replace("_", " ")
+                        key = " ".join(key.split())
+                        compact = key.replace(" ", "")
+                        mapped = header_map.get(key) or header_map.get(compact)
+                        if mapped:
+                            idx_map[mapped] = i
+
+                    has_headers = "name" in idx_map and "address" in idx_map
+                    data_rows = rows[1:] if has_headers else rows
+                    self._fuzzy_state["total"] = len(data_rows)
+                    self._fuzzy_state["status"] = "Performing fuzzy matching..."
+
+                    def _get_input_value(row_vals, field, fallback_idx):
+                        idx = idx_map.get(field, fallback_idx)
+                        if idx is None or idx >= len(row_vals):
+                            return ""
+                        val = row_vals[idx]
+                        return "" if val is None else str(val).strip()
+
+                    out_wb = openpyxl.Workbook()
+                    out_sh = out_wb.active
+                    out_sh.title = "FuzzyLookupResults"
+                    out_headers = [
+                        "Input Name",
+                        "Input C/O",
+                        "Input Address",
+                        "Input Mobile",
+                        "Matched Consumer ID",
+                        "Matched Name",
+                        "Matched Address",
+                        "Matched Mobile",
+                        "Combined Text Match %",
+                        "Mobile Exact Match %",
+                        "Final Score %",
+                        "Match Type",
+                        "Rank",
+                    ]
+                    out_sh.append(out_headers)
+
+                    for in_row in data_rows:
+                        self._fuzzy_state["processed"] += 1
+                        self._fuzzy_state["elapsed"] = int(time.time() - start_time)
+
+                        if not in_row:
+                            continue
+
+                        input_name = _get_input_value(in_row, "name", 0)
+                        input_co = _get_input_value(in_row, "co", 1)
+                        input_address = _get_input_value(in_row, "address", 2)
+                        input_mobile = _get_input_value(in_row, "mobile", 3)
+
+                        if not (input_name or input_co or input_address or input_mobile):
+                            continue
+
+                        input_combined = _normalize_fuzzy_text(f"{input_name} {input_co} {input_address}")
+                        input_mobile_norm = _normalize_mobile_10(input_mobile)
+                        input_tokens = [t for t in _tokenize_for_lookup(input_combined) if len(t) >= 3]
+
+                        candidate_ids = set()
+                        if input_mobile_norm:
+                            candidate_ids.update(mobile_index.get(input_mobile_norm, set()))
+
+                        for tok in input_tokens[:6]:
+                            candidate_ids.update(prefix_index.get(tok[:3], set()))
+
+                        longest_tokens = sorted({t for t in input_tokens if len(t) >= 4}, key=len, reverse=True)[:4]
+                        for tok in longest_tokens:
+                            candidate_ids.update(token_index.get(tok, set()))
+
+                        if not candidate_ids and input_tokens:
+                            for tok in input_tokens:
+                                candidate_ids.update(prefix_index.get(tok[:3], set()))
+
+                        if not candidate_ids:
+                            candidate_ids = set(range(len(prepped_db)))
+
+                        candidates = []
+                        for cand_idx in candidate_ids:
+                            db_row = prepped_db[cand_idx]
+                            text_score = 0.0
+                            if input_combined and db_row["combined_norm"]:
+                                if input_tokens and db_row["tokens"]:
+                                    overlap = len(set(input_tokens).intersection(db_row["tokens"]))
+                                    if overlap == 0 and (not input_mobile_norm or db_row["mobile_norm"] != input_mobile_norm):
+                                        continue
+                                text_score = _fast_text_similarity(input_combined, db_row["combined_norm"])
+
+                            mobile_score = 100.0 if (input_mobile_norm and db_row["mobile_norm"] == input_mobile_norm) else 0.0
+                            final_score = max(text_score, mobile_score)
+
+                            if text_score >= (threshold * 100.0) or mobile_score == 100.0:
+                                candidates.append({
+                                    "db": db_row,
+                                    "text_score": text_score,
+                                    "mobile_score": mobile_score,
+                                    "final_score": final_score,
+                                })
+
+                        candidates.sort(key=lambda x: (x["final_score"], x["text_score"], x["mobile_score"]), reverse=True)
+                        candidates = candidates[:top_n]
+
+                        if not candidates:
+                            out_sh.append([
+                                input_name, input_co, input_address, input_mobile,
+                                "", "", "", "",
+                                "0.00", "0.00", "0.00", "No Match", ""
+                            ])
+                            continue
+
+                        rank = 1
+                        for c in candidates:
+                            db_row = c["db"]
+                            if c["mobile_score"] == 100.0 and c["text_score"] >= (threshold * 100.0):
+                                match_type = "Both"
+                            elif c["mobile_score"] == 100.0:
+                                match_type = "Mobile Exact"
+                            else:
+                                match_type = "Fuzzy Text"
+
+                            out_sh.append([
+                                input_name, input_co, input_address, input_mobile,
+                                db_row["consumer_id"], db_row["name"], db_row["address"], db_row["mobile_number"],
+                                f"{c['text_score']:.2f}", f"{c['mobile_score']:.2f}", f"{c['final_score']:.2f}",
+                                match_type, rank
+                            ])
+                            rank += 1
+
+                    widths = [24, 24, 36, 16, 18, 26, 36, 16, 20, 18, 14, 14, 10]
+                    for idx, width in enumerate(widths, start=1):
+                        col = openpyxl.utils.get_column_letter(idx)
+                        out_sh.column_dimensions[col].width = width
+                    out_sh.freeze_panes = "A2"
+
+                    out_wb.save(output_path)
+                    self._fuzzy_state["status"] = "Complete"
+                except Exception as ex:
+                    self._fuzzy_state["error"] = str(ex)
+                    self._fuzzy_state["status"] = "Error"
+                finally:
+                    self._fuzzy_state["running"] = False
+
+            threading.Thread(target=_worker, daemon=True).start()
+            return {"success": True, "output_path": output_path}
+        except Exception as e:
+            self._fuzzy_state["running"] = False
+            return {"success": False, "error": str(e)}
+
+    # --- Consumer Database Import & Template ---
+    def generate_consumer_template(self, save_path=""):
+        try:
+            if not save_path:
+                save_path = self.pick_save_file(
+                    title="Save Consumer Data Template",
+                    default_filename="consumer_data_template.xlsx",
+                    file_types=[("Excel Files (*.xlsx)", "*.xlsx")]
+                )
+            if not save_path:
+                return {"success": False, "cancelled": True}
+
+            wb = openpyxl.Workbook()
+            sheet = wb.active
+            sheet.title = "ConsumerData"
+            headers = [
+                "CONSUMER ID",
+                "METER NO",
+                "NAME",
+                "ADDRESS",
+                "MOBILE NUMBER",
+                "CONTRACTUAL LOAD",
+                "CLASS",
+            ]
+            sheet.append(headers)
+            sheet.append(["", "", "", "", "", "", ""])
+            sheet.freeze_panes = "A2"
+
+            widths = [18, 16, 28, 36, 18, 18, 14]
+            for idx, width in enumerate(widths, start=1):
+                col = openpyxl.utils.get_column_letter(idx)
+                sheet.column_dimensions[col].width = width
+
+            wb.save(save_path)
+            return {"success": True, "path": save_path}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def import_consumer_data(self, file_path=""):
+        try:
+            if not file_path:
+                file_path = self.pick_file(
+                    title="Select Consumer Data Excel",
+                    file_types=[("Excel Files (*.xlsx;*.xls)", "*.xlsx;*.xls")]
+                )
+            if not file_path:
+                return {"success": False, "cancelled": True}
+
+            d = {}
+            wb = openpyxl.load_workbook(file_path)
+            sheet = wb.active
+
+            header_map = {
+                "consumer id": "consumer_id",
+                "consumerid": "consumer_id",
+                "meter no": "meter_no",
+                "meterno": "meter_no",
+                "name": "name",
+                "address": "address",
+                "mobile number": "mobile_number",
+                "mobilenumber": "mobile_number",
+                "mobile": "mobile_number",
+                "contractual load": "contractual_load",
+                "contractualload": "contractual_load",
+                "class": "class",
+            }
+
+            rows = list(sheet.iter_rows(values_only=True))
+            if not rows:
+                return {"success": False, "error": "Excel sheet is empty."}
+
+            first_row = rows[0]
+            index_map = {}
+            for idx, val in enumerate(first_row):
+                if val is None:
+                    continue
+                key = str(val).strip().lower().replace("_", " ")
+                key = " ".join(key.split())
+                key_compact = key.replace(" ", "")
+                mapped = header_map.get(key) or header_map.get(key_compact)
+                if mapped:
+                    index_map[mapped] = idx
+
+            has_headers = "consumer_id" in index_map and "meter_no" in index_map
+            data_rows = rows[1:] if has_headers else rows
+
+            def get_val(row_vals, field, fallback_idx):
+                idx = index_map.get(field, fallback_idx)
+                if idx is None or idx >= len(row_vals):
+                    return ""
+                val = row_vals[idx]
+                if val is None:
+                    return ""
+                if isinstance(val, float) and val.is_integer():
+                    return str(int(val)).strip()
+                return str(val).strip()
+
+            for row in data_rows:
+                if not row:
+                    continue
+                cid = get_val(row, "consumer_id", 0)
+                meter_no = get_val(row, "meter_no", 1)
+                if not cid or not meter_no:
+                    continue
+
+                mobile = re.sub(r"\D", "", get_val(row, "mobile_number", 4))
+                if len(mobile) == 12 and mobile.startswith("91"):
+                    mobile = mobile[2:]
+
+                d[cid] = {
+                    "meter_no": meter_no,
+                    "name": get_val(row, "name", 2),
+                    "address": get_val(row, "address", 3),
+                    "mobile_number": mobile,
+                    "contractual_load": get_val(row, "contractual_load", 5),
+                    "class": get_val(row, "class", 6),
+                }
+
+            if not d:
+                return {"success": False, "error": "No valid consumer records found in file."}
+
+            utils.update_meter_mapping(d)
+            return {"success": True, "count": len(d)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+

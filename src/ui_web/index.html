@@ -59,6 +59,10 @@
           <i data-lucide="file-spreadsheet" class="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-teal-600 dark:group-hover:text-teal-400"></i>
           <span class="hidden md:inline font-medium text-sm">Low Cons. Audit</span>
         </button>
+        <button onclick="switchTab('tools')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="tools">
+          <i data-lucide="wrench" class="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400"></i>
+          <span class="hidden md:inline font-medium text-sm">Tools & Utilities</span>
+        </button>
         <button onclick="switchTab('settings')" class="nav-item w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all group" data-tab="settings">
           <i data-lucide="settings" class="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-violet-600 dark:group-hover:text-violet-400"></i>
           <span class="hidden md:inline font-medium text-sm">Settings & Update</span>
@@ -120,8 +124,17 @@
         </select>
       </div>
 
-      <!-- Quick Action Indicators -->
-      <div class="flex items-center gap-3">
+      <!-- Quick Action Indicators & Tool Shortcuts -->
+      <div class="flex items-center gap-2">
+        <button onclick="launchImageCheckGUI()" title="Launch Image Check GUI Portal" class="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium transition flex items-center gap-1.5">
+          <i data-lucide="scan-eye" class="w-3.5 h-3.5 text-sky-500"></i>
+          <span class="hidden lg:inline">Image Check GUI</span>
+        </button>
+        <button onclick="switchTab('tools')" title="Fuzzy Lookup Tool" class="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium transition flex items-center gap-1.5">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
+          <span class="hidden lg:inline">Fuzzy Lookup</span>
+        </button>
+
         <div id="consumerBadge" class="hidden px-3 py-1.5 rounded-lg bg-sky-100 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/30 text-sky-700 dark:text-sky-400 text-xs font-semibold flex items-center gap-2">
           <i data-lucide="user-check" class="w-4 h-4"></i>
           <span id="consumerBadgeText">Active: -</span>
@@ -652,7 +665,115 @@
       </div>
     </section>
 
-    <!-- TAB 6: Settings & Self-Update -->
+    <!-- TAB 6: Tools & Utilities (Fuzzy Lookup, Image Check GUI) -->
+    <section id="tab-tools" class="tab-content flex-1 p-6 overflow-y-auto hidden">
+      <div class="max-w-5xl mx-auto space-y-6">
+        <div>
+          <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100">Utility Tools & Inspection Suites</h2>
+          <p class="text-xs text-slate-600 dark:text-slate-400">Advanced batch fuzzy matching, consumer indexing, and standalone portal inspection tool</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Tool Card 1: Standalone Image Check GUI -->
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-sm flex flex-col justify-between">
+            <div class="space-y-3">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-sky-500/20">
+                  <i data-lucide="scan-eye" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Image Check GUI Tool</h3>
+                  <span class="text-xs text-sky-600 dark:text-sky-400 font-semibold">Standalone Inspection Portal</span>
+                </div>
+              </div>
+              <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                Connects directly to the WBSEDCL SpotAI billing portal and local Tomcat instances. Allows real-time image comparison, server-side meter photo inspection, and discrepancy verification.
+              </p>
+              <div class="p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800/80 space-y-1 text-xs text-slate-600 dark:text-slate-400">
+                <div class="flex items-center justify-between">
+                  <span>Portal Server:</span>
+                  <span class="font-mono text-slate-800 dark:text-slate-200">spotai.wbsedcl.in</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span>Mode:</span>
+                  <span class="text-emerald-600 dark:text-emerald-400 font-medium">Standalone GUI Window</span>
+                </div>
+              </div>
+            </div>
+
+            <button onclick="launchImageCheckGUI()" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-medium px-4 py-2.5 rounded-xl text-sm transition shadow-sm flex items-center justify-center gap-2">
+              <i data-lucide="external-link" class="w-4 h-4"></i>
+              Launch Image Check GUI
+            </button>
+          </div>
+
+          <!-- Tool Card 2: Batch Fuzzy Lookup Engine -->
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-sm flex flex-col justify-between">
+            <div class="space-y-3">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center text-white shadow-md shadow-amber-500/20">
+                  <i data-lucide="sparkles" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Batch Fuzzy Lookup Tool</h3>
+                  <span class="text-xs text-amber-600 dark:text-amber-400 font-semibold">RapidFuzz Matching Engine</span>
+                </div>
+              </div>
+              <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                Matches batch external consumer lists against the local database using advanced token sorting, Levenshtein distance, prefix blocking, and mobile number exact mapping.
+              </p>
+
+              <!-- Controls -->
+              <div class="space-y-3 pt-1">
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Match Threshold</label>
+                    <div class="flex items-center gap-2">
+                      <input type="range" id="fuzzyThreshold" min="0.50" max="1.00" step="0.05" value="0.85" oninput="document.getElementById('fuzzyThresholdVal').innerText = Math.round(this.value * 100) + '%'" class="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                      <span id="fuzzyThresholdVal" class="text-xs font-mono font-bold text-amber-600 dark:text-amber-400 w-10 text-right">85%</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Max Candidates (Top N)</label>
+                    <select id="fuzzyTopN" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-slate-800 dark:text-slate-200 text-xs rounded-lg px-2 py-1.5 outline-none">
+                      <option value="1">Top 1 match</option>
+                      <option value="3">Top 3 matches</option>
+                      <option value="5" selected>Top 5 matches</option>
+                      <option value="10">Top 10 matches</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Status / Progress Box -->
+                <div id="fuzzyStatusBox" class="hidden p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs space-y-1.5">
+                  <div class="flex justify-between items-center text-slate-700 dark:text-slate-300 font-medium">
+                    <span id="fuzzyStatusText">Idle</span>
+                    <span id="fuzzyProgressCount" class="font-mono text-sky-600 dark:text-sky-400">0%</span>
+                  </div>
+                  <div class="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div id="fuzzyProgressBar" class="h-full bg-amber-500 w-0 transition-all duration-300"></div>
+                  </div>
+                  <div id="fuzzyOutputLink" class="text-xs text-emerald-600 dark:text-emerald-400 truncate hidden"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 pt-2">
+              <button onclick="generateFuzzyTemplate()" class="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-medium py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5">
+                <i data-lucide="file-spreadsheet" class="w-4 h-4 text-amber-500"></i>
+                Input Template
+              </button>
+              <button id="btnRunFuzzy" onclick="runFuzzyLookup()" class="bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm">
+                <i data-lucide="play" class="w-4 h-4"></i>
+                Run Fuzzy Lookup
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 7: Settings & Self-Update -->
     <section id="tab-settings" class="tab-content flex-1 p-6 overflow-y-auto hidden">
       <div class="max-w-4xl mx-auto space-y-6">
         <div>
@@ -681,11 +802,13 @@
               <button onclick="exportNotes()" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 px-4 py-2 rounded-lg text-sm transition">
                 Export Notes to CSV
               </button>
-              <button class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 px-4 py-2 rounded-lg text-sm transition">
+              <button onclick="importConsumerData()" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 px-4 py-2 rounded-lg text-sm transition flex items-center justify-center gap-2">
+                <i data-lucide="upload" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
                 Import Consumer Data
               </button>
-              <button class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 px-4 py-2 rounded-lg text-sm transition">
-                Generate Template
+              <button onclick="generateConsumerTemplate()" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 px-4 py-2 rounded-lg text-sm transition flex items-center justify-center gap-2">
+                <i data-lucide="file-plus" class="w-4 h-4 text-sky-600 dark:text-sky-400"></i>
+                Generate Consumer Data Template
               </button>
             </div>
           </div>

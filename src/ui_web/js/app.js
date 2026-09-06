@@ -300,19 +300,29 @@ function stepImage(direction) {
 
 async function printActiveImage() {
   if (!currentImages.length) return;
-  await callAPI('print_image', currentImages[currentImageIndex].full_path);
+  const res = await callAPI('print_image', currentImages[currentImageIndex].full_path);
+  if (res && !res.success) {
+    alert("Failed to print image: " + (res.error || "Unknown error"));
+  }
 }
 
 async function saveActiveImage() {
   if (!currentImages.length) return;
-  await callAPI('save_image_to', currentImages[currentImageIndex].full_path, '');
+  const res = await callAPI('save_image_to', currentImages[currentImageIndex].full_path, '');
+  if (res && res.success) {
+    alert("Image saved successfully to:\n" + res.path);
+  } else if (res && res.error) {
+    alert("Failed to save image: " + res.error);
+  }
 }
 
 async function saveAllImages() {
   if (!currentConsumerId) return;
   const res = await callAPI('save_all_images', currentConsumerId, '');
   if (res && res.success) {
-    alert(`Saved ${res.count} images successfully!`);
+    alert(`Successfully saved ${res.count} images to:\n${res.path}`);
+  } else if (res && res.error) {
+    alert("Failed to save all images: " + res.error);
   }
 }
 
@@ -678,8 +688,111 @@ async function startIndexing() {
 async function exportNotes() {
   const res = await callAPI('export_notes_csv');
   if (res && res.success) {
-    alert(res.message || "Exported successfully");
-  } else {
-    alert("Failed to export notes");
+    alert("Exported notes successfully to:\n" + res.path);
+  } else if (res && res.error) {
+    alert("Failed to export notes: " + res.error);
   }
 }
+
+// --- Image Check GUI ---
+async function launchImageCheckGUI() {
+  const res = await callAPI('launch_image_check_gui');
+  if (res && res.success) {
+    alert(res.message || "Image Check GUI launched successfully.");
+  } else {
+    alert("Failed to launch Image Check GUI: " + (res ? res.error : "Unknown error"));
+  }
+}
+
+// --- Consumer Data Management ---
+async function generateConsumerTemplate() {
+  const res = await callAPI('generate_consumer_template');
+  if (res && res.success) {
+    alert("Consumer data template created at:\n" + res.path);
+  } else if (res && res.error) {
+    alert("Failed to generate template: " + res.error);
+  }
+}
+
+async function importConsumerData() {
+  const res = await callAPI('import_consumer_data');
+  if (res && res.success) {
+    alert(`Successfully imported ${res.count} consumer records into local database.`);
+    initApp();
+  } else if (res && res.error) {
+    alert("Failed to import consumer data: " + res.error);
+  }
+}
+
+// --- Fuzzy Lookup Tool Engine ---
+async function generateFuzzyTemplate() {
+  const res = await callAPI('generate_fuzzy_template');
+  if (res && res.success) {
+    alert("Fuzzy lookup template created at:\n" + res.path);
+  } else if (res && res.error) {
+    alert("Failed to generate fuzzy template: " + res.error);
+  }
+}
+
+let fuzzyPollTimer = null;
+
+async function runFuzzyLookup() {
+  const threshold = parseFloat(document.getElementById('fuzzyThreshold')?.value || 0.85);
+  const topN = parseInt(document.getElementById('fuzzyTopN')?.value || 5);
+
+  const statusBox = document.getElementById('fuzzyStatusBox');
+  const statusText = document.getElementById('fuzzyStatusText');
+  const countText = document.getElementById('fuzzyProgressCount');
+  const progBar = document.getElementById('fuzzyProgressBar');
+  const linkBox = document.getElementById('fuzzyOutputLink');
+  const runBtn = document.getElementById('btnRunFuzzy');
+
+  if (statusBox) statusBox.classList.remove('hidden');
+  if (linkBox) linkBox.classList.add('hidden');
+  if (runBtn) runBtn.disabled = true;
+  if (statusText) statusText.innerText = "Selecting input file...";
+
+  const res = await callAPI('run_fuzzy_lookup', '', '', threshold, topN);
+  if (!res || !res.success) {
+    if (runBtn) runBtn.disabled = false;
+    if (res && res.cancelled) {
+      if (statusBox) statusBox.classList.add('hidden');
+      return;
+    }
+    alert("Failed to start fuzzy lookup: " + (res ? res.error : "Unknown error"));
+    if (statusBox) statusBox.classList.add('hidden');
+    return;
+  }
+
+  // Start polling fuzzy progress
+  if (fuzzyPollTimer) clearInterval(fuzzyPollTimer);
+  fuzzyPollTimer = setInterval(async () => {
+    const stat = await callAPI('get_fuzzy_status');
+    if (!stat) return;
+
+    const pct = stat.total > 0 ? Math.round((stat.processed / stat.total) * 100) : 0;
+    if (statusText) statusText.innerText = stat.status || "Matching...";
+    if (countText) countText.innerText = `${pct}% (${stat.processed}/${stat.total}) | ${stat.elapsed}s`;
+    if (progBar) progBar.style.width = `${pct}%`;
+
+    if (!stat.running) {
+      clearInterval(fuzzyPollTimer);
+      fuzzyPollTimer = null;
+      if (runBtn) runBtn.disabled = false;
+
+      if (stat.error) {
+        alert("Fuzzy Lookup encountered an error: " + stat.error);
+        if (statusText) statusText.innerText = "Error: " + stat.error;
+      } else {
+        if (progBar) progBar.style.width = '100%';
+        if (countText) countText.innerText = `100% | ${stat.elapsed}s`;
+        if (linkBox) {
+          linkBox.classList.remove('hidden');
+          linkBox.innerHTML = `<strong>Results Saved:</strong> ${stat.output_path}`;
+        }
+        alert("Fuzzy Lookup Complete!\nResults exported to:\n" + stat.output_path);
+      }
+    }
+  }, 400);
+}
+
