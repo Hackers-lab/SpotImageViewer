@@ -471,7 +471,7 @@ class AppAPI:
                     "gross_bill": round(gross_bill, 2),
                     "total_adjustments": round(total_adjustments, 2),
                     "net_assessment": round(net_assessment, 2),
-                    "rounded_assessment": round(net_assessment)
+                    "rounded_assessment": math.ceil(net_assessment)
                 }
             }
         except Exception as e:
@@ -588,7 +588,7 @@ class AppAPI:
                     "total_adjustments": total_adjustments,
                     "net": net,
                     "net_assessment": net,
-                    "rounded_assessment": round(net),
+                    "rounded_assessment": math.ceil(net),
                     "breakdown": {
                         "days": b["days"],
                         "hours": b["hours"],

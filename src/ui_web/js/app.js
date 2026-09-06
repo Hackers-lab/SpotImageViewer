@@ -1216,7 +1216,8 @@ async function runTheftCalc() {
     document.getElementById('provEd').innerHTML = `\u20B9 ${p.electricity_duty.toFixed(2)}`;
     document.getElementById('provGross').innerHTML = `\u20B9 ${p.gross_assessment.toFixed(2)}`;
     document.getElementById('provAdj').innerHTML = `- \u20B9 ${p.total_adjustments.toFixed(2)}`;
-    document.getElementById('provNet').innerHTML = `\u20B9 ${p.rounded_assessment.toLocaleString('en-IN')}`;
+    const pRounded = Math.ceil(p.net_assessment !== undefined ? p.net_assessment : p.net);
+    document.getElementById('provNet').innerHTML = `\u20B9 ${pRounded.toLocaleString('en-IN')}`;
 
     const f = res.final;
     document.getElementById('finalUnits').innerText = `${f.assessed_units.toLocaleString('en-IN')} kWh`;
@@ -1225,7 +1226,8 @@ async function runTheftCalc() {
     document.getElementById('finalEd').innerHTML = `\u20B9 ${f.electricity_duty.toFixed(2)}`;
     document.getElementById('finalGross').innerHTML = `\u20B9 ${f.gross_assessment.toFixed(2)}`;
     document.getElementById('finalAdj').innerHTML = `- \u20B9 ${f.total_adjustments.toFixed(2)}`;
-    document.getElementById('finalNet').innerHTML = `\u20B9 ${f.rounded_assessment.toLocaleString('en-IN')}`;
+    const fRounded = Math.ceil(f.net_assessment !== undefined ? f.net_assessment : f.net);
+    document.getElementById('finalNet').innerHTML = `\u20B9 ${fRounded.toLocaleString('en-IN')}`;
 
     const rel = res.relief || { diff_rs: res.diff_rs || 0, diff_pct: res.diff_pct || 0 };
     const rb = document.getElementById('reliefBar');
