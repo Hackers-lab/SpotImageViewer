@@ -11,9 +11,10 @@ a_main = Analysis(
     datas=[
         (os.path.join(PROJECT_ROOT, 'assets', 'spot_icon.ico'), 'assets'),
         (os.path.join(PROJECT_ROOT, 'assets', 'spot_icon.png'), 'assets'),
+        (os.path.join(PROJECT_ROOT, 'src', 'ui_web'), os.path.join('src', 'ui_web')),
         (CTK_DIR, 'customtkinter'),
     ],
-    hiddenimports=['ttkbootstrap', 'PIL', 'openpyxl', 'requests', 'packaging', 'darkdetect', 'customtkinter'],
+    hiddenimports=['ttkbootstrap', 'PIL', 'openpyxl', 'requests', 'packaging', 'darkdetect', 'customtkinter', 'webview', 'clr'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
