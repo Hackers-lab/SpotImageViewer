@@ -314,9 +314,9 @@ async function loadConsumerImages(consumerId) {
   if (res.dates) {
     res.dates.forEach((dateStr) => {
       const btn = document.createElement('button');
-      btn.className = "w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-between";
+      btn.className = "w-full text-left px-2 py-1 rounded text-[10px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#303030] transition flex items-center justify-between";
       const count = res.grouped[dateStr] ? res.grouped[dateStr].length : 0;
-      btn.innerHTML = `<span>${dateStr}</span><span class="text-xs text-slate-500">${count} img</span>`;
+      btn.innerHTML = `<span class="font-mono font-medium">${dateStr}</span><span class="text-[9px] text-slate-500 font-mono">${count} img</span>`;
       btn.onclick = () => {
         const targetIdx = currentImages.findIndex(img => img.date_formatted === dateStr);
         if (targetIdx !== -1) showImage(targetIdx);

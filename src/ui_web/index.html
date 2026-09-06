@@ -232,29 +232,29 @@
         </div>
 
         <!-- Photoshop-Style Right Collapsed Vertical Tab Rails (3 Collapsible Tabs) -->
-        <div id="detailsPanelRail" class="hidden w-9 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-[#181818] shrink-0 flex-col items-center py-2 gap-2 z-10 select-none">
-          <!-- Rail Tab 1: Profile -->
-          <button onclick="expandToSection('section-profile')" title="Expand Consumer Details" class="w-full flex-1 flex flex-col items-center justify-start py-3 gap-2 hover:bg-slate-100 dark:hover:bg-[#252525] transition group border-b border-slate-200/60 dark:border-slate-800/60">
-            <div class="w-6 h-6 rounded flex items-center justify-center text-slate-400 group-hover:text-sky-500">
-              <i data-lucide="user" class="w-3.5 h-3.5"></i>
+        <div id="detailsPanelRail" class="hidden w-8 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-[#181818] shrink-0 flex-col items-center py-1.5 gap-1.5 z-10 select-none">
+          <!-- Rail Tab 1: Profile (Top) -->
+          <button onclick="expandToSection('section-profile')" title="Expand Consumer Details" class="w-full flex-1 flex flex-col items-center justify-start py-2.5 gap-1.5 hover:bg-slate-100 dark:hover:bg-[#252525] transition group border-b border-slate-200/60 dark:border-slate-800/60">
+            <div class="w-5 h-5 rounded flex items-center justify-center text-slate-400 group-hover:text-sky-500">
+              <i data-lucide="user" class="w-3 h-3"></i>
             </div>
-            <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-slate-200 whitespace-nowrap" style="writing-mode: vertical-rl;">Details</span>
+            <span class="text-[8.5px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-slate-200 whitespace-nowrap" style="writing-mode: vertical-rl;">Details</span>
           </button>
 
-          <!-- Rail Tab 2: Notes -->
-          <button onclick="expandToSection('section-notes')" title="Expand Notes & Remarks" class="w-full flex-1 flex flex-col items-center justify-start py-3 gap-2 hover:bg-slate-100 dark:hover:bg-[#252525] transition group border-b border-slate-200/60 dark:border-slate-800/60">
-            <div class="w-6 h-6 rounded flex items-center justify-center text-slate-400 group-hover:text-amber-500">
-              <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+          <!-- Rail Tab 2: Cycles (Middle) -->
+          <button onclick="expandToSection('section-cycles')" title="Expand Available Cycles" class="w-full flex-1 flex flex-col items-center justify-start py-2.5 gap-1.5 hover:bg-slate-100 dark:hover:bg-[#252525] transition group border-b border-slate-200/60 dark:border-slate-800/60">
+            <div class="w-5 h-5 rounded flex items-center justify-center text-slate-400 group-hover:text-emerald-500">
+              <i data-lucide="calendar" class="w-3 h-3"></i>
             </div>
-            <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-slate-200 whitespace-nowrap" style="writing-mode: vertical-rl;">Notes</span>
+            <span class="text-[8.5px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-slate-200 whitespace-nowrap" style="writing-mode: vertical-rl;">Cycles</span>
           </button>
 
-          <!-- Rail Tab 3: Cycles -->
-          <button onclick="expandToSection('section-cycles')" title="Expand Available Cycles" class="w-full flex-1 flex flex-col items-center justify-start py-3 gap-2 hover:bg-slate-100 dark:hover:bg-[#252525] transition group">
-            <div class="w-6 h-6 rounded flex items-center justify-center text-slate-400 group-hover:text-emerald-500">
-              <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+          <!-- Rail Tab 3: Notes (Bottom) -->
+          <button onclick="expandToSection('section-notes')" title="Expand Notes & Remarks" class="w-full flex-1 flex flex-col items-center justify-start py-2.5 gap-1.5 hover:bg-slate-100 dark:hover:bg-[#252525] transition group">
+            <div class="w-5 h-5 rounded flex items-center justify-center text-slate-400 group-hover:text-amber-500">
+              <i data-lucide="edit-3" class="w-3 h-3"></i>
             </div>
-            <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-slate-200 whitespace-nowrap" style="writing-mode: vertical-rl;">Cycles</span>
+            <span class="text-[8.5px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-slate-200 whitespace-nowrap" style="writing-mode: vertical-rl;">Notes</span>
           </button>
         </div>
 
@@ -275,72 +275,91 @@
               </div>
             </div>
 
-            <!-- SECTION 1: CONSUMER DETAILS -->
-            <div id="section-profile" class="bg-white dark:bg-[#232323] rounded-lg border border-slate-200 dark:border-slate-800/90 shadow-sm overflow-hidden transition-all duration-200">
-              <div onclick="toggleSection('section-profile')" class="px-3 py-2 bg-slate-100/70 dark:bg-[#2a2a2a] border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between cursor-pointer select-none hover:bg-slate-200/60 dark:hover:bg-[#303030] transition">
+            <!-- SECTION 1: CONSUMER DETAILS (Open by Default, Highly Compact) -->
+            <div id="section-profile" class="bg-white dark:bg-[#232323] rounded-md border border-slate-200 dark:border-slate-800/90 shadow-sm overflow-hidden transition-all duration-200">
+              <div onclick="toggleSection('section-profile')" class="px-2.5 py-1.5 bg-slate-100/70 dark:bg-[#282828] border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between cursor-pointer select-none hover:bg-slate-200/60 dark:hover:bg-[#303030] transition">
                 <div class="flex items-center gap-1.5">
-                  <i data-lucide="user" class="w-3.5 h-3.5 text-sky-500"></i>
-                  <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">1. Consumer Details</h3>
+                  <i data-lucide="user" class="w-3 h-3 text-sky-500"></i>
+                  <h3 class="text-[10px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">1. Consumer Details</h3>
                 </div>
-                <div class="flex items-center gap-1.5">
-                  <span class="text-[9px] px-1.5 py-0.5 rounded font-mono bg-sky-500/10 text-sky-600 dark:text-sky-400 font-semibold">PROFILE</span>
-                  <i id="icon-section-profile" data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200"></i>
+                <div class="flex items-center gap-1">
+                  <span class="text-[8.5px] px-1 py-0.2 rounded font-mono bg-sky-500/10 text-sky-600 dark:text-sky-400 font-semibold">INFO</span>
+                  <i id="icon-section-profile" data-lucide="chevron-down" class="w-3 h-3 text-slate-400 transition-transform duration-200"></i>
                 </div>
               </div>
               
-              <div id="body-section-profile" class="p-3 space-y-2.5">
+              <div id="body-section-profile" class="p-2 space-y-1.5 text-[10.5px]">
                 <div>
-                  <span class="text-[10px] text-slate-500 font-medium block uppercase tracking-wider">Consumer Name</span>
-                  <span id="profileName" class="text-xs font-semibold text-slate-900 dark:text-slate-100 block truncate">-</span>
+                  <span class="text-[9px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider block leading-none mb-0.5">Consumer Name</span>
+                  <span id="profileName" class="text-[11.5px] font-semibold text-slate-900 dark:text-slate-100 block truncate leading-tight">-</span>
                 </div>
-                <div class="grid grid-cols-2 gap-2">
-                  <div class="p-1.5 bg-slate-50 dark:bg-[#1a1a1a] rounded border border-slate-200/60 dark:border-slate-800/60">
-                    <span class="text-[9px] text-slate-500 font-medium block uppercase tracking-wider">Consumer ID</span>
-                    <span id="profileCid" class="text-xs font-mono font-bold text-sky-600 dark:text-sky-400 block truncate">-</span>
+                <div class="grid grid-cols-2 gap-1.5">
+                  <div class="px-1.5 py-1 bg-slate-50 dark:bg-[#1a1a1a] rounded border border-slate-200/60 dark:border-slate-800/60">
+                    <span class="text-[8.5px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider block leading-none mb-0.5">Consumer ID</span>
+                    <span id="profileCid" class="text-[10.5px] font-mono font-bold text-sky-600 dark:text-sky-400 block truncate leading-tight">-</span>
                   </div>
-                  <div class="p-1.5 bg-slate-50 dark:bg-[#1a1a1a] rounded border border-slate-200/60 dark:border-slate-800/60">
-                    <span class="text-[9px] text-slate-500 font-medium block uppercase tracking-wider">Meter No</span>
-                    <span id="profileMeter" class="text-xs font-mono font-bold text-amber-600 dark:text-amber-400 block truncate">-</span>
+                  <div class="px-1.5 py-1 bg-slate-50 dark:bg-[#1a1a1a] rounded border border-slate-200/60 dark:border-slate-800/60">
+                    <span class="text-[8.5px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider block leading-none mb-0.5">Meter No</span>
+                    <span id="profileMeter" class="text-[10.5px] font-mono font-bold text-amber-600 dark:text-amber-400 block truncate leading-tight">-</span>
                   </div>
                 </div>
-                <div>
-                  <span class="text-[10px] text-slate-500 font-medium block uppercase tracking-wider">Mobile Number</span>
-                  <span id="profileMobile" class="text-xs text-slate-700 dark:text-slate-300 block truncate">-</span>
-                </div>
-                <div>
-                  <span class="text-[10px] text-slate-500 font-medium block uppercase tracking-wider">Address</span>
-                  <p id="profileAddress" class="text-xs text-slate-700 dark:text-slate-300 line-clamp-2 leading-relaxed">-</p>
-                </div>
-                <div class="grid grid-cols-2 gap-2 pt-1.5 border-t border-slate-200 dark:border-slate-800/80">
+                <div class="grid grid-cols-2 gap-1.5">
                   <div>
-                    <span class="text-[10px] text-slate-500 font-medium block uppercase tracking-wider">Load</span>
-                    <span id="profileLoad" class="text-xs font-semibold text-slate-800 dark:text-slate-200 block">-</span>
+                    <span class="text-[8.5px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider block leading-none mb-0.5">Mobile</span>
+                    <span id="profileMobile" class="text-[10px] text-slate-700 dark:text-slate-300 block truncate leading-tight">-</span>
                   </div>
                   <div>
-                    <span class="text-[10px] text-slate-500 font-medium block uppercase tracking-wider">Class</span>
-                    <span id="profileClass" class="text-xs font-semibold text-slate-800 dark:text-slate-200 block">-</span>
+                    <span class="text-[8.5px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider block leading-none mb-0.5">Load / Class</span>
+                    <span class="text-[10px] font-semibold text-slate-800 dark:text-slate-200 block truncate leading-tight">
+                      <span id="profileLoad">-</span> &bull; <span id="profileClass">-</span>
+                    </span>
                   </div>
+                </div>
+                <div>
+                  <span class="text-[8.5px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider block leading-none mb-0.5">Address</span>
+                  <p id="profileAddress" class="text-[10px] text-slate-600 dark:text-slate-400 line-clamp-1 leading-normal">-</p>
                 </div>
               </div>
             </div>
 
-            <!-- SECTION 2: NOTES & REMARKS -->
-            <div id="section-notes" class="bg-white dark:bg-[#232323] rounded-lg border border-slate-200 dark:border-slate-800/90 shadow-sm overflow-hidden transition-all duration-200">
-              <div onclick="toggleSection('section-notes')" class="px-3 py-2 bg-slate-100/70 dark:bg-[#2a2a2a] border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between cursor-pointer select-none hover:bg-slate-200/60 dark:hover:bg-[#303030] transition">
+            <!-- SECTION 2: AVAILABLE CYCLES (Middle, Open by Default) -->
+            <div id="section-cycles" class="bg-white dark:bg-[#232323] rounded-md border border-slate-200 dark:border-slate-800/90 shadow-sm overflow-hidden transition-all duration-200">
+              <div onclick="toggleSection('section-cycles')" class="px-2.5 py-1.5 bg-slate-100/70 dark:bg-[#282828] border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between cursor-pointer select-none hover:bg-slate-200/60 dark:hover:bg-[#303030] transition">
                 <div class="flex items-center gap-1.5">
-                  <i data-lucide="edit-3" class="w-3.5 h-3.5 text-amber-500"></i>
-                  <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">2. Notes & Remarks</h3>
+                  <i data-lucide="calendar" class="w-3 h-3 text-emerald-500"></i>
+                  <h3 class="text-[10px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">2. Available Cycles</h3>
                 </div>
-                <div class="flex items-center gap-1.5">
-                  <span class="text-[9px] px-1.5 py-0.5 rounded font-mono bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold">AUDIT</span>
-                  <i id="icon-section-notes" data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200"></i>
+                <div class="flex items-center gap-1">
+                  <span class="text-[8.5px] px-1 py-0.2 rounded font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">CYCLES</span>
+                  <i id="icon-section-cycles" data-lucide="chevron-down" class="w-3 h-3 text-slate-400 transition-transform duration-200"></i>
                 </div>
               </div>
 
-              <div id="body-section-notes" class="p-3 space-y-2.5">
+              <div id="body-section-cycles" class="p-1.5">
+                <div id="cyclesList" class="space-y-0.5 max-h-40 overflow-y-auto pr-0.5 text-[10px]">
+                  <span class="text-[10px] text-slate-500 italic px-1 block py-1">No cycles loaded</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- SECTION 3: NOTES & REMARKS (Bottom, Collapsed by Default) -->
+            <div id="section-notes" class="bg-white dark:bg-[#232323] rounded-md border border-slate-200 dark:border-slate-800/90 shadow-sm overflow-hidden transition-all duration-200">
+              <div onclick="toggleSection('section-notes')" class="px-2.5 py-1.5 bg-slate-100/70 dark:bg-[#282828] border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between cursor-pointer select-none hover:bg-slate-200/60 dark:hover:bg-[#303030] transition">
+                <div class="flex items-center gap-1.5">
+                  <i data-lucide="edit-3" class="w-3 h-3 text-amber-500"></i>
+                  <h3 class="text-[10px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">3. Notes & Remarks</h3>
+                </div>
+                <div class="flex items-center gap-1">
+                  <span class="text-[8.5px] px-1 py-0.2 rounded font-mono bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold">AUDIT</span>
+                  <i id="icon-section-notes" data-lucide="chevron-down" class="w-3 h-3 text-slate-400 transition-transform duration-200" style="transform: rotate(-90deg);"></i>
+                </div>
+              </div>
+
+              <!-- Collapsed by default -->
+              <div id="body-section-notes" class="hidden p-2 space-y-1.5">
                 <div>
-                  <label class="text-[10px] text-slate-500 font-medium block uppercase tracking-wider mb-1">Status Category</label>
-                  <select id="noteCategory" class="w-full bg-slate-50 dark:bg-[#1a1a1a] border border-slate-300 dark:border-slate-700 rounded text-xs px-2 py-1.5 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500">
+                  <label class="text-[9px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider block mb-0.5">Status Category</label>
+                  <select id="noteCategory" class="w-full bg-slate-50 dark:bg-[#1a1a1a] border border-slate-300 dark:border-slate-700 rounded text-[10px] px-1.5 py-1 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500">
                     <option value="OK">OK</option>
                     <option value="CHECK">CHECK</option>
                     <option value="RECHECK">RECHECK</option>
@@ -349,36 +368,16 @@
                   </select>
                 </div>
                 <div>
-                  <label class="text-[10px] text-slate-500 font-medium block uppercase tracking-wider mb-1">Field Remarks</label>
-                  <textarea id="noteRemarks" rows="2" placeholder="Enter inspection remarks or notes..." class="w-full bg-slate-50 dark:bg-[#1a1a1a] border border-slate-300 dark:border-slate-700 rounded text-xs p-2 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500 resize-none"></textarea>
+                  <label class="text-[9px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider block mb-0.5">Field Remarks</label>
+                  <textarea id="noteRemarks" rows="2" placeholder="Enter remarks..." class="w-full bg-slate-50 dark:bg-[#1a1a1a] border border-slate-300 dark:border-slate-700 rounded text-[10px] p-1.5 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500 resize-none leading-tight"></textarea>
                 </div>
-                <div class="flex gap-2">
-                  <button onclick="saveNote()" class="flex-1 bg-sky-600 hover:bg-sky-500 text-white text-xs py-1.5 rounded font-medium transition shadow-sm flex items-center justify-center gap-1">
-                    <i data-lucide="save" class="w-3.5 h-3.5"></i> Save
+                <div class="flex gap-1.5">
+                  <button onclick="saveNote()" class="flex-1 bg-sky-600 hover:bg-sky-500 text-white text-[10px] py-1 rounded font-medium transition shadow-sm flex items-center justify-center gap-1">
+                    <i data-lucide="save" class="w-3 h-3"></i> Save
                   </button>
-                  <button onclick="deleteNote()" class="px-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs py-1.5 rounded font-medium transition shadow-sm flex items-center justify-center gap-1">
-                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete
+                  <button onclick="deleteNote()" class="px-2 bg-rose-600 hover:bg-rose-500 text-white text-[10px] py-1 rounded font-medium transition shadow-sm flex items-center justify-center gap-1">
+                    <i data-lucide="trash-2" class="w-3 h-3"></i> Delete
                   </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- SECTION 3: AVAILABLE CYCLES -->
-            <div id="section-cycles" class="bg-white dark:bg-[#232323] rounded-lg border border-slate-200 dark:border-slate-800/90 shadow-sm overflow-hidden transition-all duration-200">
-              <div onclick="toggleSection('section-cycles')" class="px-3 py-2 bg-slate-100/70 dark:bg-[#2a2a2a] border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between cursor-pointer select-none hover:bg-slate-200/60 dark:hover:bg-[#303030] transition">
-                <div class="flex items-center gap-1.5">
-                  <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-500"></i>
-                  <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">3. Available Cycles</h3>
-                </div>
-                <div class="flex items-center gap-1.5">
-                  <span class="text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">HISTORY</span>
-                  <i id="icon-section-cycles" data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200"></i>
-                </div>
-              </div>
-
-              <div id="body-section-cycles" class="p-2.5">
-                <div id="cyclesList" class="space-y-1 max-h-44 overflow-y-auto pr-1">
-                  <span class="text-xs text-slate-500 italic px-1 block">No cycles loaded</span>
                 </div>
               </div>
             </div>
