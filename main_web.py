@@ -30,7 +30,8 @@ def main():
         js_api=api,
         width=1340,
         height=850,
-        min_size=(1000, 680)
+        min_size=(1000, 680),
+        maximized=True
     )
 
     # Start the event loop

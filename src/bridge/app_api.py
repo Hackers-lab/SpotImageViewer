@@ -41,12 +41,36 @@ class AppAPI:
     # --- System & Settings ---
     def get_app_info(self):
         total_images = database.get_total_image_count()
-        folders = [config.IMAGE_FOLDER] + database.get_additional_folders()
+        folders = []
+        primary_path = config.IMAGE_FOLDER
+        folders.append({
+            "path": primary_path,
+            "accessible": os.path.exists(primary_path),
+            "is_primary": True
+        })
+        for p in database.get_additional_folders():
+            folders.append({
+                "path": p,
+                "accessible": os.path.exists(p),
+                "is_primary": False
+            })
+        consumer_count = 0
+        try:
+            conn = database.get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM meter_mapping")
+            consumer_count = cursor.fetchone()[0]
+            conn.close()
+        except:
+            pass
+
         return {
             "version": config.CURRENT_VERSION,
             "total_images": total_images,
             "folders": folders,
-            "has_meter_data": database.has_meter_data()
+            "has_meter_data": consumer_count > 0,
+            "consumer_count": consumer_count,
+            "consumer_updated_at": database.get_info_value("consumer_data_updated_at", "")
         }
 
     # --- Search & Consumer Details ---
@@ -523,7 +547,20 @@ class AppAPI:
                 
                 return {
                     "units": total_units, "energy": penal_energy_charge, "fixed": penal_fc,
-                    "ed_percent": ed_percent, "ed": total_ed, "gross": gross_bill
+                    "ed_percent": ed_percent, "ed": total_ed, "gross": gross_bill,
+                    "months": round(months, 4),
+                    "rounded_months": rounded_months,
+                    "units_per_month": round(units_per_month, 2),
+                    "pf": pf,
+                    "lf": lf,
+                    "load_kva": round(load_kva, 3),
+                    "rounded_load": rounded_load,
+                    "normal_monthly_energy": round(normal_monthly_charge, 2),
+                    "normal_total_energy": round(normal_total_charge, 2),
+                    "fixed_charge_rate": cat_data.get("fixed_charge", 0.0),
+                    "normal_fc": round(normal_fc, 2),
+                    "days": days,
+                    "hours": hours
                 }
 
             prov = compute_assessment(prov_days, prov_hours)
@@ -551,7 +588,28 @@ class AppAPI:
                     "total_adjustments": total_adjustments,
                     "net": net,
                     "net_assessment": net,
-                    "rounded_assessment": round(net)
+                    "rounded_assessment": round(net),
+                    "breakdown": {
+                        "days": b["days"],
+                        "hours": b["hours"],
+                        "load_kva": b["load_kva"],
+                        "pf": b["pf"],
+                        "lf": b["lf"],
+                        "units": b["units"],
+                        "months": b["months"],
+                        "rounded_months": b["rounded_months"],
+                        "units_per_month": b["units_per_month"],
+                        "normal_monthly_energy": b["normal_monthly_energy"],
+                        "normal_total_energy": b["normal_total_energy"],
+                        "penal_energy": b["energy"],
+                        "fixed_rate": b["fixed_charge_rate"],
+                        "rounded_load": b["rounded_load"],
+                        "normal_fc": b["normal_fc"],
+                        "penal_fc": b["fixed"],
+                        "ed_percent": round(b["ed_percent"] * 100, 2),
+                        "ed_amount": b["ed"],
+                        "gross": b["gross"]
+                    }
                 }
 
             prov_block = format_block(prov, prov_net)
@@ -572,6 +630,82 @@ class AppAPI:
                 "relief": relief_info,
                 "diff_rs": diff_rs,
                 "diff_pct": diff_pct
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def calculate_theft_reverse_load(self, p):
+        """Calculate expected connected load given a target assessed amount, days, hours, and tariff."""
+        try:
+            target_amount = float(p.get("target_amount", 0.0))
+            if target_amount <= 0:
+                return {"success": False, "error": "Target assessment amount must be greater than 0"}
+
+            hours = min(24.0, max(0.1, float(p.get("hours", 24.0))))
+            days = max(1, int(p.get("days", 365)))
+            category = p.get("category", "")
+            consumer_type = p.get("consumer_type", "Consumer")
+
+            adj_e = float(p.get("adj_energy", 0.0))
+            adj_f = float(p.get("adj_fixed", 0.0))
+            adj_ed = float(p.get("adj_ed", 0.0))
+            target_gross = target_amount + (adj_e + adj_f + adj_ed)
+
+            def test_load(load_kva):
+                calc_payload = {
+                    "category": category,
+                    "consumer_type": consumer_type,
+                    "load": load_kva,
+                    "load_unit": "kVA",
+                    "days": days,
+                    "hours": hours,
+                    "adj_energy": 0,
+                    "adj_fixed": 0,
+                    "adj_ed": 0
+                }
+                res = self.calculate_theft(calc_payload)
+                if res.get("success"):
+                    return res["result"]["gross_bill"]
+                return 0.0
+
+            # Binary search for matching load in kVA
+            low, high = 0.01, 2000.0
+            for _ in range(60):
+                mid = (low + high) / 2.0
+                g = test_load(mid)
+                if g < target_gross:
+                    low = mid
+                else:
+                    high = mid
+
+            load_kva = round(mid, 3)
+            load_kw = round(load_kva * 0.85, 3)
+
+            # Verification forward calculation
+            verify_payload = {
+                "category": category,
+                "consumer_type": consumer_type,
+                "load": load_kva,
+                "load_unit": "kVA",
+                "days": days,
+                "hours": hours,
+                "adj_energy": adj_e,
+                "adj_fixed": adj_f,
+                "adj_ed": adj_ed
+            }
+            verify_res = self.calculate_theft(verify_payload)
+            ver = verify_res.get("result", {}) if verify_res.get("success") else {}
+
+            return {
+                "success": True,
+                "load_kva": load_kva,
+                "load_kw": load_kw,
+                "target_amount": target_amount,
+                "resulting_gross": ver.get("gross_bill", 0),
+                "resulting_net": ver.get("net_assessment", 0),
+                "assessed_units": ver.get("assessed_units", 0),
+                "hours": hours,
+                "days": days
             }
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -607,6 +741,21 @@ class AppAPI:
                     "installer_url": data.get("installer_url", "")
                 }
             return {"success": False, "error": "Failed to connect to update server."}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    # --- Search History ---
+    def get_search_history(self, key="consumer_ids"):
+        try:
+            return {"success": True, "history": utils.load_search_history(key)}
+        except Exception as e:
+            return {"success": False, "error": str(e), "history": []}
+
+    def save_search_history(self, key="consumer_ids", val=""):
+        try:
+            if val:
+                utils.save_search_history(key, str(val).strip())
+            return {"success": True}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -740,15 +889,20 @@ class AppAPI:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def add_network_folder(self, path):
+    def add_network_folder(self, path=""):
         try:
+            if not path:
+                path = self.pick_folder(title="Select Folder to Add")
+            if not path:
+                return {"success": False, "cancelled": True}
+
             if not os.path.exists(path):
                 return {"success": False, "error": "Folder path does not exist or is not accessible"}
             folders = database.get_additional_folders()
             if path not in folders:
                 folders.append(path)
                 database.save_additional_folders(folders)
-            return {"success": True}
+            return {"success": True, "path": path}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -762,7 +916,7 @@ class AppAPI:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    # --- System ---
+    # --- System & Image Indexing ---
     def start_indexing(self):
         if self._indexing_state["running"]:
             return {"success": False, "error": "Indexing already running"}
@@ -771,20 +925,97 @@ class AppAPI:
         self._indexing_state["scanned"] = 0
         self._indexing_state["total"] = 0
         self._indexing_state["elapsed"] = 0
+        self._indexing_state["current_folder"] = ""
         
         def _index():
             start = time.time()
+            total_inserted = 0
+            scanned_files_count = 0
             try:
-                if hasattr(utils, "index_images_generator"):
-                    for status in utils.index_images_generator():
-                        self._indexing_state["scanned"] = status.get("scanned", 0)
-                        self._indexing_state["total"] = status.get("total", 0)
-                        self._indexing_state["elapsed"] = int(time.time() - start)
-                else:
-                    time.sleep(2)
+                # 1. Dynamically fetch registered folders
+                additional_folders = database.get_additional_folders()
+                folders = [config.IMAGE_FOLDER] + (additional_folders or [])
+                unique_folders = []
+                for f in folders:
+                    if f and os.path.exists(f) and os.path.normpath(f) not in [os.path.normpath(u) for u in unique_folders]:
+                        unique_folders.append(f)
+
+                conn = database.get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("PRAGMA journal_mode=WAL;")
+                cursor.execute("PRAGMA synchronous=OFF;")
+
+                cursor.execute("DELETE FROM images")
+                cursor.execute("DELETE FROM directories")
+                conn.commit()
+
+                batch_data = []
+                BATCH_SIZE = 2000
+
+                for folder in unique_folders:
+                    self._indexing_state["current_folder"] = folder
+                    for root_dir, dirs, files in os.walk(folder):
+                        if not files:
+                            continue
+                        cursor.execute("INSERT OR IGNORE INTO directories (dir_path) VALUES (?)", (root_dir,))
+                        cursor.execute("SELECT id FROM directories WHERE dir_path = ?", (root_dir,))
+                        dir_row = cursor.fetchone()
+                        dir_id = dir_row[0] if dir_row else 1
+
+                        for filename in files:
+                            scanned_files_count += 1
+                            try:
+                                if len(filename) < 25:
+                                    continue
+                                if not filename[:8].isdigit():
+                                    continue
+
+                                date_orig = filename[:8]
+                                try:
+                                    dt = datetime.strptime(date_orig, "%d%m%Y")
+                                    date_iso = dt.strftime("%Y-%m-%d")
+                                except ValueError:
+                                    continue
+
+                                mru = filename[8:16]
+                                cid = filename[16:25]
+
+                                batch_data.append((cid, date_orig, date_iso, mru, filename, dir_id))
+
+                                if len(batch_data) >= BATCH_SIZE:
+                                    cursor.executemany(
+                                        "INSERT OR IGNORE INTO images (consumer_id, date_original, date_iso, mru, filename, dir_id) VALUES (?,?,?,?,?,?)",
+                                        batch_data
+                                    )
+                                    conn.commit()
+                                    total_inserted += len(batch_data)
+                                    batch_data = []
+                                    self._indexing_state["scanned"] = total_inserted
+                                    self._indexing_state["total"] = total_inserted
+                                    self._indexing_state["elapsed"] = int(time.time() - start)
+                            except Exception:
+                                continue
+
+                if batch_data:
+                    cursor.executemany(
+                        "INSERT OR IGNORE INTO images (consumer_id, date_original, date_iso, mru, filename, dir_id) VALUES (?,?,?,?,?,?)",
+                        batch_data
+                    )
+                    conn.commit()
+                    total_inserted += len(batch_data)
+
+                cursor.execute("ANALYZE;")
+                cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                conn.close()
+
+                self._indexing_state["scanned"] = total_inserted
+                self._indexing_state["total"] = total_inserted
+                self._indexing_state["elapsed"] = int(time.time() - start)
+            except Exception as e:
+                print(f"[Error in Indexing Worker]: {e}")
             finally:
                 self._indexing_state["running"] = False
-                
+
         threading.Thread(target=_index, daemon=True).start()
         return {"success": True}
 
@@ -1389,7 +1620,94 @@ class AppAPI:
                 return {"success": False, "error": "No valid consumer records found in file."}
 
             utils.update_meter_mapping(d)
-            return {"success": True, "count": len(d)}
+            database.set_info_value("consumer_data_updated_at", datetime.now().strftime("%d-%m-%Y %H:%M"))
+            return {"success": True, "count": len(d), "file_path": file_path}
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    def open_file_external(self, file_path=""):
+        """Open any file or directory in default system application or explorer."""
+        try:
+            if not file_path:
+                return {"success": False, "error": "No file path provided."}
+            if not os.path.exists(file_path):
+                return {"success": False, "error": f"File does not exist: {file_path}"}
+
+            if os.name == 'nt':
+                os.startfile(file_path)
+            else:
+                opener = "open" if sys.platform == "darwin" else "xdg-open"
+                subprocess.call([opener, file_path])
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def open_url_external(self, url=""):
+        """Open web URL in user's default browser."""
+        try:
+            if not url:
+                url = "https://github.com/Hackers-lab/SpotImageViewer"
+            import webbrowser
+            webbrowser.open(url)
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def open_database_folder(self):
+        """Open database directory in Windows explorer."""
+        return self.open_file_external(config.BASE_DIR)
+
+    def export_consumer_data_file(self, dest_path=""):
+        """Export current SQLite meter_mapping records into an Excel file and open it."""
+        try:
+            if not dest_path:
+                dest_path = self.pick_save_file(
+                    title="Export Consumer Master Records",
+                    default_filename="consumer_master_export.xlsx",
+                    file_types=[("Excel Files (*.xlsx)", "*.xlsx")]
+                )
+            if not dest_path:
+                return {"success": False, "cancelled": True}
+
+            conn = database.get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT consumer_id, meter_no, name, address, mobile_number, contractual_load, class
+                FROM meter_mapping
+                ORDER BY consumer_id ASC
+                """
+            )
+            rows = cursor.fetchall()
+            conn.close()
+
+            wb = openpyxl.Workbook()
+            sheet = wb.active
+            sheet.title = "ConsumerMaster"
+            headers = [
+                "CONSUMER ID", "METER NO", "NAME", "ADDRESS",
+                "MOBILE NUMBER", "CONTRACTUAL LOAD", "CLASS"
+            ]
+            sheet.append(headers)
+
+            for r in rows:
+                sheet.append([
+                    str(r[0] or ""), str(r[1] or ""), str(r[2] or ""),
+                    str(r[3] or ""), str(r[4] or ""), str(r[5] or ""),
+                    str(r[6] or "")
+                ])
+
+            sheet.freeze_panes = "A2"
+            widths = [18, 16, 28, 36, 18, 18, 14]
+            for idx, width in enumerate(widths, start=1):
+                col = openpyxl.utils.get_column_letter(idx)
+                sheet.column_dimensions[col].width = width
+
+            wb.save(dest_path)
+            # Open the exported excel file automatically
+            self.open_file_external(dest_path)
+            return {"success": True, "count": len(rows), "path": dest_path}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
 
