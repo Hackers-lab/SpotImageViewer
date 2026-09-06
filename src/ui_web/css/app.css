@@ -12,14 +12,14 @@ body {
   height: 100vh;
   width: 100vw;
   display: flex;
-  font-size: 13px;
-  line-height: 1.4;
+  font-size: 11.5px;
+  line-height: 1.35;
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -41,15 +41,42 @@ body {
   -webkit-backdrop-filter: blur(12px);
 }
 
-/* Compact inputs for desktop efficiency */
+/* Compact inputs for dense desktop workspace */
 input[type="text"],
 input[type="number"],
 input[type="date"],
 select,
 textarea {
-  font-size: 13px !important;
-  line-height: 1.25 !important;
+  font-size: 11.5px !important;
+  line-height: 1.2 !important;
   user-select: text;
+}
+
+/* Global utility adjustments for high information density */
+.text-sm {
+  font-size: 0.78rem !important; /* ~12.5px */
+  line-height: 1.25rem !important;
+}
+
+.text-xs {
+  font-size: 0.70rem !important; /* ~11.2px */
+  line-height: 1.05rem !important;
+}
+
+.text-base {
+  font-size: 0.88rem !important; /* ~14px */
+}
+
+.text-lg {
+  font-size: 0.95rem !important; /* ~15.2px */
+}
+
+.text-xl {
+  font-size: 1.10rem !important; /* ~17.6px */
+}
+
+.text-2xl {
+  font-size: 1.35rem !important; /* ~21.6px */
 }
 
 /* Filmstrip items */
