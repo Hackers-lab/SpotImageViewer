@@ -485,15 +485,31 @@ async function runBillCalc() {
 }
 
 // --- Theft Calculations ---
+function formatDecimalHours(h) {
+  const totalMinutes = Math.max(0, Math.min(24 * 60, Math.round(h * 60)));
+  const hrs = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  return `(${String(hrs).padStart(2, '0')}h ${String(mins).padStart(2, '0')}m)`;
+}
+
 async function runTheftCalc() {
+  const provHours = parseFloat(document.getElementById('theftProvHours').value || 24);
+  const finalHours = parseFloat(document.getElementById('theftFinalHours').value || 19);
+
+  const provHoursLabel = document.getElementById('provHoursLabel');
+  if (provHoursLabel) provHoursLabel.innerText = formatDecimalHours(provHours);
+  const finalHoursLabel = document.getElementById('finalHoursLabel');
+  if (finalHoursLabel) finalHoursLabel.innerText = formatDecimalHours(finalHours);
+
   const payload = {
     category: document.getElementById('theftCategory').value,
     consumer_type: document.getElementById('theftConsumerType').value,
     load: parseFloat(document.getElementById('theftLoad').value || 1.5),
     load_unit: document.getElementById('theftLoadUnit').value,
-    days_prov: parseInt(document.getElementById('theftProvDays').value || 30),
+    days_prov: parseInt(document.getElementById('theftProvDays').value || 365),
     days_final: parseInt(document.getElementById('theftFinalDays').value || 365),
-    hours: parseFloat(document.getElementById('theftHours').value || 8),
+    prov_hours: provHours,
+    final_hours: finalHours,
     adj_energy: parseFloat(document.getElementById('theftAdjEnergy').value || 0),
     adj_fixed: parseFloat(document.getElementById('theftAdjFixed').value || 0),
     adj_ed: parseFloat(document.getElementById('theftAdjEd').value || 0)
@@ -512,7 +528,7 @@ async function runTheftCalc() {
 
   const res = await callAPI('calculate_theft_dual', payload);
   if (res && res.success) {
-    const p = res.provisional;
+    const p = res.provisional || res.prov;
     document.getElementById('provUnits').innerText = `${p.assessed_units.toLocaleString('en-IN')} kWh`;
     document.getElementById('provEnergy').innerHTML = `\u20B9 ${p.penal_energy_charge.toFixed(2)}`;
     document.getElementById('provFixed').innerHTML = `\u20B9 ${p.penal_fixed_charge.toFixed(2)}`;
@@ -530,13 +546,15 @@ async function runTheftCalc() {
     document.getElementById('finalAdj').innerHTML = `- \u20B9 ${f.total_adjustments.toFixed(2)}`;
     document.getElementById('finalNet').innerHTML = `\u20B9 ${f.rounded_assessment.toLocaleString('en-IN')}`;
 
-    const rel = res.relief;
+    const rel = res.relief || { diff_rs: res.diff_rs || 0, diff_pct: res.diff_pct || 0 };
     const rb = document.getElementById('reliefBar');
-    rb.innerHTML = `Final Assessment Relief: \u20B9 ${rel.diff_rs.toFixed(2)} (${rel.diff_pct.toFixed(2)}%)`;
-    if (rel.diff_pct > 25) {
-      rb.className = "mt-4 p-3 rounded-lg bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 text-sm font-medium text-center border border-rose-200 dark:border-rose-800/50";
-    } else {
-      rb.className = "mt-4 p-3 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-sm font-medium text-center border border-emerald-200 dark:border-emerald-800/50";
+    if (rb) {
+      rb.innerHTML = `Final Assessment Relief: \u20B9 ${rel.diff_rs.toFixed(2)} (${rel.diff_pct.toFixed(2)}%)`;
+      if (rel.diff_pct > 25) {
+        rb.className = "mt-2.5 p-2.5 rounded-lg bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 text-xs font-semibold text-center border border-rose-200 dark:border-rose-800/50";
+      } else {
+        rb.className = "mt-2.5 p-2.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold text-center border border-emerald-200 dark:border-emerald-800/50";
+      }
     }
   }
 }

@@ -1,11 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  user-select: none;
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
 body {
@@ -13,25 +12,27 @@ body {
   height: 100vh;
   width: 100vw;
   display: flex;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #94a3b8;
+  background: #cbd5e1;
   border-radius: 4px;
 }
 [data-theme="dark"] ::-webkit-scrollbar-thumb {
   background: #334155;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: #94a3b8;
 }
 
 /* Glass card styling */
@@ -40,24 +41,26 @@ body {
   -webkit-backdrop-filter: blur(12px);
 }
 
-.input-field {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem; /* text-sm, 14px */
-  outline: none;
-  transition: all 0.2s ease;
+/* Compact inputs for desktop efficiency */
+input[type="text"],
+input[type="number"],
+input[type="date"],
+select,
+textarea {
+  font-size: 13px !important;
+  line-height: 1.25 !important;
+  user-select: text;
 }
 
 /* Filmstrip items */
 .filmstrip-thumb {
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   border: 2px solid transparent;
 }
 .filmstrip-thumb.active {
-  border-color: #38bdf8;
-  transform: scale(1.05);
+  border-color: #0284c7;
+  transform: scale(1.04);
 }
 .filmstrip-thumb:hover:not(.active) {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }

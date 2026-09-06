@@ -204,7 +204,16 @@ class AppAPI:
                 if days <= 0: days = 1
                 months_multiplier = days / 30.0
 
-            phase = p.get("phase", "1-Phase")
+            phase_input = str(p.get("phase", "1-Phase")).strip()
+            if phase_input in ("1", "1-Phase", "Single Phase"):
+                phase = "1-Phase"
+            elif phase_input in ("3", "3-Phase", "Three Phase"):
+                phase = "3-Phase"
+            elif phase_input.lower() in ("own", "own meter"):
+                phase = "Own Meter"
+            else:
+                phase = phase_input
+
             mvca_rate = float(p.get("mvca", 0.0))
             load_unit = p.get("load_unit", "kVA")
             raw_load = float(p.get("load", 1.0))
@@ -216,9 +225,10 @@ class AppAPI:
             total_units = 0
 
             if is_tod:
-                n = int(p.get("tod_n", 0))
-                pk = int(p.get("tod_p", 0))
-                o = int(p.get("tod_o", 0))
+                tod_dict = p.get("tod_units") or {}
+                n = int(tod_dict.get("normal", p.get("tod_n", 0)))
+                pk = int(tod_dict.get("peak", p.get("tod_p", 0)))
+                o = int(tod_dict.get("off_peak", p.get("tod_o", 0)))
                 total_units = n + pk + o
                 if "tod_slabs" in cat_data:
                     energy_charge += n * cat_data["tod_slabs"].get("Normal", 0)
@@ -275,8 +285,8 @@ class AppAPI:
                     base_rent = 50.0
                 meter_rent = base_rent * months_multiplier
 
-            # MVCA
-            mvca_charge = (total_units * mvca_rate) / 100.0
+            # MVCA (in ₹ per unit, directly multiplied as in desktop bill calculator)
+            mvca_charge = total_units * mvca_rate
 
             # Electricity Duty (ED)
             monthly_units = total_units / months_multiplier if months_multiplier > 0 else 0
@@ -324,16 +334,22 @@ class AppAPI:
                     "energy_charge": round(energy_charge, 2),
                     "fixed_charge": round(base_fc, 2),
                     "is_minimum_override": is_minimum,
+                    "min_charge_override": is_minimum,
                     "minimum_floor": round(min_floor, 2),
+                    "minimum_charge": round(min_floor, 2),
                     "meter_rent": round(meter_rent, 2),
                     "mvca_charge": round(mvca_charge, 2),
                     "ed_charge": round(ed_charge, 2),
                     "ed_percentage": round(ed_percent * 100, 2),
                     "gross_total": round(gross_total, 2),
+                    "gross_bill": round(gross_total, 2),
                     "gov_relief": round(subsidy_amount, 2),
                     "special_rebate": round(special_rebate, 2),
+                    "rebate_special": round(special_rebate, 2),
                     "timely_rebate": round(timely_rebate, 2),
+                    "rebate_timely": round(timely_rebate, 2),
                     "epay_rebate": round(epay_rebate, 2),
+                    "rebate_epay": round(epay_rebate, 2),
                     "net_bill": round(net_bill, 2),
                     "rounded_bill": round(net_bill)
                 }
@@ -439,10 +455,12 @@ class AppAPI:
             raw_load = float(p.get("load", 1.0))
             load_kva = (raw_load / 0.85) if p.get("load_unit", "kVA") == "kW" else raw_load
 
-            prov_days = int(p.get("prov_days", 365))
-            prov_hours = float(p.get("prov_hours", 24.0))
-            final_days = int(p.get("final_days", 365))
-            final_hours = float(p.get("final_hours", 19.0))
+            prov_days = int(p.get("days_prov", p.get("prov_days", 365)))
+            final_days = int(p.get("days_final", p.get("final_days", 365)))
+            
+            shared_hours = p.get("hours")
+            prov_hours = float(p.get("prov_hours", shared_hours if shared_hours is not None else 24.0))
+            final_hours = float(p.get("final_hours", shared_hours if shared_hours is not None else 19.0))
             
             adj_e = float(p.get("adj_energy", 0.0))
             adj_f = float(p.get("adj_fixed", 0.0))
@@ -507,14 +525,42 @@ class AppAPI:
             
             diff_rs = prov_net - final_net
             diff_pct = (diff_rs / prov_net * 100) if prov_net > 0 else 0
-            
+
+            def format_block(b, net):
+                return {
+                    "units": b["units"],
+                    "assessed_units": b["units"],
+                    "energy": b["energy"],
+                    "penal_energy_charge": b["energy"],
+                    "fixed": b["fixed"],
+                    "penal_fixed_charge": b["fixed"],
+                    "ed_percent": b["ed_percent"],
+                    "ed": b["ed"],
+                    "electricity_duty": b["ed"],
+                    "gross": b["gross"],
+                    "gross_assessment": b["gross"],
+                    "total_adjustments": total_adjustments,
+                    "net": net,
+                    "net_assessment": net,
+                    "rounded_assessment": round(net)
+                }
+
+            prov_block = format_block(prov, prov_net)
+            final_block = format_block(final, final_net)
+            relief_info = {
+                "diff_rs": diff_rs,
+                "diff_pct": diff_pct
+            }
+
             return {
                 "success": True,
-                "prov": prov,
-                "final": final,
+                "prov": prov_block,
+                "provisional": prov_block,
+                "final": final_block,
                 "adjustments": total_adjustments,
                 "prov_net": prov_net,
                 "final_net": final_net,
+                "relief": relief_info,
                 "diff_rs": diff_rs,
                 "diff_pct": diff_pct
             }

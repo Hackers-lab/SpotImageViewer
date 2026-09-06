@@ -268,23 +268,24 @@
     </section>
 
     <!-- TAB 2: Modern Reactive Bill Calculator -->
-    <section id="tab-bill" class="tab-content flex-1 p-6 overflow-y-auto hidden">
-      <div class="max-w-5xl mx-auto space-y-6">
+    <section id="tab-bill" class="tab-content flex-1 p-4 lg:p-6 overflow-y-auto hidden">
+      <div class="max-w-5xl mx-auto space-y-4">
         <div>
-          <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100">Bill Calculator Studio</h2>
-          <p class="text-xs text-slate-600 dark:text-slate-400">Pro-Rata, Domestic Subsidy, and Tariff Billing Engine</p>
+          <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100">Bill Calculator Studio</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Pro-Rata, Domestic Subsidy, and Tariff Billing Engine</p>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div class="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-5 shadow-sm">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+          <!-- Inputs Card (7 cols) -->
+          <div class="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3.5 shadow-sm">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Tariff Class</label>
-                <select id="billCategory" onchange="runBillCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500"></select>
+                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">Tariff Class</label>
+                <select id="billCategory" onchange="runBillCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2.5 py-1.5 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500"></select>
               </div>
               <div>
-                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Billing Cycle</label>
-                <select id="billCycle" onchange="toggleBillCycle()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500">
+                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">Billing Cycle</label>
+                <select id="billCycle" onchange="toggleBillCycle()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2.5 py-1.5 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500">
                   <option value="Quarterly">Quarterly (3 Months)</option>
                   <option value="Monthly">Monthly (1 Month)</option>
                   <option value="Pro-Rata">Pro-Rata (Custom Days)</option>
@@ -293,237 +294,253 @@
             </div>
 
             <!-- Pro-Rata Form -->
-            <div id="proRataRow" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-950/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div id="proRataRow" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-slate-50 dark:bg-slate-950/50 p-3 rounded-lg border border-slate-200 dark:border-slate-800">
               <div>
-                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">From Date</label>
-                <input type="date" id="billFromDate" onchange="calculateDaysAndRun()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200">
+                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">From Date</label>
+                <input type="date" id="billFromDate" onchange="calculateDaysAndRun()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2 py-1 text-slate-800 dark:text-slate-200">
               </div>
               <div>
-                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">To Date</label>
-                <input type="date" id="billToDate" onchange="calculateDaysAndRun()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200">
+                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">To Date</label>
+                <input type="date" id="billToDate" onchange="calculateDaysAndRun()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2 py-1 text-slate-800 dark:text-slate-200">
               </div>
               <div>
-                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Calculated Days</label>
-                <input type="number" id="billDays" value="30" oninput="runBillCalc()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200" min="1">
+                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">Calculated Days</label>
+                <input type="number" id="billDays" value="30" oninput="runBillCalc()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2 py-1 text-slate-800 dark:text-slate-200" min="1">
               </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div id="normalUnitsContainer">
-                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Total Billed Units</label>
-                <input type="number" id="billUnits" value="150" oninput="runBillCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-sky-600 dark:text-sky-400 font-bold" min="0">
+                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">Total Units</label>
+                <input type="number" id="billUnits" value="150" oninput="runBillCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2.5 py-1.5 text-sky-600 dark:text-sky-400 font-semibold" min="0">
               </div>
               <div>
-                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Contract Load</label>
-                <div class="flex gap-2">
-                  <input type="number" step="0.1" id="billLoad" value="1.0" oninput="runBillCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200" min="0.1">
-                  <select id="billLoadUnit" onchange="runBillCalc()" class="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200 w-20">
+                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">Contract Load</label>
+                <div class="flex gap-1.5">
+                  <input type="number" step="0.1" id="billLoad" value="1.0" oninput="runBillCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2 py-1.5 text-slate-800 dark:text-slate-200" min="0.1">
+                  <select id="billLoadUnit" onchange="runBillCalc()" class="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-1.5 py-1.5 text-slate-800 dark:text-slate-200 w-16 shrink-0">
                     <option value="kVA">kVA</option>
                     <option value="kW">kW</option>
                   </select>
                 </div>
               </div>
               <div>
-                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">MVCA Rate (P/Unit)</label>
-                <input type="number" step="0.1" id="billMvca" value="0.0" oninput="runBillCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200">
+                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">MVCA Rate (₹/U)</label>
+                <input type="number" step="0.01" id="billMvca" value="0.00" oninput="runBillCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2.5 py-1.5 text-slate-800 dark:text-slate-200">
               </div>
             </div>
 
             <!-- Phase Selection -->
             <div>
-              <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Phase / Meter Type</label>
-              <div class="flex gap-4">
-                <label class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300"><input type="radio" name="phase" value="1" checked onchange="runBillCalc()"> 1-Phase</label>
-                <label class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300"><input type="radio" name="phase" value="3" onchange="runBillCalc()"> 3-Phase</label>
-                <label class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300"><input type="radio" name="phase" value="own" onchange="runBillCalc()"> Own Meter</label>
+              <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">Phase / Meter Connection</label>
+              <div class="flex items-center gap-4 py-0.5">
+                <label class="inline-flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 cursor-pointer"><input type="radio" name="phase" value="1" checked onchange="runBillCalc()" class="accent-sky-600"> 1-Phase</label>
+                <label class="inline-flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 cursor-pointer"><input type="radio" name="phase" value="3" onchange="runBillCalc()" class="accent-sky-600"> 3-Phase</label>
+                <label class="inline-flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 cursor-pointer"><input type="radio" name="phase" value="own" onchange="runBillCalc()" class="accent-sky-600"> Own Meter</label>
               </div>
             </div>
 
             <!-- TOD Container (Hidden by default) -->
-            <div id="todUnitsContainer" class="hidden grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 dark:bg-slate-950/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div id="todUnitsContainer" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-slate-50 dark:bg-slate-950/50 p-3 rounded-lg border border-slate-200 dark:border-slate-800">
               <div>
-                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Normal Units</label>
-                <input type="number" id="todNormal" value="0" oninput="runBillCalc()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2">
+                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">Normal Units</label>
+                <input type="number" id="todNormal" value="0" oninput="runBillCalc()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2 py-1">
               </div>
               <div>
-                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Peak Units</label>
-                <input type="number" id="todPeak" value="0" oninput="runBillCalc()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2">
+                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">Peak Units</label>
+                <input type="number" id="todPeak" value="0" oninput="runBillCalc()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2 py-1">
               </div>
               <div>
-                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Off-Peak Units</label>
-                <input type="number" id="todOffPeak" value="0" oninput="runBillCalc()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2">
+                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">Off-Peak Units</label>
+                <input type="number" id="todOffPeak" value="0" oninput="runBillCalc()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2 py-1">
               </div>
             </div>
 
-            <div class="flex items-center gap-6 pt-2">
-              <label class="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                <input type="checkbox" id="billMeterRent" checked onchange="runBillCalc()" class="rounded border-slate-300 dark:border-slate-700 text-sky-500 focus:ring-0">
+            <div class="flex flex-wrap items-center gap-5 pt-1">
+              <label class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                <input type="checkbox" id="billMeterRent" checked onchange="runBillCalc()" class="rounded border-slate-300 dark:border-slate-700 accent-sky-600">
                 Include Meter Rent
               </label>
-              <label id="monsoonContainer" class="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                <input type="checkbox" id="billMonsoon" onchange="runBillCalc()" class="rounded border-slate-300 dark:border-slate-700 text-sky-500 focus:ring-0">
-                Monsoon Rebate (50% Fixed Charge)
+              <label id="monsoonContainer" class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                <input type="checkbox" id="billMonsoon" onchange="runBillCalc()" class="rounded border-slate-300 dark:border-slate-700 accent-sky-600">
+                Monsoon Rebate (50% Fixed)
               </label>
             </div>
           </div>
 
-          <div class="bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 flex flex-col justify-between shadow-lg">
-            <div class="space-y-4">
-              <div class="flex items-center justify-between pb-3 border-b border-slate-300 dark:border-slate-800">
-                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Calculated Bill</h3>
-                <span class="text-xs px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-semibold">Live</span>
+          <!-- Receipt Card (5 cols) -->
+          <div class="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Detailed Bill Breakdown</h3>
+              <span class="text-[11px] px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-semibold">Live Calculation</span>
+            </div>
+
+            <div class="space-y-1.5 text-xs">
+              <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                <span>Energy Charge</span>
+                <span id="resEnergy" class="font-semibold text-slate-800 dark:text-slate-200">&#8377; 0.00</span>
+              </div>
+              <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                <span>Fixed / Demand Charge</span>
+                <span id="resFixed" class="font-semibold text-slate-800 dark:text-slate-200">&#8377; 0.00</span>
+              </div>
+              <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                <span>Minimum Charge Floor <span id="resMinTag" class="text-rose-500 text-[10px] hidden">(Triggered)</span></span>
+                <span id="resMin" class="font-semibold text-slate-800 dark:text-slate-200">&#8377; 0.00</span>
+              </div>
+              <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                <span>MVCA Surcharge</span>
+                <span id="resMvca" class="font-semibold text-slate-800 dark:text-slate-200">&#8377; 0.00</span>
+              </div>
+              <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                <span>Meter Rent</span>
+                <span id="resMeter" class="font-semibold text-slate-800 dark:text-slate-200">&#8377; 0.00</span>
+              </div>
+              <div class="flex justify-between text-emerald-600 dark:text-emerald-400">
+                <span>Govt. Energy Relief / Subsidy</span>
+                <span id="resRelief" class="font-semibold">- &#8377; 0.00</span>
+              </div>
+              <div class="flex justify-between text-slate-600 dark:text-slate-400 pb-1.5 border-b border-slate-200 dark:border-slate-800">
+                <span>Electricity Duty (<span id="resEdRate">0</span>%)</span>
+                <span id="resEd" class="font-semibold text-slate-800 dark:text-slate-200">&#8377; 0.00</span>
               </div>
 
-              <div class="space-y-2.5 text-sm">
-                <div class="flex justify-between text-slate-700 dark:text-slate-300">
-                  <span>Energy Charge</span>
-                  <span id="resEnergy" class="font-sans font-medium text-slate-900 dark:text-slate-100">&#8377; 0.00</span>
+              <!-- Gross -->
+              <div class="flex justify-between text-xs font-bold text-slate-900 dark:text-slate-100 py-1 bg-slate-50 dark:bg-slate-950/60 px-2 rounded">
+                <span>GROSS BILL</span>
+                <span id="resGross" class="text-sm">&#8377; 0.00</span>
+              </div>
+
+              <!-- Rebates Section -->
+              <div class="pt-1 space-y-1">
+                <div class="flex justify-between text-emerald-600 dark:text-emerald-400">
+                  <span>Special Rebate (10p/U)</span>
+                  <span id="resSpecial" class="font-semibold">- &#8377; 0.00</span>
                 </div>
-                <div class="flex justify-between text-slate-700 dark:text-slate-300">
-                  <span>Fixed/Demand Charge</span>
-                  <span id="resFixed" class="font-sans font-medium text-slate-900 dark:text-slate-100">&#8377; 0.00</span>
+                <div class="flex justify-between text-emerald-600 dark:text-emerald-400">
+                  <span>Timely Payment Rebate (1%)</span>
+                  <span id="resTimely" class="font-semibold">- &#8377; 0.00</span>
                 </div>
-                <div class="flex justify-between text-slate-700 dark:text-slate-300">
-                  <span>Minimum Charge <span id="resMinTag" class="text-rose-500 text-xs hidden">(Applied)</span></span>
-                  <span id="resMin" class="font-sans font-medium text-slate-900 dark:text-slate-100">&#8377; 0.00</span>
-                </div>
-                <div class="flex justify-between text-slate-700 dark:text-slate-300">
-                  <span>MVCA Surcharge</span>
-                  <span id="resMvca" class="font-sans font-medium text-slate-900 dark:text-slate-100">&#8377; 0.00</span>
-                </div>
-                <div class="flex justify-between text-slate-700 dark:text-slate-300">
-                  <span>Meter Rent</span>
-                  <span id="resMeter" class="font-sans font-medium text-slate-900 dark:text-slate-100">&#8377; 0.00</span>
-                </div>
-                <div class="flex justify-between text-emerald-600 dark:text-emerald-400 pt-1">
-                  <span>Govt Subsidy/Relief</span>
-                  <span id="resRelief" class="font-sans font-medium">- &#8377; 0.00</span>
-                </div>
-                <div class="flex justify-between text-slate-700 dark:text-slate-300 pb-1 border-b border-slate-300 dark:border-slate-800">
-                  <span>Electricity Duty (<span id="resEdRate">0</span>%)</span>
-                  <span id="resEd" class="font-sans font-medium text-slate-900 dark:text-slate-100">&#8377; 0.00</span>
-                </div>
-                <div class="flex justify-between font-bold text-slate-900 dark:text-slate-100">
-                  <span>GROSS BILL</span>
-                  <span id="resGross" class="font-sans">&#8377; 0.00</span>
-                </div>
-                <div class="flex justify-between text-emerald-600 dark:text-emerald-400 text-xs">
-                  <span>Timely Payment Rebate (-1%)</span>
-                  <span id="resTimely" class="font-sans">- &#8377; 0.00</span>
-                </div>
-                <div class="flex justify-between text-emerald-600 dark:text-emerald-400 text-xs">
-                  <span>E-Payment Rebate (-1%)</span>
-                  <span id="resEpay" class="font-sans">- &#8377; 0.00</span>
-                </div>
-                <div class="flex justify-between text-emerald-600 dark:text-emerald-400 text-xs">
-                  <span>Special Rebate (-10p)</span>
-                  <span id="resSpecial" class="font-sans">- &#8377; 0.00</span>
+                <div class="flex justify-between text-emerald-600 dark:text-emerald-400">
+                  <span>E-Payment Rebate (1%)</span>
+                  <span id="resEpay" class="font-semibold">- &#8377; 0.00</span>
                 </div>
               </div>
             </div>
 
-            <div class="pt-6 border-t border-slate-300 dark:border-slate-800 space-y-2 mt-4">
-              <span class="text-xs text-slate-600 dark:text-slate-400 block">NET PAYABLE</span>
-              <div class="text-2xl font-extrabold text-sky-600 dark:text-sky-400 font-sans tracking-tight" id="resNet">&#8377; 0</div>
+            <!-- Net Payable Banner -->
+            <div class="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-sky-50 dark:bg-sky-950/40 p-3 rounded-lg border border-sky-200 dark:border-sky-900/50">
+              <div>
+                <span class="text-[11px] font-bold tracking-wider text-sky-800 dark:text-sky-300 block uppercase">Estimated Net Payable</span>
+                <span class="text-[10px] text-slate-500 dark:text-slate-400">Rounded WBERC compliant total</span>
+              </div>
+              <div class="text-2xl font-black text-sky-700 dark:text-sky-400 tracking-tight" id="resNet">&#8377; 0</div>
             </div>
           </div>
-        </div>
       </div>
     </section>
 
     <!-- TAB 3: Theft Assessment Studio -->
-    <section id="tab-theft" class="tab-content flex-1 p-6 overflow-y-auto hidden">
-      <div class="max-w-6xl mx-auto space-y-6">
+    <section id="tab-theft" class="tab-content flex-1 p-4 lg:p-6 overflow-y-auto hidden">
+      <div class="max-w-5xl mx-auto space-y-4">
         <div>
-          <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100">Theft & Unauthorized Usage Assessment</h2>
-          <p class="text-xs text-slate-600 dark:text-slate-400">Section 126 & 135 Electricity Act Dual-Penalty Ledger</p>
+          <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100">Theft & Unauthorized Usage Assessment</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Section 126 & 135 Electricity Act Dual-Penalty Ledger</p>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-5 shadow-sm">
-            <h3 class="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Parameters</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+          <!-- Parameters (5 cols) -->
+          <div class="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3.5 shadow-sm">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Offender Parameters</h3>
+            <div class="space-y-3">
               <div>
-                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Tariff Class</label>
-                <select id="theftCategory" onchange="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500"></select>
+                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">Tariff Class</label>
+                <select id="theftCategory" onchange="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2.5 py-1.5 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500"></select>
               </div>
               <div>
-                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Consumer Status</label>
-                <select id="theftConsumerType" onchange="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500">
+                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">Offender Type</label>
+                <select id="theftConsumerType" onchange="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2.5 py-1.5 text-slate-800 dark:text-slate-200 outline-none focus:border-sky-500">
                   <option value="Consumer">Registered Consumer</option>
-                  <option value="Non-Consumer">Non-Consumer (Direct Hooking)</option>
+                  <option value="Non-Consumer">Non-Consumer (Direct Theft)</option>
                 </select>
               </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Connected Load</label>
-                <div class="flex gap-2">
-                  <input type="number" step="0.1" id="theftLoad" value="1.5" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200" min="0.1">
-                  <select id="theftLoadUnit" onchange="runTheftCalc()" class="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200 w-20">
+                <label class="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">Connected Load</label>
+                <div class="flex gap-1.5">
+                  <input type="number" step="0.1" id="theftLoad" value="1.5" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2.5 py-1.5 text-slate-800 dark:text-slate-200" min="0.1">
+                  <select id="theftLoadUnit" onchange="runTheftCalc()" class="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-1.5 py-1.5 text-slate-800 dark:text-slate-200 w-16 shrink-0">
                     <option value="kVA">kVA</option>
                     <option value="kW">kW</option>
                   </select>
                 </div>
               </div>
-              <div>
-                <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">Hours / Day</label>
-                <input type="number" step="0.5" id="theftHours" value="8" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2 text-slate-800 dark:text-slate-200" min="0" max="24">
-              </div>
             </div>
 
             <!-- Prior Bill Adjustments -->
-            <div class="pt-3 border-t border-slate-200 dark:border-slate-800">
-              <h4 class="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-3">Prior Deductions (Paid)</h4>
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="pt-2.5 border-t border-slate-200 dark:border-slate-800">
+              <h4 class="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">Paid Bill Deductions (₹)</h4>
+              <div class="grid grid-cols-3 gap-2">
                 <div>
-                  <label class="text-xs text-slate-500 block mb-1">Energy (&#8377;)</label>
-                  <input type="number" id="theftAdjEnergy" value="0" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2">
+                  <label class="text-[11px] text-slate-500 block mb-1">Energy</label>
+                  <input type="number" id="theftAdjEnergy" value="0" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2 py-1 text-slate-800 dark:text-slate-200">
                 </div>
                 <div>
-                  <label class="text-xs text-slate-500 block mb-1">Fixed (&#8377;)</label>
-                  <input type="number" id="theftAdjFixed" value="0" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2">
+                  <label class="text-[11px] text-slate-500 block mb-1">Fixed</label>
+                  <input type="number" id="theftAdjFixed" value="0" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2 py-1 text-slate-800 dark:text-slate-200">
                 </div>
                 <div>
-                  <label class="text-xs text-slate-500 block mb-1">Duty (&#8377;)</label>
-                  <input type="number" id="theftAdjEd" value="0" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-sm p-2">
+                  <label class="text-[11px] text-slate-500 block mb-1">Duty</label>
+                  <input type="number" id="theftAdjEd" value="0" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-xs px-2 py-1 text-slate-800 dark:text-slate-200">
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 flex flex-col justify-between shadow-lg">
-            <h3 class="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-4">Dual Ledger Output</h3>
+          <!-- Dual Ledger (7 cols) -->
+          <div class="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Dual Assessment Comparison</h3>
+              <span class="text-[11px] px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-semibold">2x Penal Rate</span>
+            </div>
             
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-2 gap-3.5">
               <!-- Provisional Left -->
-              <div class="border-r border-slate-300 dark:border-slate-800 pr-4 space-y-3">
-                <div class="flex items-center justify-between">
-                  <h4 class="text-xs font-bold text-sky-600 dark:text-sky-400">Provisional</h4>
-                  <div class="text-xs text-slate-500 flex flex-col items-end">
-                    <span>Days: <input type="number" id="theftProvDays" value="30" oninput="runTheftCalc()" class="w-12 bg-transparent border-b border-slate-400 text-right text-slate-800 dark:text-slate-200"></span>
+              <div class="border-r border-slate-200 dark:border-slate-800 pr-3.5 space-y-2.5">
+                <div class="pb-1.5 border-b border-slate-200 dark:border-slate-800 space-y-1">
+                  <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase">Provisional</h4>
+                    <span id="provHoursLabel" class="text-[11px] text-slate-500 font-mono">(24h 00m)</span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+                    <div>
+                      <span class="text-[10px] block">Days</span>
+                      <input type="number" id="theftProvDays" value="365" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-xs">
+                    </div>
+                    <div>
+                      <span class="text-[10px] block">Hrs/Day</span>
+                      <input type="number" step="0.5" id="theftProvHours" value="24" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-xs">
+                    </div>
                   </div>
                 </div>
                 
-                <div class="space-y-2 text-sm">
-                  <div class="flex justify-between text-slate-700 dark:text-slate-300">
-                    <span>Assessed Units</span>
-                    <span id="provUnits">0</span>
+                <div class="space-y-1.5 text-xs">
+                  <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                    <span>Units</span>
+                    <span id="provUnits" class="font-semibold text-slate-800 dark:text-slate-200">0 kWh</span>
                   </div>
-                  <div class="flex justify-between text-slate-700 dark:text-slate-300">
+                  <div class="flex justify-between text-slate-600 dark:text-slate-400">
                     <span>Penal Energy</span>
-                    <span id="provEnergy">&#8377; 0.00</span>
+                    <span id="provEnergy" class="font-semibold text-slate-800 dark:text-slate-200">&#8377; 0.00</span>
                   </div>
-                  <div class="flex justify-between text-slate-700 dark:text-slate-300">
+                  <div class="flex justify-between text-slate-600 dark:text-slate-400">
                     <span>Penal Fixed</span>
-                    <span id="provFixed">&#8377; 0.00</span>
+                    <span id="provFixed" class="font-semibold text-slate-800 dark:text-slate-200">&#8377; 0.00</span>
                   </div>
-                  <div class="flex justify-between text-slate-700 dark:text-slate-300">
-                    <span>Elec. Duty</span>
-                    <span id="provEd">&#8377; 0.00</span>
+                  <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                    <span>Duty (ED)</span>
+                    <span id="provEd" class="font-semibold text-slate-800 dark:text-slate-200">&#8377; 0.00</span>
                   </div>
-                  <div class="flex justify-between font-bold border-t border-slate-300 dark:border-slate-800 pt-1">
+                  <div class="flex justify-between font-bold border-t border-slate-200 dark:border-slate-800 pt-1 text-slate-800 dark:text-slate-200">
                     <span>Gross</span>
                     <span id="provGross">&#8377; 0.00</span>
                   </div>
@@ -531,40 +548,50 @@
                     <span>Deductions</span>
                     <span id="provAdj">- &#8377; 0.00</span>
                   </div>
-                  <div class="flex justify-between font-bold text-sky-600 dark:text-sky-400 pt-2 text-lg">
-                    <span>Net</span>
-                    <span id="provNet">&#8377; 0</span>
+                  <div class="flex justify-between items-center font-bold text-sky-600 dark:text-sky-400 pt-1 border-t border-slate-200 dark:border-slate-800 bg-sky-50/50 dark:bg-sky-950/30 p-1.5 rounded">
+                    <span class="text-xs">NET</span>
+                    <span id="provNet" class="text-sm font-black">&#8377; 0</span>
                   </div>
                 </div>
               </div>
 
               <!-- Final Right -->
-              <div class="pl-4 space-y-3">
-                <div class="flex items-center justify-between">
-                  <h4 class="text-xs font-bold text-rose-600 dark:text-rose-400">Final (126/135)</h4>
-                  <div class="text-xs text-slate-500 flex flex-col items-end">
-                    <span>Days: <input type="number" id="theftFinalDays" value="365" oninput="runTheftCalc()" class="w-12 bg-transparent border-b border-slate-400 text-right text-slate-800 dark:text-slate-200"></span>
+              <div class="space-y-2.5">
+                <div class="pb-1.5 border-b border-slate-200 dark:border-slate-800 space-y-1">
+                  <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-bold text-rose-600 dark:text-rose-400 uppercase">Final (Hearing)</h4>
+                    <span id="finalHoursLabel" class="text-[11px] text-slate-500 font-mono">(19h 00m)</span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+                    <div>
+                      <span class="text-[10px] block">Days</span>
+                      <input type="number" id="theftFinalDays" value="365" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-xs">
+                    </div>
+                    <div>
+                      <span class="text-[10px] block">Hrs/Day</span>
+                      <input type="number" step="0.5" id="theftFinalHours" value="19" oninput="runTheftCalc()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-xs">
+                    </div>
                   </div>
                 </div>
                 
-                <div class="space-y-2 text-sm">
-                  <div class="flex justify-between text-slate-700 dark:text-slate-300">
-                    <span>Assessed Units</span>
-                    <span id="finalUnits">0</span>
+                <div class="space-y-1.5 text-xs">
+                  <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                    <span>Units</span>
+                    <span id="finalUnits" class="font-semibold text-slate-800 dark:text-slate-200">0 kWh</span>
                   </div>
-                  <div class="flex justify-between text-slate-700 dark:text-slate-300">
+                  <div class="flex justify-between text-slate-600 dark:text-slate-400">
                     <span>Penal Energy</span>
-                    <span id="finalEnergy">&#8377; 0.00</span>
+                    <span id="finalEnergy" class="font-semibold text-slate-800 dark:text-slate-200">&#8377; 0.00</span>
                   </div>
-                  <div class="flex justify-between text-slate-700 dark:text-slate-300">
+                  <div class="flex justify-between text-slate-600 dark:text-slate-400">
                     <span>Penal Fixed</span>
-                    <span id="finalFixed">&#8377; 0.00</span>
+                    <span id="finalFixed" class="font-semibold text-slate-800 dark:text-slate-200">&#8377; 0.00</span>
                   </div>
-                  <div class="flex justify-between text-slate-700 dark:text-slate-300">
-                    <span>Elec. Duty</span>
-                    <span id="finalEd">&#8377; 0.00</span>
+                  <div class="flex justify-between text-slate-600 dark:text-slate-400">
+                    <span>Duty (ED)</span>
+                    <span id="finalEd" class="font-semibold text-slate-800 dark:text-slate-200">&#8377; 0.00</span>
                   </div>
-                  <div class="flex justify-between font-bold border-t border-slate-300 dark:border-slate-800 pt-1">
+                  <div class="flex justify-between font-bold border-t border-slate-200 dark:border-slate-800 pt-1 text-slate-800 dark:text-slate-200">
                     <span>Gross</span>
                     <span id="finalGross">&#8377; 0.00</span>
                   </div>
@@ -572,22 +599,23 @@
                     <span>Deductions</span>
                     <span id="finalAdj">- &#8377; 0.00</span>
                   </div>
-                  <div class="flex justify-between font-bold text-rose-600 dark:text-rose-400 pt-2 text-lg">
-                    <span>Net</span>
-                    <span id="finalNet">&#8377; 0</span>
+                  <div class="flex justify-between items-center font-bold text-rose-600 dark:text-rose-400 pt-1 border-t border-slate-200 dark:border-slate-800 bg-rose-50/50 dark:bg-rose-950/30 p-1.5 rounded">
+                    <span class="text-xs">NET</span>
+                    <span id="finalNet" class="text-sm font-black">&#8377; 0</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- Relief comparison -->
-            <div id="reliefBar" class="mt-4 p-3 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-sm font-medium text-center border border-emerald-200 dark:border-emerald-800/50">
+            <!-- Relief comparison banner -->
+            <div id="reliefBar" class="mt-2.5 p-2.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold text-center border border-emerald-200 dark:border-emerald-800/50">
               Final Assessment Relief: &#8377; 0.00 (0.00%)
             </div>
           </div>
         </div>
       </div>
     </section>
+
 
     <!-- TAB 4: Tariff Class Browser -->
     <section id="tab-tariffs" class="tab-content flex-1 p-6 overflow-y-auto hidden">
