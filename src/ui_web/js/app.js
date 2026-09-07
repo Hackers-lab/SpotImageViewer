@@ -213,17 +213,26 @@ function expandToSection(targetSectionId) {
   lucide.createIcons();
 }
 
+function applyTheme(theme) {
+  const t = (theme === 'light') ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('siv_theme', t);
+  const iconEl = document.getElementById('themeIcon');
+  if (iconEl) {
+    iconEl.setAttribute('data-lucide', t === 'dark' ? 'sun' : 'moon');
+  }
+  const labelEl = document.getElementById('themeLabel');
+  if (labelEl) {
+    labelEl.innerText = t.toUpperCase();
+  }
+  lucide.createIcons();
+}
+
 function restoreLayoutPrefs() {
   // Restore saved theme
   const savedTheme = localStorage.getItem('siv_theme');
   if (savedTheme) {
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    const iconEl = document.getElementById('themeIcon');
-    if (iconEl) {
-      iconEl.setAttribute('data-lucide', savedTheme === 'dark' ? 'sun' : 'moon');
-    }
-    const labelEl = document.getElementById('themeLabel');
-    if (labelEl) labelEl.innerText = savedTheme.toUpperCase();
+    applyTheme(savedTheme);
   }
 
   if (localStorage.getItem('siv_sidebar_collapsed') === '1') {
@@ -260,6 +269,14 @@ async function callAPI(method, ...args) {
 async function initApp() {
   initAppFont();
   const info = await callAPI('get_app_info');
+  if (info && info.theme) {
+    applyTheme(info.theme);
+  } else {
+    const themeRes = await callAPI('get_theme');
+    if (themeRes && themeRes.theme) {
+      applyTheme(themeRes.theme);
+    }
+  }
   if (info && info.total_images !== undefined) {
     document.getElementById('statImages').innerText = `${info.total_images.toLocaleString()}`;
     document.getElementById('indexedCount').innerText = info.total_images;
@@ -364,18 +381,8 @@ function toggleTheme() {
   const html = document.documentElement;
   const currentTheme = html.getAttribute('data-theme') || 'dark';
   const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-  html.setAttribute('data-theme', newTheme);
-  localStorage.setItem('siv_theme', newTheme);
-  
-  const iconEl = document.getElementById('themeIcon');
-  if (iconEl) {
-    iconEl.setAttribute('data-lucide', newTheme === 'dark' ? 'sun' : 'moon');
-  }
-  const labelEl = document.getElementById('themeLabel');
-  if (labelEl) {
-    labelEl.innerText = newTheme.toUpperCase();
-  }
-  lucide.createIcons();
+  applyTheme(newTheme);
+  callAPI('set_theme', newTheme);
 }
 
 // --- Universal Search Handling ---
@@ -487,10 +494,13 @@ function clearViewerState() {
   if (dateTagContainer) dateTagContainer.classList.add('hidden');
   const toggleGroup = document.getElementById('viewModeToggleGroup');
   if (toggleGroup) toggleGroup.classList.add('hidden');
-  const overviewGrid = document.getElementById('overviewGridContainer');
-  if (overviewGrid) overviewGrid.classList.add('hidden');
+  const overviewGridContainer = document.getElementById('overviewGridContainer');
+  if (overviewGridContainer) overviewGridContainer.classList.add('hidden');
+  const gridInner = document.getElementById('overviewGrid');
+  if (gridInner) gridInner.innerHTML = '';
   const viewport = document.getElementById('viewport');
   if (viewport) viewport.classList.remove('hidden');
+  currentImageViewMode = 'single';
 
   // Clear filmstrip
   const filmstrip = document.getElementById('filmstripContainer');
@@ -601,6 +611,18 @@ function populateProfile(p) {
 // --- Live WBSEDCL OSD & Connection Status Controller ---
 let currentLiveOsdData = null;
 
+function formatHudOffice(rawOffice) {
+  if (!rawOffice || rawOffice === '-' || rawOffice === 'N/A') return '-';
+  // Strip "customer care center", "customer care centre", "ccc", etc.
+  let cleaned = String(rawOffice)
+    .replace(/customer\s+care\s+cent(?:er|re)/gi, '')
+    .replace(/\b(?:c\.?c\.?c\.?)\b/gi, '')
+    .replace(/[(),]/g, ' ')
+    .trim();
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  return words.length > 0 ? words[0] : (String(rawOffice).split(/\s+/)[0] || '-');
+}
+
 async function loadLiveOSD(consumerId, forceRefresh = false) {
   const cid = String(consumerId || '').trim();
   const hud = document.getElementById('liveOsdHud');
@@ -618,12 +640,15 @@ async function loadLiveOSD(consumerId, forceRefresh = false) {
 
   if (!cid || !/^\d{9}$/.test(cid)) {
     if (hud) hud.classList.add('hidden');
-    if (statusBadge) statusBadge.className = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-400";
-    if (statusText) statusText.innerText = "Invalid CID";
+    if (statusBadge) statusBadge.className = "";
+    if (statusText) {
+      statusText.className = "text-[10px] font-semibold text-slate-400";
+      statusText.innerText = "Invalid CID";
+    }
     if (totalDuesEl) totalDuesEl.innerText = "0.00";
     if (unpaidEl) unpaidEl.innerText = "\u20B9 0.00";
     if (lpscEl) lpscEl.innerText = "\u20B9 0.00";
-    if (officeEl) officeEl.innerText = "-";
+    if (officeEl) { officeEl.innerText = "-"; officeEl.title = ""; }
     if (connDateEl) connDateEl.innerText = "-";
     if (docTypeEl) docTypeEl.innerText = "-";
     if (cachedIndicator) cachedIndicator.innerText = "";
@@ -632,12 +657,15 @@ async function loadLiveOSD(consumerId, forceRefresh = false) {
     return;
   }
 
-  // Show floating HUD pill in viewport
+  // Show floating HUD card in viewport
   if (hud) hud.classList.remove('hidden');
 
   // Set loading state
-  if (statusBadge) statusBadge.className = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 animate-pulse";
-  if (statusText) statusText.innerText = "Checking Portal...";
+  if (statusBadge) statusBadge.className = "";
+  if (statusText) {
+    statusText.className = "text-[10px] font-semibold text-amber-500 dark:text-amber-400 animate-pulse";
+    statusText.innerText = "Checking Portal...";
+  }
   if (refreshIcon) refreshIcon.classList.add('animate-spin');
 
   try {
@@ -645,49 +673,57 @@ async function loadLiveOSD(consumerId, forceRefresh = false) {
     if (refreshIcon) refreshIcon.classList.remove('animate-spin');
 
     if (!res || !res.success || !res.data) {
-      if (statusBadge) statusBadge.className = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400";
-      if (statusText) statusText.innerText = res ? (res.error || "Portal unreachable") : "Offline";
+      if (statusBadge) statusBadge.className = "";
+      if (statusText) {
+        statusText.className = "text-[10px] font-semibold text-rose-500 dark:text-rose-400";
+        statusText.innerText = res ? (res.error || "Portal unreachable") : "Offline";
+      }
       return;
     }
 
     const d = res.data;
     currentLiveOsdData = d;
 
-    // Status styling
-    let badgeClass = "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
-    let dotClass = "bg-slate-400";
-
-    if (d.isLive) {
-      badgeClass = "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800";
-      dotClass = "bg-emerald-500 animate-pulse";
-    } else if (d.isDeemed) {
-      badgeClass = "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800";
-      dotClass = "bg-amber-500";
-    } else if (d.isDisconnected) {
-      badgeClass = "bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800";
-      dotClass = "bg-rose-500";
-    }
-
-    if (statusBadge) {
-      statusBadge.className = `inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${badgeClass}`;
-      statusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full ${dotClass}"></span><span id="liveOsdStatusText">${escapeHtml(d.connectionStatus || 'LIVE')}</span>`;
+    // Status styling - Simple clean text without pill
+    if (statusBadge) statusBadge.className = "";
+    if (statusText) {
+      const connStatus = String(d.connectionStatus || '').toUpperCase();
+      if (d.isLive || connStatus === 'LIVE') {
+        statusText.className = "text-[10.5px] font-bold text-emerald-600 dark:text-emerald-400";
+        statusText.innerText = "Connected";
+      } else if (d.isDeemed || connStatus === 'DEEMED') {
+        statusText.className = "text-[10px] font-bold text-amber-600 dark:text-amber-400";
+        statusText.innerText = d.connectionStatus || "Deemed";
+      } else if (d.isDisconnected || connStatus === 'DISCONNECTED') {
+        statusText.className = "text-[10px] font-bold text-rose-600 dark:text-rose-400";
+        statusText.innerText = d.connectionStatus || "Disconnected";
+      } else {
+        statusText.className = "text-[10px] font-semibold text-slate-600 dark:text-slate-400";
+        statusText.innerText = d.connectionStatus || "-";
+      }
     }
 
     if (totalDuesEl) totalDuesEl.innerText = Number(d.totalDues || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     if (unpaidEl) unpaidEl.innerText = `\u20B9 ${Number(d.osd || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     if (lpscEl) lpscEl.innerText = `\u20B9 ${Number(d.lpsc || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    if (officeEl) officeEl.innerText = d.office || '-';
+    if (officeEl) {
+      officeEl.innerText = formatHudOffice(d.office);
+      officeEl.title = d.office || '-';
+    }
     if (connDateEl) connDateEl.innerText = d.connDate || '-';
     if (docTypeEl) docTypeEl.innerText = d.docType || 'OUTSTANDING REPORT';
     if (cachedIndicator) cachedIndicator.innerText = d.cached ? '(cached)' : '(live)';
-    if (btnPdf) btnPdf.classList.remove('hidden');
+    if (btnPdf) btnPdf.classList.add('hidden');
 
     lucide.createIcons();
   } catch (err) {
     console.error("Failed to load live OSD:", err);
     if (refreshIcon) refreshIcon.classList.remove('animate-spin');
-    if (statusBadge) statusBadge.className = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400";
-    if (statusText) statusText.innerText = "Error";
+    if (statusBadge) statusBadge.className = "";
+    if (statusText) {
+      statusText.className = "text-[10px] font-semibold text-rose-500 dark:text-rose-400";
+      statusText.innerText = "Error";
+    }
   }
 }
 
@@ -738,25 +774,56 @@ async function deleteNote() {
 async function loadConsumerImages(consumerId) {
   const res = await callAPI('get_consumer_images', consumerId);
   if (!res || !res.success) {
-    // Clear viewport fully on failure
+    // Clear viewport and grid fully on failure or no images
     currentImages = [];
     currentImageIndex = 0;
     resetZoom();
-    document.getElementById('mainImage').src = '';
-    document.getElementById('mainImage').classList.add('hidden');
+    const mainImg = document.getElementById('mainImage');
+    if (mainImg) {
+      mainImg.src = '';
+      mainImg.classList.add('hidden');
+    }
+    const errMsg = (res && res.error) ? res.error : "This consumer has no spot images";
     const placeholder = document.getElementById('imagePlaceholder');
     if (placeholder) {
       placeholder.classList.remove('hidden');
       placeholder.innerHTML = `
-        <div class="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 flex items-center justify-center text-rose-400 dark:text-rose-500">
+        <div class="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 flex items-center justify-center text-amber-400 dark:text-amber-500">
           <i data-lucide="image-off" class="w-8 h-8"></i>
         </div>
-        <p class="text-sm font-medium text-rose-500">${res ? res.error : "No images found for this consumer"}</p>
+        <p class="text-base font-semibold text-slate-700 dark:text-slate-300">No Spot Images</p>
+        <p class="text-sm font-medium text-slate-500">${escapeHtml(errMsg)}</p>
       `;
       lucide.createIcons();
     }
-    document.getElementById('filmstripContainer').innerHTML = `<p class="text-xs text-rose-500 px-4">${res ? res.error : "Failed to load images"}</p>`;
-    document.getElementById('searchResultCount').innerText = '0 photos';
+    const grid = document.getElementById('overviewGrid');
+    if (grid) {
+      grid.innerHTML = `
+        <div class="col-span-full flex flex-col items-center justify-center py-20 text-slate-500 gap-3">
+          <div class="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 flex items-center justify-center text-amber-400 dark:text-amber-500">
+            <i data-lucide="image-off" class="w-8 h-8"></i>
+          </div>
+          <p class="text-base font-semibold text-slate-700 dark:text-slate-300">No Spot Images</p>
+          <p class="text-sm font-medium text-slate-500">${escapeHtml(errMsg)}</p>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+
+    switchImageViewMode('single');
+
+    const cyclesList = document.getElementById('cyclesList');
+    if (cyclesList) cyclesList.innerHTML = '';
+    const filmstrip = document.getElementById('filmstripContainer');
+    if (filmstrip) filmstrip.innerHTML = `<p class="text-xs text-amber-500 px-4">${escapeHtml(errMsg)}</p>`;
+    const filmBadge = document.getElementById('filmstripCountBadge');
+    if (filmBadge) filmBadge.innerText = '0';
+    const searchResCount = document.getElementById('searchResultCount');
+    if (searchResCount) searchResCount.innerText = '0 photos';
+    const countSpan = document.getElementById('viewAllPhotosCount');
+    if (countSpan) countSpan.innerText = '0';
+    const dateTag = document.getElementById('imgDateTagContainer');
+    if (dateTag) dateTag.classList.add('hidden');
     const toggleGroup = document.getElementById('viewModeToggleGroup');
     if (toggleGroup) toggleGroup.classList.add('hidden');
     return;
@@ -818,8 +885,10 @@ async function loadConsumerImages(consumerId) {
     switchImageViewMode('single');
     resetZoom();
     const mainImg = document.getElementById('mainImage');
-    mainImg.src = '';
-    mainImg.classList.add('hidden');
+    if (mainImg) {
+      mainImg.src = '';
+      mainImg.classList.add('hidden');
+    }
     const placeholder = document.getElementById('imagePlaceholder');
     if (placeholder) {
       placeholder.classList.remove('hidden');
@@ -827,7 +896,21 @@ async function loadConsumerImages(consumerId) {
         <div class="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 flex items-center justify-center text-amber-400 dark:text-amber-500">
           <i data-lucide="image-off" class="w-8 h-8"></i>
         </div>
+        <p class="text-base font-semibold text-slate-700 dark:text-slate-300">No Spot Images</p>
         <p class="text-sm font-medium text-slate-500">This consumer has no spot images</p>
+      `;
+      lucide.createIcons();
+    }
+    const grid = document.getElementById('overviewGrid');
+    if (grid) {
+      grid.innerHTML = `
+        <div class="col-span-full flex flex-col items-center justify-center py-20 text-slate-500 gap-3">
+          <div class="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 flex items-center justify-center text-amber-400 dark:text-amber-500">
+            <i data-lucide="image-off" class="w-8 h-8"></i>
+          </div>
+          <p class="text-base font-semibold text-slate-700 dark:text-slate-300">No Spot Images</p>
+          <p class="text-sm font-medium text-slate-500">This consumer has no spot images</p>
+        </div>
       `;
       lucide.createIcons();
     }
@@ -876,6 +959,20 @@ async function renderOverviewGrid() {
   const grid = document.getElementById('overviewGrid');
   if (!grid) return;
   grid.innerHTML = '';
+
+  if (!currentImages || currentImages.length === 0) {
+    grid.innerHTML = `
+      <div class="col-span-full flex flex-col items-center justify-center py-20 text-slate-500 gap-3">
+        <div class="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 flex items-center justify-center text-amber-400 dark:text-amber-500">
+          <i data-lucide="image-off" class="w-8 h-8"></i>
+        </div>
+        <p class="text-base font-semibold text-slate-700 dark:text-slate-300">No Spot Images</p>
+        <p class="text-sm font-medium text-slate-500">This consumer has no spot images</p>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
 
   for (let idx = 0; idx < currentImages.length; idx++) {
     const img = currentImages[idx];

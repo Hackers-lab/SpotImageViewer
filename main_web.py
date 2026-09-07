@@ -30,10 +30,10 @@ except Exception:
 
 import webview
 try:
-    from core import database
+    from core import config, database
     from bridge.app_api import AppAPI
 except ImportError:
-    import database
+    import config, database
     from app_api import AppAPI
 
 def main():
@@ -50,7 +50,7 @@ def main():
 
     # Create PyWebView window with native Edge WebView2 engine
     window = webview.create_window(
-        title="Spot Image Viewer & Verification Studio (v20.0)",
+        title="Spot Image Viewer & Verification Studio (v20.1)",
         url=f"file:///{html_file.replace(os.sep, '/')}",
         js_api=api,
         width=1340,
@@ -59,8 +59,13 @@ def main():
         maximized=True
     )
 
-    # Start the event loop
-    webview.start(debug=False)
+    # Start the event loop with persistent local storage
+    storage_dir = os.path.join(config.BASE_DIR, "webview_storage")
+    try:
+        os.makedirs(storage_dir, exist_ok=True)
+    except Exception:
+        pass
+    webview.start(debug=False, private_mode=False, storage_path=storage_dir)
 
 if __name__ == "__main__":
     main()

@@ -88,8 +88,18 @@ class AppAPI:
             "folders": folders,
             "has_meter_data": consumer_count > 0,
             "consumer_count": consumer_count,
-            "consumer_updated_at": database.get_info_value("consumer_data_updated_at", "")
+            "consumer_updated_at": database.get_info_value("consumer_data_updated_at", ""),
+            "theme": database.get_info_value("app_theme", "dark")
         }
+
+    def get_theme(self):
+        theme = database.get_info_value("app_theme", "dark")
+        return {"success": True, "theme": theme}
+
+    def set_theme(self, theme):
+        theme_val = "light" if str(theme).lower() == "light" else "dark"
+        database.set_info_value("app_theme", theme_val)
+        return {"success": True, "theme": theme_val}
 
     # --- Search & Consumer Details ---
     def search_consumer(self, query, filter_type="auto"):

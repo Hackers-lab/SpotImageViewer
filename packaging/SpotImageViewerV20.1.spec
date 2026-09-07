@@ -54,7 +54,7 @@ exe_main = EXE(
     a_main.scripts,
     [],
     exclude_binaries=True,
-    name='SpotImageViewerV20.0',
+    name='SpotImageViewerV20.1',
     icon=os.path.join(PROJECT_ROOT, 'assets', 'spot_icon.ico'),
     debug=False,
     bootloader_ignore_signals=False,
@@ -117,5 +117,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name='SpotImageViewerV20.0',
+    name='SpotImageViewerV20.1',
 )
