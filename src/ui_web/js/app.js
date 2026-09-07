@@ -1264,6 +1264,62 @@ function setupViewportEvents() {
         switchImageViewMode('single');
       }
       stepImage(1);
+      return;
+    }
+
+    // Check if any modal overlay is active
+    const searchModal = document.getElementById('searchModal');
+    if (searchModal && !searchModal.classList.contains('hidden')) return;
+    const helpModal = document.getElementById('helpModal');
+    if (helpModal && !helpModal.classList.contains('hidden')) return;
+
+    // Ctrl+F / Cmd+F: Focus and select search input
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+      e.preventDefault();
+      const searchInput = document.getElementById('searchInput');
+      if (searchInput) {
+        searchInput.focus();
+        searchInput.select();
+      }
+      return;
+    }
+
+    // Instant Type-To-Search: Any alphanumeric or symbol key typed while in viewer tab focuses and types into search bar
+    if (!e.ctrlKey && !e.altKey && !e.metaKey && e.key && e.key.length === 1) {
+      const searchInput = document.getElementById('searchInput');
+      if (searchInput) {
+        e.preventDefault();
+        searchInput.focus();
+        if (currentConsumerId && searchInput.value.trim() === String(currentConsumerId).trim()) {
+          searchInput.value = e.key;
+        } else {
+          searchInput.value += e.key;
+        }
+        const len = searchInput.value.length;
+        searchInput.setSelectionRange(len, len);
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        if (typeof toggleSearchClearBtn === 'function') {
+          toggleSearchClearBtn();
+        }
+      }
+      return;
+    }
+
+    // Backspace: Delete character and focus search input
+    if (e.key === 'Backspace') {
+      const searchInput = document.getElementById('searchInput');
+      if (searchInput && searchInput.value.length > 0) {
+        e.preventDefault();
+        searchInput.focus();
+        searchInput.value = searchInput.value.slice(0, -1);
+        const len = searchInput.value.length;
+        searchInput.setSelectionRange(len, len);
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        if (typeof toggleSearchClearBtn === 'function') {
+          toggleSearchClearBtn();
+        }
+      }
+      return;
     }
   });
 }
