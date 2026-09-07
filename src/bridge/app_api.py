@@ -49,6 +49,7 @@ class AppAPI:
     """
 
     _indexing_state = {"running": False, "scanned": 0, "total": 0, "elapsed": 0}
+    _update_state = {"status": "idle", "downloaded": 0, "total": 0, "percent": 0, "error": None, "installer_path": None}
 
     def __init__(self, window=None):
         self.window = window
@@ -781,11 +782,79 @@ class AppAPI:
                     "current_version": config.CURRENT_VERSION,
                     "latest_version": latest_v,
                     "release_notes": data.get("release_notes", ""),
-                    "installer_url": data.get("installer_url", "")
+                    "installer_url": data.get("installer_url") or data.get("download_url", "")
                 }
             return {"success": False, "error": "Failed to connect to update server."}
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    def start_self_update(self, installer_url=""):
+        """Download installer in background and stage Windows installer execution."""
+        if AppAPI._update_state.get("status") == "downloading":
+            return {"success": True, "message": "Download already in progress."}
+
+        AppAPI._update_state = {
+            "status": "downloading",
+            "downloaded": 0,
+            "total": 0,
+            "percent": 0,
+            "error": None,
+            "installer_path": None
+        }
+
+        def _worker():
+            try:
+                target_url = str(installer_url).strip() if installer_url else ""
+                if not target_url:
+                    r = requests.get(config.UPDATE_URL, timeout=5)
+                    if r.status_code == 200:
+                        d = r.json()
+                        target_url = d.get("installer_url") or d.get("download_url") or ""
+                if not target_url:
+                    raise ValueError("No valid installer URL found.")
+
+                import tempfile
+                filename = os.path.basename(target_url.split("?")[0]) or "SpotImageViewer_Setup.exe"
+                temp_dir = tempfile.gettempdir()
+                dest_path = os.path.join(temp_dir, filename)
+
+                def _prog(dl, tot):
+                    AppAPI._update_state["downloaded"] = dl
+                    AppAPI._update_state["total"] = tot
+                    AppAPI._update_state["percent"] = int((dl / tot) * 100) if tot else 0
+
+                utils.download_file_with_progress(target_url, dest_path, _prog)
+
+                AppAPI._update_state["status"] = "ready"
+                AppAPI._update_state["percent"] = 100
+                AppAPI._update_state["installer_path"] = dest_path
+
+                # Launch installer helper script which waits for current PID to exit
+                current_pid = os.getpid()
+                utils.launch_windows_installer(dest_path, current_pid)
+            except Exception as e:
+                AppAPI._update_state["status"] = "error"
+                AppAPI._update_state["error"] = str(e)
+
+        threading.Thread(target=_worker, daemon=True).start()
+        return {"success": True}
+
+    def get_update_progress(self):
+        """Return live download progress status for self update."""
+        return dict(AppAPI._update_state)
+
+    def exit_for_update(self):
+        """Close window and terminate application so the staged installer can run."""
+        def _delayed_exit():
+            time.sleep(1.0)
+            if self.window:
+                try:
+                    self.window.destroy()
+                except Exception:
+                    pass
+            os._exit(0)
+        threading.Thread(target=_delayed_exit, daemon=True).start()
+        return {"success": True}
 
     # --- Search History ---
     def get_search_history(self, key="consumer_ids"):

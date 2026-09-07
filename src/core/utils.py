@@ -178,7 +178,7 @@ def perform_self_update_async(update_payload, app_pid, finished_callback, progre
     threading.Thread(target=worker, daemon=True).start()
 
 
-def launch_windows_installer(installer_path, app_pid, install_args="/VERYSILENT /NORESTART"):
+def launch_windows_installer(installer_path, app_pid, install_args=""):
     """
     Executes an installer after current application terminates.
     Creates a helper .cmd in temp directory to wait for PID, run installer, and exit.
@@ -192,7 +192,11 @@ def launch_windows_installer(installer_path, app_pid, install_args="/VERYSILENT 
         cmd_run = f'powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path \'{installer_path}\' -DestinationPath \'{target_dir}\' -Force"'
     else:
         # Standard executable setup (Inno Setup / NSIS)
-        cmd_run = f'"{installer_path}" {install_args}'
+        clean_args = str(install_args).strip() if install_args else ""
+        if clean_args:
+            cmd_run = f'"{installer_path}" {clean_args}'
+        else:
+            cmd_run = f'start "" "{installer_path}"'
 
     batch_content = (
         "@echo off\n"

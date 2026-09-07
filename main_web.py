@@ -58,6 +58,7 @@ def main():
         min_size=(1000, 680),
         maximized=True
     )
+    api.set_window(window)
 
     # Start the event loop with persistent local storage
     storage_dir = os.path.join(config.BASE_DIR, "webview_storage")
