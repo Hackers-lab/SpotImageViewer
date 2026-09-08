@@ -115,10 +115,15 @@ def get_db_connection():
     return sqlite3.connect(config.DB_FILE, check_same_thread=False)
 
 def get_total_image_count(force_recount=False):
-    if not force_recount:
-        cached = get_info_value("cached_total_images", None)
-        if cached is not None and isinstance(cached, int) and cached >= 0:
+    cached = get_info_value("cached_total_images", None)
+    if cached is not None and isinstance(cached, int) and cached >= 0:
+        if not force_recount:
             return cached
+    if not force_recount:
+        # No cache exists — return 0 immediately to avoid blocking the UI thread.
+        # A background thread will do the heavy count and push the real value.
+        return 0
+    # force_recount=True: do the actual heavy query (called from background thread only)
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -388,10 +393,14 @@ def update_meter_mapping(mapping_dict):
         print(f"DATABASE ERROR in update_meter_mapping: {e}")
 
 def get_consumer_count(force_recount=False):
-    if not force_recount:
-        cached = get_info_value("cached_consumer_count", None)
-        if cached is not None and isinstance(cached, int) and cached >= 0:
+    cached = get_info_value("cached_consumer_count", None)
+    if cached is not None and isinstance(cached, int) and cached >= 0:
+        if not force_recount:
             return cached
+    if not force_recount:
+        # No cache exists — return 0 immediately to avoid blocking the UI thread.
+        return 0
+    # force_recount=True: do the actual heavy query (called from background thread only)
     try:
         conn = get_db_connection()
         cursor = conn.cursor()

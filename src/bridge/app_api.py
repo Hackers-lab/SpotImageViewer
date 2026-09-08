@@ -59,12 +59,15 @@ class AppAPI:
 
     # --- System & Settings ---
     def get_app_info(self):
-        total_images = database.get_total_image_count()
-        consumer_count = database.get_consumer_count()
+        # Check if cache is missing FIRST and launch background recounts.
+        # The get_total_image_count() / get_consumer_count() calls below will
+        # return 0 instantly when no cache exists (no blocking query).
+        # The background threads will do the heavy COUNT(*) and push the real
+        # values to the UI via evaluate_js.
+        needs_image_recount = database.get_info_value("cached_total_images", None) is None
+        needs_consumer_recount = database.get_info_value("cached_consumer_count", None) is None
 
-        # If cache is missing (e.g. existing huge database running new version for first time),
-        # trigger a background recount so we don't freeze the UI thread on launch
-        if database.get_info_value("cached_total_images", None) is None:
+        if needs_image_recount:
             def _bg_recount_images():
                 try:
                     c = database.get_total_image_count(force_recount=True)
@@ -74,7 +77,7 @@ class AppAPI:
                     pass
             threading.Thread(target=_bg_recount_images, daemon=True).start()
 
-        if database.get_info_value("cached_consumer_count", None) is None:
+        if needs_consumer_recount:
             def _bg_recount_consumers():
                 try:
                     c = database.get_consumer_count(force_recount=True)
@@ -83,6 +86,10 @@ class AppAPI:
                 except Exception:
                     pass
             threading.Thread(target=_bg_recount_consumers, daemon=True).start()
+
+        # These return cached value instantly, or 0 if no cache yet
+        total_images = database.get_total_image_count()
+        consumer_count = database.get_consumer_count()
 
         folders = []
         primary_path = config.IMAGE_FOLDER

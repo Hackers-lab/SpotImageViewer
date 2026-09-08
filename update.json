@@ -1,13 +1,17 @@
 {
-  "version": 20.3,
-  "release_notes": "V20.3 — Performance & Startup Optimization Suite:\n\n- Instant App Startup (2M+ Images Ready): Replaced heavy blocking startup queries with persistent database count caching, eliminating 'Not Responding' freezes and 0-count stalls on high-volume workstations.\n- Asynchronous Count Reconciliation: Recounts and folder sync execute in non-blocking background threads, ensuring the UI is immediately interactive.\n- Frontend Optimistic Hydration: Image counters restore instantly from local storage cache before IPC calls complete, avoiding count flickers.\n- On-Demand Fuzzy Engine: Decoupled heavy memory preparation from application startup while preserving 100% comprehensive candidate discovery and scoring precision.",
-  "download_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.3/SpotImageViewer_Setup.exe",
-  "installer_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.3/SpotImageViewer_Setup.exe",
-  "zip_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.3/SpotImageViewerV20.3.zip",
+  "version": 20.31,
+  "release_notes": "V20.31 — Hotfix: Startup Hang Fix:\n\n- Critical Fix: Eliminated blocking SELECT COUNT(*) queries on the main thread when no cache exists (first run after update on large databases).\n- Non-Blocking Startup: App now shows 0 immediately and updates counts asynchronously via background threads, preventing 'Not Responding' freeze on databases with 175K–2M+ images.\n- Cache-First Architecture: Count queries never block the UI thread; heavy SQL only runs in daemon background threads.",
+  "download_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.31/SpotImageViewer_Setup.exe",
+  "installer_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.31/SpotImageViewer_Setup.exe",
+  "zip_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.31/SpotImageViewerV20.31.zip",
   "install_args": "/VERYSILENT /NORESTART",
-  "launch_exe": "SpotImageViewer\\SpotImageViewerV20.3.exe",
+  "launch_exe": "SpotImageViewer\\SpotImageViewerV20.31.exe",
   "sha256": "",
   "previous_versions": [
+    {
+      "version": 20.3,
+      "release_notes": "V20.3 — Performance & Startup Optimization Suite:\n\n- Instant App Startup (2M+ Images Ready): Replaced heavy blocking startup queries with persistent database count caching, eliminating 'Not Responding' freezes and 0-count stalls on high-volume workstations.\n- Asynchronous Count Reconciliation: Recounts and folder sync execute in non-blocking background threads, ensuring the UI is immediately interactive.\n- Frontend Optimistic Hydration: Image counters restore instantly from local storage cache before IPC calls complete, avoiding count flickers.\n- On-Demand Fuzzy Engine: Decoupled heavy memory preparation from application startup while preserving 100% comprehensive candidate discovery and scoring precision."
+    },
     {
       "version": 20.2,
       "release_notes": "V20.2 — Instant Type-to-Search & Self-Updater Suite:\n\n- Instant Type-to-Search: In Image Viewer workspace, typing any character instantly focuses and enters search without clicking the search bar, streamlining high-volume inspections.\n- In-App Self-Update Suite: Fully integrated one-click update downloading with live progress bar and automated Windows installer launch.\n- Synchronized Version Labels: All workspace documentation, navigation, and settings labels stay continuously synchronized across application restarts.\n- Performance & Stability: Enhanced keyboard event handling and search input responsiveness."
