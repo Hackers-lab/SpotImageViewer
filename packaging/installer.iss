@@ -2,9 +2,9 @@
 ; Generated for automated packaging & silent self-updating
 
 #define MyAppName "Spot Image Viewer"
-#define MyAppVersion "20.2"
+#define MyAppVersion "20.3"
 #define MyAppPublisher "WBSEDCL / Pramod Kumar Verma"
-#define MyAppExeName "SpotImageViewerV20.2.exe"
+#define MyAppExeName "SpotImageViewerV20.3.exe"
 #define MyAppURL "https://github.com/Hackers-lab/SpotImageViewer"
 
 [Setup]
@@ -37,7 +37,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; Source directory produced by PyInstaller (spec build)
-Source: "..\dist\SpotImageViewerV20.2\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\SpotImageViewerV20.3\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

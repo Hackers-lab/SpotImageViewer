@@ -276,8 +276,43 @@ async function callAPI(method, ...args) {
   return { success: false, error: "PyWebView API not available" };
 }
 
+function updateAppCounts(totalImages, consumerCount) {
+  if (totalImages !== null && totalImages !== undefined) {
+    const statEl = document.getElementById('statImages');
+    const idxEl = document.getElementById('indexedCount');
+    if (statEl) statEl.innerText = Number(totalImages).toLocaleString();
+    if (idxEl) idxEl.innerText = totalImages;
+    try { localStorage.setItem('siv_cached_total_images', String(totalImages)); } catch (e) {}
+  }
+  if (consumerCount !== null && consumerCount !== undefined) {
+    const dbWarningContainer = document.getElementById('statusDbWarningContainer');
+    const dbWarningText = document.getElementById('statusDbWarningText');
+    if (consumerCount === 0) {
+      if (dbWarningContainer) {
+        dbWarningContainer.classList.remove('hidden');
+        dbWarningContainer.classList.add('flex');
+      }
+      if (dbWarningText) dbWarningText.innerText = "Consumer data not updated";
+    } else {
+      if (dbWarningContainer) {
+        dbWarningContainer.classList.add('hidden');
+        dbWarningContainer.classList.remove('flex');
+      }
+    }
+  }
+}
+
 async function initApp() {
   initAppFont();
+
+  // Instant optimistic render from localStorage to prevent 0 flash
+  try {
+    const savedImgCount = localStorage.getItem('siv_cached_total_images');
+    if (savedImgCount) {
+      updateAppCounts(parseInt(savedImgCount, 10), null);
+    }
+  } catch (e) {}
+
   const info = await callAPI('get_app_info');
   if (info && info.theme) {
     applyTheme(info.theme);
@@ -288,8 +323,7 @@ async function initApp() {
     }
   }
   if (info && info.total_images !== undefined) {
-    document.getElementById('statImages').innerText = `${info.total_images.toLocaleString()}`;
-    document.getElementById('indexedCount').innerText = info.total_images;
+    updateAppCounts(info.total_images, info.consumer_count);
   }
   if (info && info.version) {
     const curVer = info.version;

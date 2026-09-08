@@ -60,6 +60,30 @@ class AppAPI:
     # --- System & Settings ---
     def get_app_info(self):
         total_images = database.get_total_image_count()
+        consumer_count = database.get_consumer_count()
+
+        # If cache is missing (e.g. existing huge database running new version for first time),
+        # trigger a background recount so we don't freeze the UI thread on launch
+        if database.get_info_value("cached_total_images", None) is None:
+            def _bg_recount_images():
+                try:
+                    c = database.get_total_image_count(force_recount=True)
+                    if self.window:
+                        self.window.evaluate_js(f"if (typeof updateAppCounts === 'function') {{ updateAppCounts({c}, null); }}")
+                except Exception:
+                    pass
+            threading.Thread(target=_bg_recount_images, daemon=True).start()
+
+        if database.get_info_value("cached_consumer_count", None) is None:
+            def _bg_recount_consumers():
+                try:
+                    c = database.get_consumer_count(force_recount=True)
+                    if self.window:
+                        self.window.evaluate_js(f"if (typeof updateAppCounts === 'function') {{ updateAppCounts(null, {c}); }}")
+                except Exception:
+                    pass
+            threading.Thread(target=_bg_recount_consumers, daemon=True).start()
+
         folders = []
         primary_path = config.IMAGE_FOLDER
         folders.append({
@@ -73,15 +97,6 @@ class AppAPI:
                 "accessible": os.path.exists(p),
                 "is_primary": False
             })
-        consumer_count = 0
-        try:
-            conn = database.get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM meter_mapping")
-            consumer_count = cursor.fetchone()[0]
-            conn.close()
-        except:
-            pass
 
         return {
             "version": config.CURRENT_VERSION,
@@ -1148,6 +1163,7 @@ class AppAPI:
                 cursor.execute("ANALYZE;")
                 cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
                 conn.close()
+                database.set_info_value("cached_total_images", total_inserted)
 
                 elapsed = max(1, int(time.time() - start))
                 speed = int(total_inserted / elapsed) if total_inserted else 0

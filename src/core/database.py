@@ -114,13 +114,18 @@ def init_db():
 def get_db_connection():
     return sqlite3.connect(config.DB_FILE, check_same_thread=False)
 
-def get_total_image_count():
+def get_total_image_count(force_recount=False):
+    if not force_recount:
+        cached = get_info_value("cached_total_images", None)
+        if cached is not None and isinstance(cached, int) and cached >= 0:
+            return cached
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM images")
         count = cursor.fetchone()[0]
         conn.close()
+        set_info_value("cached_total_images", count)
         return count
     except:
         return 0
@@ -378,19 +383,31 @@ def update_meter_mapping(mapping_dict):
         )
         conn.commit()
         conn.close()
+        set_info_value("cached_consumer_count", len(data_to_insert))
     except Exception as e:
         print(f"DATABASE ERROR in update_meter_mapping: {e}")
 
-def has_meter_data():
+def get_consumer_count(force_recount=False):
+    if not force_recount:
+        cached = get_info_value("cached_consumer_count", None)
+        if cached is not None and isinstance(cached, int) and cached >= 0:
+            return cached
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM meter_mapping")
         count = cursor.fetchone()[0]
         conn.close()
-        return count > 0
+        set_info_value("cached_consumer_count", count)
+        return count
     except:
-        return False
+        return 0
+
+def has_meter_data():
+    cached = get_info_value("cached_consumer_count", None)
+    if cached is not None and isinstance(cached, int):
+        return cached > 0
+    return get_consumer_count() > 0
 
 
 def get_all_consumer_profiles():

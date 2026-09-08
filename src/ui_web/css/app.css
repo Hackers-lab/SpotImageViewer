@@ -1,9 +1,7 @@
-
-/* =========================================================
-   SPOT IMAGE VIEWER — v20.2 INDUSTRIAL STUDIO UI
-   Visual layer only: existing IDs, event handlers and data
-   contracts are intentionally preserved.
-   ========================================================= */
+/* ==========================================================================
+   SPOT IMAGE VIEWER — v20.3 INDUSTRIAL STUDIO UI
+   Clean, modern, high-contrast stylesheet with full dark/light theme support
+   ========================================================================== */
 
 :root {
   --accent: #31a8ff;
