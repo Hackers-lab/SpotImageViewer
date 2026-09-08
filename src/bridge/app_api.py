@@ -70,6 +70,8 @@ class AppAPI:
         if needs_image_recount:
             def _bg_recount_images():
                 try:
+                    import time
+                    time.sleep(1.0) # Allow initial UI rendering and RPCs to finish first
                     c = database.get_total_image_count(force_recount=True)
                     if self.window:
                         self.window.evaluate_js(f"if (typeof updateAppCounts === 'function') {{ updateAppCounts({c}, null); }}")
@@ -80,6 +82,8 @@ class AppAPI:
         if needs_consumer_recount:
             def _bg_recount_consumers():
                 try:
+                    import time
+                    time.sleep(1.5) # Stagger so they do not compete for disk I/O
                     c = database.get_consumer_count(force_recount=True)
                     if self.window:
                         self.window.evaluate_js(f"if (typeof updateAppCounts === 'function') {{ updateAppCounts(null, {c}); }}")

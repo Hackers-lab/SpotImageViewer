@@ -12,13 +12,36 @@ def _add_column_if_missing(cursor, table_name, column_name, column_def):
     if column_name not in existing:
         cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_def}")
 
-def init_db():
+CURRENT_DB_SCHEMA_VERSION = 3
+
+def get_db_connection():
+    conn = sqlite3.connect(config.DB_FILE, check_same_thread=False, timeout=30.0)
     try:
-        conn = get_db_connection()
+        # High performance tuning for multi-gigabyte / 2M+ rows databases
         cursor = conn.cursor()
-        
         cursor.execute("PRAGMA journal_mode=WAL;")
         cursor.execute("PRAGMA synchronous=NORMAL;")
+        cursor.execute("PRAGMA cache_size=-64000;")  # 64MB memory cache (default is 2MB)
+        cursor.execute("PRAGMA mmap_size=268435456;") # 256MB memory mapped I/O
+        cursor.execute("PRAGMA temp_store=MEMORY;")
+    except Exception:
+        pass
+    return conn
+
+def init_db(force=False):
+    """
+    Initializes database tables and indexes safely.
+    Skips expensive index/column checks on startup if schema version matches.
+    """
+    try:
+        # Check if already initialized at current schema version
+        if not force:
+            v = get_info_value("db_schema_version", 0)
+            if v == CURRENT_DB_SCHEMA_VERSION:
+                return True, "Schema up to date"
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
         # New directories table
         cursor.execute('''
@@ -40,8 +63,7 @@ def init_db():
             )
         ''')
 
-        # Robust schema migration for existing databases:
-        # If user had an older schema missing 'filename', 'dir_id', or 'date_iso', add them!
+        # Schema migration for existing databases
         _add_column_if_missing(cursor, "images", "filename", "TEXT")
         _add_column_if_missing(cursor, "images", "dir_id", "INTEGER")
         _add_column_if_missing(cursor, "images", "date_iso", "TEXT")
@@ -107,12 +129,12 @@ def init_db():
 
         conn.commit()
         conn.close()
+        
+        # Mark schema version completed
+        set_info_value("db_schema_version", CURRENT_DB_SCHEMA_VERSION)
         return True, "Success"
     except Exception as e:
         return False, str(e)
-
-def get_db_connection():
-    return sqlite3.connect(config.DB_FILE, check_same_thread=False)
 
 def get_total_image_count(force_recount=False):
     cached = get_info_value("cached_total_images", None)
@@ -123,12 +145,19 @@ def get_total_image_count(force_recount=False):
         # No cache exists — return 0 immediately to avoid blocking the UI thread.
         # A background thread will do the heavy count and push the real value.
         return 0
-    # force_recount=True: do the actual heavy query (called from background thread only)
+    # force_recount=True: do the count (called from background thread only)
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM images")
-        count = cursor.fetchone()[0]
+        # Superfast ROWID check: for standard SQLite tables with autoincrement / standard rowid,
+        # MAX(ROWID) executes in O(1) time (sub-millisecond even on 10M rows)
+        cursor.execute("SELECT MAX(ROWID) FROM images")
+        row = cursor.fetchone()
+        if row and row[0] is not None and row[0] > 0:
+            count = row[0]
+        else:
+            cursor.execute("SELECT COUNT(*) FROM images")
+            count = cursor.fetchone()[0]
         conn.close()
         set_info_value("cached_total_images", count)
         return count

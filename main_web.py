@@ -37,11 +37,13 @@ except ImportError:
     from app_api import AppAPI
 
 def main():
-    # Initialize local database tables if needed
-    database.init_db()
-
-    # Instantiate the Python RPC Bridge
+    # Instantiate the Python RPC Bridge immediately
     api = AppAPI()
+
+    # Initialize local database tables asynchronously so the WebView window opens immediately
+    # without waiting for index or disk checks on huge (2M+) databases
+    import threading
+    threading.Thread(target=database.init_db, daemon=True).start()
 
     # Path to local HTML single page application
     html_file = os.path.join(SRC_DIR, "ui_web", "index.html")
