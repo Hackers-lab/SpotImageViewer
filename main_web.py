@@ -52,7 +52,7 @@ def main():
 
     # Create PyWebView window with native Edge WebView2 engine
     window = webview.create_window(
-        title="Spot Image Viewer & Verification Studio (v20.31)",
+        title="Spot Image Viewer & Verification Studio (v20.4)",
         url=f"file:///{html_file.replace(os.sep, '/')}",
         js_api=api,
         width=1340,
