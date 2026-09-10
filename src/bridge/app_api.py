@@ -56,7 +56,7 @@ except ImportError:
 _io_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="siv-io")
 
 
-def _wait_db(timeout=1.5):
+def _wait_db(timeout=5.0):
     """Wait for init_db to finish (prevents deadlock with schema migration locks)."""
     database.init_db_ready.wait(timeout=timeout)
 

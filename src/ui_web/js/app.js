@@ -31,45 +31,88 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-// Robust PyWebView lifecycle & bootloader
-let appInitialized = false;
-async function safeInitApp() {
-  if (appInitialized) return;
-  appInitialized = true;
-  await initApp();
+// Safe Lucide icon generator that never throws unhandled errors
+window.lucide = window.lucide || { createIcons: function() {} };
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  const _origCreateIcons = lucide.createIcons.bind(lucide);
+  lucide.createIcons = function(...args) {
+    try {
+      return _origCreateIcons(...args);
+    } catch (e) {
+      console.warn("lucide.createIcons caught:", e);
+    }
+  };
+}
+function safeCreateIcons() {
+  if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+    try {
+      lucide.createIcons();
+    } catch (e) {
+      console.warn("safeCreateIcons warning:", e);
+    }
+  }
 }
 
-function bootApp() {
-  lucide.createIcons();
-  restoreLayoutPrefs();
+// Robust PyWebView lifecycle & bootloader
+let appInitialized = false;
+let appInitializing = false;
 
-  // If pywebview is already injected before this script ran:
-  if (window.pywebview && window.pywebview.api) {
-    console.log("PyWebView API already ready at boot");
-    safeInitApp();
+window.safeInitApp = async function() {
+  if (appInitialized || appInitializing) return;
+  
+  // PyWebView must be injected and ready
+  if (!window.pywebview || !window.pywebview.api) {
     return;
   }
 
-  // Otherwise listen for pywebviewready event
-  window.addEventListener('pywebviewready', () => {
-    console.log("PyWebView Ready event fired");
-    safeInitApp();
-  }, { once: true });
+  appInitializing = true;
+  try {
+    const success = await initApp();
+    if (success !== false) {
+      appInitialized = true;
+      console.log("App initialization completed successfully");
+    } else {
+      console.warn("initApp indicated partial failure, allowing retry on next signal");
+    }
+  } catch (err) {
+    console.error("Error during initApp execution:", err);
+  } finally {
+    appInitializing = false;
+  }
+};
 
-  // Polling fallback: handles cases where pywebviewready fired at before_load
-  // before app.js was parsed, or if Edge WebView2 takes a few milliseconds
+function bootApp() {
+  safeCreateIcons();
+  restoreLayoutPrefs();
+
+  // 1. Check if already injected
+  if (window.pywebview && window.pywebview.api) {
+    console.log("PyWebView API already ready at boot");
+    window.safeInitApp();
+    return;
+  }
+
+  // 2. Listen on window and document for pywebviewready
+  const onReady = () => {
+    console.log("PyWebView Ready event received");
+    window.safeInitApp();
+  };
+  window.addEventListener('pywebviewready', onReady);
+  document.addEventListener('pywebviewready', onReady);
+
+  // 3. Continuous polling (up to 30s) — never prematurely sets appInitialized = true!
   let elapsed = 0;
   const pollTimer = setInterval(() => {
     elapsed += 50;
     if (window.pywebview && window.pywebview.api) {
       clearInterval(pollTimer);
       console.log(`PyWebView API detected via poll after ${elapsed}ms`);
-      safeInitApp();
-    } else if (elapsed >= 3500) {
+      window.safeInitApp();
+    } else if (elapsed >= 30000) {
       clearInterval(pollTimer);
       if (!appInitialized) {
-        console.warn("PyWebView API not detected within 3.5s — fallback init");
-        safeInitApp();
+        console.error("PyWebView API not detected within 30s");
+        updateStatusBar("Bridge connection timeout. Please restart application.", "error");
       }
     }
   }, 50);
@@ -311,10 +354,10 @@ function restoreLayoutPrefs() {
 }
 
 async function callAPI(method, ...args) {
-  // If pywebview is not ready yet, wait up to 3500ms before giving up
+  // If pywebview is not ready yet, wait up to 15 seconds before giving up
   if (!window.pywebview || !window.pywebview.api || typeof window.pywebview.api[method] !== 'function') {
     let waited = 0;
-    while ((!window.pywebview || !window.pywebview.api || typeof window.pywebview.api[method] !== 'function') && waited < 3500) {
+    while ((!window.pywebview || !window.pywebview.api || typeof window.pywebview.api[method] !== 'function') && waited < 15000) {
       await new Promise(r => setTimeout(r, 50));
       waited += 50;
     }
@@ -328,7 +371,7 @@ async function callAPI(method, ...args) {
       return { success: false, error: e.toString() };
     }
   }
-  console.warn(`API method ${method} called without PyWebView`);
+  console.warn(`API method ${method} called without PyWebView (waited 15s)`);
   return { success: false, error: "PyWebView API not available" };
 }
 
@@ -376,6 +419,10 @@ async function initApp() {
   } catch (e) {}
 
   const info = await callAPI('get_app_info');
+  if (!info || info.success === false) {
+    console.warn("get_app_info failed or returned error:", info);
+    return false;
+  }
   if (info && info.theme) {
     applyTheme(info.theme);
   } else {
@@ -445,7 +492,24 @@ async function initApp() {
   // Initialize interactive manual fuzzy lookup rows
   initManualFuzzyLookup();
 
-  lucide.createIcons();
+  // Auto-detect empty database and prompt/start initial indexing
+  if (info && info.total_images === 0) {
+    console.log("Database contains 0 images. Auto-checking if image folders exist to index...");
+    setTimeout(async () => {
+      try {
+        const fRes = await callAPI('get_folder_status');
+        if (fRes && fRes.folders && fRes.folders.length > 0 && fRes.folders[0].exists) {
+          updateStatusBar("Empty database detected. Starting initial image index...", "loading", 10);
+          await startIndexing();
+        }
+      } catch (err) {
+        console.warn("Auto-index check error:", err);
+      }
+    }, 1200);
+  }
+
+  safeCreateIcons();
+  return true;
 }
 
 let latestUpdateInfo = null;

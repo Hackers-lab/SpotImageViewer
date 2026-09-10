@@ -17,33 +17,34 @@
       var t = localStorage.getItem('siv_theme') || 'dark';
       document.documentElement.setAttribute('data-theme', t);
     })();
+    // Fallback safe Lucide stub in case script evaluation is delayed
+    window.lucide = window.lucide || { createIcons: function() {} };
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com" charset="UTF-8"></script>
+  <script src="js/tailwind.js" charset="UTF-8"></script>
   <script charset="UTF-8">
-    tailwind.config = {
-      darkMode: ['selector', '[data-theme="dark"]'],
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['var(--app-font)', 'Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
-          },
-          fontSize: {
-            '2xs': ['0.70rem', { lineHeight: '0.85rem' }],
-            'xs': ['0.78rem', { lineHeight: '1.05rem' }],
-            'sm': ['0.85rem', { lineHeight: '1.20rem' }],
-            'base': ['0.95rem', { lineHeight: '1.35rem' }],
-            'lg': ['1.05rem', { lineHeight: '1.45rem' }],
-            'xl': ['1.20rem', { lineHeight: '1.60rem' }],
-            '2xl': ['1.40rem', { lineHeight: '1.75rem' }],
+    if (typeof tailwind !== 'undefined') {
+      tailwind.config = {
+        darkMode: ['selector', '[data-theme="dark"]'],
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['var(--app-font)', 'Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
+            },
+            fontSize: {
+              '2xs': ['0.70rem', { lineHeight: '0.85rem' }],
+              'xs': ['0.78rem', { lineHeight: '1.05rem' }],
+              'sm': ['0.85rem', { lineHeight: '1.20rem' }],
+              'base': ['0.95rem', { lineHeight: '1.35rem' }],
+              'lg': ['1.05rem', { lineHeight: '1.45rem' }],
+              'xl': ['1.20rem', { lineHeight: '1.60rem' }],
+              '2xl': ['1.40rem', { lineHeight: '1.75rem' }],
+            }
           }
         }
-      }
+      };
     }
   </script>
-  <script src="https://unpkg.com/lucide@latest" charset="UTF-8"></script>
+  <script src="js/lucide.min.js" charset="UTF-8"></script>
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body class="app-shell bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col overflow-hidden h-screen w-screen select-none transition-colors duration-300">
@@ -1530,7 +1531,7 @@
                 <i data-lucide="refresh-cw" class="w-4 h-4 shrink-0"></i>
                 <div class="truncate">
                   <span class="block leading-tight">Software Update</span>
-                  <span id="navAppVersion" class="text-[10px] text-slate-400 font-normal">v20.2 Studio Edition</span>
+                  <span id="navAppVersion" class="text-[10px] text-slate-400 font-normal">v20.51 Studio Edition</span>
                 </div>
               </button>
 
@@ -1713,7 +1714,7 @@
                 <div class="flex items-center justify-between">
                   <div>
                     <span class="text-xs font-bold text-slate-800 dark:text-slate-200 block">Current Installed Version</span>
-                    <span id="currentAppVersionSettings" class="text-xs text-sky-600 dark:text-sky-400 font-mono font-bold">v20.2 Studio Edition</span>
+                    <span id="currentAppVersionSettings" class="text-xs text-sky-600 dark:text-sky-400 font-mono font-bold">v20.51 Studio Edition</span>
                   </div>
                   <button id="btnCheckUpdateManual" onclick="triggerUpdateCheck()" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow-sm cursor-pointer">
                     <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Check Now
@@ -1892,7 +1893,7 @@
 
       <!-- Version & Edition Info -->
       <div class="flex items-center gap-1.5 font-mono text-[10px] text-slate-400 dark:text-slate-500">
-        <span id="statusAppVersion">v20.2 Studio</span>
+        <span id="statusAppVersion">v20.51 Studio</span>
       </div>
     </div>
   </footer>
@@ -1935,7 +1936,7 @@
           </div>
           <div>
             <h3 class="font-bold text-slate-900 dark:text-slate-100 text-sm">Spot Image Viewer — User Guide & Help</h3>
-            <span id="helpAppVersion" class="text-xs text-slate-500">v20.2 Studio Edition Documentation</span>
+            <span id="helpAppVersion" class="text-xs text-slate-500">v20.51 Studio Edition Documentation</span>
           </div>
         </div>
         <button onclick="closeHelpModal()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1 rounded-lg">

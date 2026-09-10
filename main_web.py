@@ -2,8 +2,8 @@ import os
 import sys
 
 # Support frozen PyInstaller bundle environment as well as development
-if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-    BASE_DIR = sys._MEIPASS
+if getattr(sys, 'frozen', False):
+    BASE_DIR = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -70,6 +70,14 @@ def main():
         maximized=True
     )
     api.set_window(window)
+
+    def _on_loaded():
+        try:
+            window.evaluate_js("if (typeof window.safeInitApp === 'function') { window.safeInitApp(); }")
+        except Exception:
+            pass
+
+    window.events.loaded += _on_loaded
 
     # Start the event loop with persistent local storage
     storage_dir = os.path.join(config.BASE_DIR, "webview_storage")

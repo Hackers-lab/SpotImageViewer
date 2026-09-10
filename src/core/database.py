@@ -174,8 +174,6 @@ def init_db(force=False):
                 CREATE VIRTUAL TABLE IF NOT EXISTS meter_mapping_fts
                 USING fts5(consumer_id, name, address, content='meter_mapping', content_rowid='rowid')
             ''')
-            # Rebuild FTS index from current meter_mapping data
-            cursor.execute("INSERT OR REPLACE INTO meter_mapping_fts(meter_mapping_fts) VALUES('rebuild')")
         except Exception:
             # FTS5 may not be available in all SQLite builds — graceful fallback
             pass
@@ -184,6 +182,23 @@ def init_db(force=False):
         
         # Mark schema version completed
         set_info_value("db_schema_version", CURRENT_DB_SCHEMA_VERSION)
+
+        # Background worker to populate FTS if table exists but FTS is empty (never blocks UI/init_db)
+        def _bg_populate_fts():
+            try:
+                bg_conn = sqlite3.connect(config.DB_FILE, timeout=60.0)
+                bg_cursor = bg_conn.cursor()
+                bg_cursor.execute("SELECT COUNT(*) FROM meter_mapping_fts")
+                if bg_cursor.fetchone()[0] == 0:
+                    bg_cursor.execute("SELECT COUNT(*) FROM meter_mapping")
+                    if bg_cursor.fetchone()[0] > 0:
+                        bg_cursor.execute("INSERT OR REPLACE INTO meter_mapping_fts(meter_mapping_fts) VALUES('rebuild')")
+                        bg_conn.commit()
+                bg_conn.close()
+            except Exception:
+                pass
+        threading.Thread(target=_bg_populate_fts, daemon=True).start()
+
         return True, "Success"
     except Exception as e:
         return False, str(e)
