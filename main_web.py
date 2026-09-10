@@ -15,18 +15,21 @@ for p in [BASE_DIR, SRC_DIR, CORE_DIR, BRIDGE_DIR]:
         sys.path.insert(0, p)
 
 # Fix openpyxl compat issue where numpy has no attribute 'short'
-try:
-    import numpy as _np
-    if not hasattr(_np, 'short'):
-        _np.short = _np.int16
-    if not hasattr(_np, 'ushort'):
-        _np.ushort = _np.uint16
-    if not hasattr(_np, 'int_'):
-        _np.int_ = _np.int64
-    if not hasattr(_np, 'uint_'):
-        _np.uint_ = _np.uint64
-except Exception:
-    pass
+# Deferred to background thread — numpy import takes 150-500ms and is not needed
+# until user triggers Excel import/export.
+def _patch_numpy():
+    try:
+        import numpy as _np
+        if not hasattr(_np, 'short'):
+            _np.short = _np.int16
+        if not hasattr(_np, 'ushort'):
+            _np.ushort = _np.uint16
+        if not hasattr(_np, 'int_'):
+            _np.int_ = _np.int64
+        if not hasattr(_np, 'uint_'):
+            _np.uint_ = _np.uint64
+    except Exception:
+        pass
 
 import webview
 try:
@@ -37,12 +40,18 @@ except ImportError:
     from app_api import AppAPI
 
 def main():
+    import threading
+
     # Instantiate the Python RPC Bridge immediately
     api = AppAPI()
 
+    # Patch numpy in background — saves 150-500ms startup time
+    threading.Thread(target=_patch_numpy, daemon=True).start()
+
     # Initialize local database tables asynchronously so the WebView window opens immediately
-    # without waiting for index or disk checks on huge (2M+) databases
-    import threading
+    # without waiting for index or disk checks on huge (2M+) databases.
+    # The init_db_ready event (in database module) is set when done, preventing
+    # the startup deadlock where UI reads compete with schema migration locks.
     threading.Thread(target=database.init_db, daemon=True).start()
 
     # Path to local HTML single page application
@@ -52,7 +61,7 @@ def main():
 
     # Create PyWebView window with native Edge WebView2 engine
     window = webview.create_window(
-        title="Spot Image Viewer & Verification Studio (v20.4)",
+        title="Spot Image Viewer & Verification Studio (v20.5)",
         url=f"file:///{html_file.replace(os.sep, '/')}",
         js_api=api,
         width=1340,

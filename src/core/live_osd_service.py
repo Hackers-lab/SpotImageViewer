@@ -7,6 +7,7 @@ import re
 import io
 import time
 import base64
+import threading
 from typing import Optional, Dict, Any
 from urllib.parse import urljoin
 import requests
@@ -23,6 +24,7 @@ BASE_PORTAL_URL = "https://portal.wbsedcl.in/webdynpro/resources/wbsedcl/noduesa
 # In-memory cache to prevent spamming the portal for repeatedly selected consumers
 # Format: {consumer_id: (timestamp, result_dict, pdf_bytes)}
 _OSD_CACHE = {}
+_OSD_LOCK = threading.Lock()
 _CACHE_TTL = 900  # 15 minutes TTL
 
 
@@ -192,24 +194,45 @@ def get_live_osd_data(consumer_id: str, include_pdf_base64: bool = False, force_
     clean_id = str(consumer_id).strip()
     now = time.time()
 
-    if not force_refresh and clean_id in _OSD_CACHE:
-        cached_time, cached_result, cached_pdf = _OSD_CACHE[clean_id]
-        if (now - cached_time) < _CACHE_TTL:
-            res = dict(cached_result)
-            if include_pdf_base64 and cached_pdf:
-                res["pdfBase64"] = base64.b64encode(cached_pdf).decode("utf-8")
-            res["cached"] = True
-            return {"success": True, "data": res}
+    if not force_refresh:
+        with _OSD_LOCK:
+            if clean_id in _OSD_CACHE:
+                cached_time, cached_result, cached_pdf = _OSD_CACHE[clean_id]
+                if (now - cached_time) < _CACHE_TTL:
+                    res = dict(cached_result)
+                    if include_pdf_base64 and cached_pdf:
+                        res["pdfBase64"] = base64.b64encode(cached_pdf).decode("utf-8")
+                    res["cached"] = True
+                    return {"success": True, "data": res}
 
     try:
         pdf_bytes = fetch_live_osd_pdf(clean_id)
         result = parse_osd_pdf(pdf_bytes, clean_id)
-        _OSD_CACHE[clean_id] = (now, result, pdf_bytes)
+        with _OSD_LOCK:
+            _OSD_CACHE[clean_id] = (now, result, pdf_bytes)
 
         res = dict(result)
         if include_pdf_base64:
             res["pdfBase64"] = base64.b64encode(pdf_bytes).decode("utf-8")
         res["cached"] = False
-        return {"success": True, "data": res}
+    except requests.exceptions.ConnectionError as exc:
+        err_str = str(exc)
+        err_msg = "No Internet Connection"
+        if "11001" in err_str or "getaddrinfo" in err_str or "NameResolutionError" in err_str:
+            err_msg = "No Internet Connection"
+        elif "ConnectionRefused" in err_str:
+            err_msg = "Portal Server Offline"
+        return {"success": False, "error": err_msg, "error_code": "OFFLINE", "raw_error": err_str}
+    except requests.exceptions.Timeout as exc:
+        return {"success": False, "error": "Portal Timed Out", "error_code": "TIMEOUT", "raw_error": str(exc)}
+    except requests.exceptions.HTTPError as exc:
+        status_code = getattr(exc.response, 'status_code', None)
+        msg = f"Portal Error ({status_code})" if status_code else "Portal HTTP Error"
+        return {"success": False, "error": msg, "error_code": "HTTP_ERROR", "raw_error": str(exc)}
+    except ValueError as exc:
+        return {"success": False, "error": str(exc), "error_code": "INVALID_INPUT", "raw_error": str(exc)}
     except Exception as exc:
-        return {"success": False, "error": str(exc)}
+        err_str = str(exc)
+        if "11001" in err_str or "getaddrinfo" in err_str:
+            return {"success": False, "error": "No Internet Connection", "error_code": "OFFLINE", "raw_error": err_str}
+        return {"success": False, "error": "Portal Error", "error_code": "UNKNOWN", "raw_error": err_str}

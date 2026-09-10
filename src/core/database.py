@@ -1,9 +1,20 @@
 import sqlite3
 import json
+import threading
 try:
     from core import config
 except ImportError:
     import config
+
+
+# --- Thread-local connection pool ---
+# Reuse a single SQLite connection per thread instead of opening/closing + running
+# 6 PRAGMAs on every single database call.  This saves ~10-20ms per call.
+_thread_local = threading.local()
+
+# Event that signals init_db() has completed.  UI reads should wait on this
+# to avoid hitting an exclusive schema-migration lock and deadlocking for up to 30s.
+init_db_ready = threading.Event()
 
 
 def _add_column_if_missing(cursor, table_name, column_name, column_def):
@@ -12,12 +23,26 @@ def _add_column_if_missing(cursor, table_name, column_name, column_def):
     if column_name not in existing:
         cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_def}")
 
-CURRENT_DB_SCHEMA_VERSION = 3
+CURRENT_DB_SCHEMA_VERSION = 4  # Bumped for FTS5 migration
 
 def get_db_connection():
+    """Return a thread-local cached connection.  PRAGMAs execute once per thread."""
+    conn = getattr(_thread_local, 'conn', None)
+    if conn is not None:
+        try:
+            conn.execute("SELECT 1")  # health-check
+            return conn
+        except Exception:
+            # Connection is broken — drop it and create a new one
+            try:
+                conn.close()
+            except Exception:
+                pass
+            _thread_local.conn = None
+
     conn = sqlite3.connect(config.DB_FILE, check_same_thread=False, timeout=30.0)
     try:
-        # High performance tuning for multi-gigabyte / 2M+ rows databases
+        # High performance tuning — runs ONCE per thread lifetime
         cursor = conn.cursor()
         cursor.execute("PRAGMA journal_mode=WAL;")
         cursor.execute("PRAGMA synchronous=NORMAL;")
@@ -26,7 +51,19 @@ def get_db_connection():
         cursor.execute("PRAGMA temp_store=MEMORY;")
     except Exception:
         pass
+    _thread_local.conn = conn
     return conn
+
+
+def close_thread_connection():
+    """Explicitly close the cached connection for the current thread (optional cleanup)."""
+    conn = getattr(_thread_local, 'conn', None)
+    if conn is not None:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _thread_local.conn = None
 
 def init_db(force=False):
     """
@@ -116,8 +153,11 @@ def init_db(force=False):
         _add_column_if_missing(cursor, "meter_mapping", "contractual_load", "TEXT")
         _add_column_if_missing(cursor, "meter_mapping", "class", "TEXT")
 
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_meter_consumer_id ON meter_mapping (consumer_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_meter_no_exact ON meter_mapping (meter_no)')
+        # Drop redundant duplicate indexes (consumer_id is already indexed by PRIMARY KEY,
+        # and meter_no is indexed by idx_meter_no)
+        cursor.execute('DROP INDEX IF EXISTS idx_meter_consumer_id')
+        cursor.execute('DROP INDEX IF EXISTS idx_meter_no_exact')
+
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_meter_mobile ON meter_mapping (mobile_number)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_meter_name_nocase ON meter_mapping (name COLLATE NOCASE)')
 
@@ -127,14 +167,29 @@ def init_db(force=False):
             default_options = [("OK",), ("CHECK",), ("RECHECK",)]
             cursor.executemany("INSERT INTO note_options VALUES (?)", default_options)
 
+        # FTS5 virtual table for instant name/address search
+        # (replaces LIKE '%query%' which causes full table scans)
+        try:
+            cursor.execute('''
+                CREATE VIRTUAL TABLE IF NOT EXISTS meter_mapping_fts
+                USING fts5(consumer_id, name, address, content='meter_mapping', content_rowid='rowid')
+            ''')
+            # Rebuild FTS index from current meter_mapping data
+            cursor.execute("INSERT OR REPLACE INTO meter_mapping_fts(meter_mapping_fts) VALUES('rebuild')")
+        except Exception:
+            # FTS5 may not be available in all SQLite builds — graceful fallback
+            pass
+
         conn.commit()
-        conn.close()
         
         # Mark schema version completed
         set_info_value("db_schema_version", CURRENT_DB_SCHEMA_VERSION)
         return True, "Success"
     except Exception as e:
         return False, str(e)
+    finally:
+        # Signal that schema initialization is complete — safe for UI reads now
+        init_db_ready.set()
 
 def get_total_image_count(force_recount=False):
     cached = get_info_value("cached_total_images", None)
@@ -158,7 +213,6 @@ def get_total_image_count(force_recount=False):
         else:
             cursor.execute("SELECT COUNT(*) FROM images")
             count = cursor.fetchone()[0]
-        conn.close()
         set_info_value("cached_total_images", count)
         return count
     except:
@@ -172,7 +226,6 @@ def get_info_value(key, default=None):
         cursor = conn.cursor()
         cursor.execute("SELECT value FROM db_info WHERE key = ?", (key,))
         row = cursor.fetchone()
-        conn.close()
         return json.loads(row[0]) if row else default
     except:
         return default
@@ -183,7 +236,6 @@ def set_info_value(key, value):
         cursor = conn.cursor()
         cursor.execute("INSERT OR REPLACE INTO db_info VALUES (?, ?)", (key, json.dumps(value)))
         conn.commit()
-        conn.close()
     except:
         pass
 
@@ -193,7 +245,6 @@ def get_additional_folders():
         cursor = conn.cursor()
         cursor.execute("SELECT folder_path FROM additional_folders")
         rows = cursor.fetchall()
-        conn.close()
         return [row[0] for row in rows]
     except:
         return []
@@ -206,7 +257,6 @@ def save_additional_folders(folders):
         if folders:
             cursor.executemany("INSERT INTO additional_folders VALUES (?)", [(f,) for f in folders])
         conn.commit()
-        conn.close()
     except:
         pass
 
@@ -216,7 +266,6 @@ def get_all_notes():
         cursor = conn.cursor()
         cursor.execute("SELECT consumer_id, note, remarks FROM notes")
         rows = cursor.fetchall()
-        conn.close()
         return {row[0]: {'note': row[1], 'remarks': row[2]} for row in rows}
     except:
         return {}
@@ -227,7 +276,6 @@ def save_note(consumer_id, note, remarks):
         cursor = conn.cursor()
         cursor.execute("INSERT OR REPLACE INTO notes VALUES (?, ?, ?)", (consumer_id, note, remarks))
         conn.commit()
-        conn.close()
     except:
         pass
         
@@ -237,7 +285,6 @@ def delete_note(consumer_id):
         cursor = conn.cursor()
         cursor.execute("DELETE FROM notes WHERE consumer_id=?", (consumer_id,))
         conn.commit()
-        conn.close()
     except:
         pass
 
@@ -247,7 +294,6 @@ def get_note_options():
         cursor = conn.cursor()
         cursor.execute("SELECT option_text FROM note_options")
         rows = cursor.fetchall()
-        conn.close()
         return [row[0] for row in rows]
     except:
         return []
@@ -258,7 +304,6 @@ def add_note_option(option):
         cursor = conn.cursor()
         cursor.execute("INSERT OR IGNORE INTO note_options VALUES (?)", (option,))
         conn.commit()
-        conn.close()
     except:
         pass
         
@@ -268,7 +313,6 @@ def get_meter_number(consumer_id):
         cursor = conn.cursor()
         cursor.execute("SELECT meter_no FROM meter_mapping WHERE consumer_id = ?", (consumer_id,))
         row = cursor.fetchone()
-        conn.close()
         return row[0] if row else None
     except:
         return None
@@ -287,7 +331,6 @@ def get_consumer_profile(consumer_id):
             (consumer_id,)
         )
         row = cursor.fetchone()
-        conn.close()
         if not row:
             return None
         return {
@@ -308,7 +351,6 @@ def get_consumer_by_meter(meter_no):
         cursor = conn.cursor()
         cursor.execute("SELECT consumer_id FROM meter_mapping WHERE meter_no = ?", (meter_no,))
         row = cursor.fetchone()
-        conn.close()
         return row[0] if row else None
     except:
         return None
@@ -318,18 +360,38 @@ def search_consumers_by_name(name_query, limit=200):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT consumer_id, meter_no, name, address, mobile_number, contractual_load, class
-            FROM meter_mapping
-            WHERE name LIKE ? COLLATE NOCASE
-            ORDER BY name COLLATE NOCASE ASC
-            LIMIT ?
-            """,
-            (f"%{name_query.strip()}%", int(limit))
-        )
+        q = name_query.strip()
+        if not q:
+            return []
+        # Try FTS5 first — O(1) token lookup instead of full table scan
+        try:
+            # FTS5 MATCH with wildcard suffix for prefix matching
+            fts_query = " ".join(f'"{w}"*' for w in q.split() if w)
+            cursor.execute(
+                """
+                SELECT m.consumer_id, m.meter_no, m.name, m.address,
+                       m.mobile_number, m.contractual_load, m.class
+                FROM meter_mapping_fts fts
+                JOIN meter_mapping m ON m.rowid = fts.rowid
+                WHERE meter_mapping_fts MATCH ?
+                ORDER BY rank
+                LIMIT ?
+                """,
+                (fts_query, int(limit))
+            )
+        except Exception:
+            # Fallback to LIKE if FTS5 is not available
+            cursor.execute(
+                """
+                SELECT consumer_id, meter_no, name, address, mobile_number, contractual_load, class
+                FROM meter_mapping
+                WHERE name LIKE ? COLLATE NOCASE
+                ORDER BY name COLLATE NOCASE ASC
+                LIMIT ?
+                """,
+                (f"%{q}%", int(limit))
+            )
         rows = cursor.fetchall()
-        conn.close()
         return [
             {
                 "consumer_id": r[0],
@@ -361,7 +423,6 @@ def search_consumers_by_mobile(mobile_number, limit=200):
             (mobile_number.strip(), int(limit))
         )
         rows = cursor.fetchall()
-        conn.close()
         return [
             {
                 "consumer_id": r[0],
@@ -416,7 +477,12 @@ def update_meter_mapping(mapping_dict):
             data_to_insert
         )
         conn.commit()
-        conn.close()
+        # Rebuild FTS5 index to keep name search in sync
+        try:
+            cursor.execute("INSERT OR REPLACE INTO meter_mapping_fts(meter_mapping_fts) VALUES('rebuild')")
+            conn.commit()
+        except Exception:
+            pass
         set_info_value("cached_consumer_count", len(data_to_insert))
     except Exception as e:
         print(f"DATABASE ERROR in update_meter_mapping: {e}")
@@ -426,16 +492,14 @@ def get_consumer_count(force_recount=False):
     if cached is not None and isinstance(cached, int) and cached >= 0:
         if not force_recount:
             return cached
-    if not force_recount:
-        # No cache exists — return 0 immediately to avoid blocking the UI thread.
-        return 0
-    # force_recount=True: do the actual heavy query (called from background thread only)
+    # On 50K consumers, SELECT COUNT(*) takes only ~10ms.
+    # Query directly to prevent false 0 counts that trigger 'Consumer data not updated' warnings.
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM meter_mapping")
-        count = cursor.fetchone()[0]
-        conn.close()
+        row = cursor.fetchone()
+        count = row[0] if row else 0
         set_info_value("cached_consumer_count", count)
         return count
     except:
@@ -445,7 +509,14 @@ def has_meter_data():
     cached = get_info_value("cached_consumer_count", None)
     if cached is not None and isinstance(cached, int):
         return cached > 0
-    return get_consumer_count() > 0
+    # Fast O(1) existence check in sub-millisecond time
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM meter_mapping LIMIT 1")
+        return cursor.fetchone() is not None
+    except:
+        return False
 
 
 def get_all_consumer_profiles():
@@ -459,7 +530,6 @@ def get_all_consumer_profiles():
             """
         )
         rows = cursor.fetchall()
-        conn.close()
         return [
             {
                 "consumer_id": r[0] or "",

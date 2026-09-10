@@ -8,6 +8,19 @@ let startX = 0, startY = 0, translateX = 0, translateY = 0;
 let currentTariffs = {};
 let currentConsumerId = null;
 
+async function loadWithConcurrency(items, limit, fn) {
+  const results = [];
+  let index = 0;
+  async function worker() {
+    while (index < items.length) {
+      const i = index++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  return results;
+}
+
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
@@ -287,7 +300,8 @@ function updateAppCounts(totalImages, consumerCount) {
   if (consumerCount !== null && consumerCount !== undefined) {
     const dbWarningContainer = document.getElementById('statusDbWarningContainer');
     const dbWarningText = document.getElementById('statusDbWarningText');
-    if (consumerCount === 0) {
+    const hasData = Number(consumerCount) > 0;
+    if (!hasData) {
       if (dbWarningContainer) {
         dbWarningContainer.classList.remove('hidden');
         dbWarningContainer.classList.add('flex');
@@ -299,17 +313,22 @@ function updateAppCounts(totalImages, consumerCount) {
         dbWarningContainer.classList.remove('flex');
       }
     }
+    try { localStorage.setItem('siv_cached_consumer_count', String(consumerCount)); } catch (e) {}
   }
 }
 
 async function initApp() {
   initAppFont();
 
-  // Instant optimistic render from localStorage to prevent 0 flash
+  // Instant optimistic render from localStorage to prevent 0 / missing flash
   try {
     const savedImgCount = localStorage.getItem('siv_cached_total_images');
-    if (savedImgCount) {
-      updateAppCounts(parseInt(savedImgCount, 10), null);
+    const savedConsumerCount = localStorage.getItem('siv_cached_consumer_count');
+    if (savedImgCount !== null || savedConsumerCount !== null) {
+      updateAppCounts(
+        savedImgCount !== null ? parseInt(savedImgCount, 10) : null,
+        savedConsumerCount !== null ? parseInt(savedConsumerCount, 10) : null
+      );
     }
   } catch (e) {}
 
@@ -360,13 +379,14 @@ async function initApp() {
   // Consumer database status check & notification in status bar (right section)
   const dbWarningContainer = document.getElementById('statusDbWarningContainer');
   const dbWarningText = document.getElementById('statusDbWarningText');
-  if (info && (!info.has_meter_data || info.consumer_count === 0)) {
+  const hasConsumers = Boolean(info && (info.has_meter_data || (info.consumer_count && info.consumer_count > 0)));
+  if (!hasConsumers) {
     if (dbWarningContainer) {
       dbWarningContainer.classList.remove('hidden');
       dbWarningContainer.classList.add('flex');
     }
     if (dbWarningText) dbWarningText.innerText = "Consumer data not updated";
-  } else if (info && info.has_meter_data) {
+  } else {
     if (dbWarningContainer) {
       dbWarningContainer.classList.add('hidden');
       dbWarningContainer.classList.remove('flex');
@@ -732,8 +752,19 @@ async function loadLiveOSD(consumerId, forceRefresh = false) {
       if (statusBadge) statusBadge.className = "";
       if (statusText) {
         statusText.className = "text-[10px] font-semibold text-rose-500 dark:text-rose-400";
-        statusText.innerText = res ? (res.error || "Portal unreachable") : "Offline";
+        let displayError = "Offline";
+        if (res && res.error) {
+          displayError = res.error;
+          if (displayError.length > 24) {
+            displayError = (res.error_code === 'OFFLINE' || displayError.toLowerCase().includes('internet')) ? "No Internet" : "Portal Offline";
+          }
+        }
+        statusText.innerText = displayError;
+        statusText.title = res ? (res.error || res.raw_error || "Could not connect to WBSEDCL portal") : "No Internet Connection";
       }
+      if (totalDuesEl) totalDuesEl.innerText = "-";
+      if (unpaidEl) unpaidEl.innerText = "-";
+      if (lpscEl) lpscEl.innerText = "-";
       return;
     }
 
@@ -778,8 +809,12 @@ async function loadLiveOSD(consumerId, forceRefresh = false) {
     if (statusBadge) statusBadge.className = "";
     if (statusText) {
       statusText.className = "text-[10px] font-semibold text-rose-500 dark:text-rose-400";
-      statusText.innerText = "Error";
+      statusText.innerText = "No Internet";
+      statusText.title = "Network request failed. Please check your internet connection.";
     }
+    if (totalDuesEl) totalDuesEl.innerText = "-";
+    if (unpaidEl) unpaidEl.innerText = "-";
+    if (lpscEl) lpscEl.innerText = "-";
   }
 }
 
@@ -1050,19 +1085,18 @@ async function renderOverviewGrid() {
       showImage(idx);
     };
     grid.appendChild(card);
-
-    // Asynchronously load thumbnail for card
-    (async () => {
-      const thumb = await callAPI('get_image_data', img.full_path, 350);
-      const loader = document.getElementById(`grid-loader-${idx}`);
-      const imgEl = document.getElementById(`grid-img-${idx}`);
-      if (loader) loader.classList.add('hidden');
-      if (imgEl && thumb && thumb.success) {
-        imgEl.src = thumb.data;
-        imgEl.classList.remove('hidden');
-      }
-    })();
   }
+
+  await loadWithConcurrency(currentImages, 6, async (img, idx) => {
+    const thumb = await callAPI('get_image_data', img.full_path, 350);
+    const loader = document.getElementById(`grid-loader-${idx}`);
+    const imgEl = document.getElementById(`grid-img-${idx}`);
+    if (loader) loader.classList.add('hidden');
+    if (imgEl && thumb && thumb.success) {
+      imgEl.src = thumb.data;
+      imgEl.classList.remove('hidden');
+    }
+  });
 }
 
 window.switchImageViewMode = switchImageViewMode;
@@ -1082,11 +1116,23 @@ async function renderFilmstrip() {
   for (let idx = 0; idx < currentImages.length; idx++) {
     const img = currentImages[idx];
     const item = document.createElement('div');
+    item.id = `filmstrip-item-${idx}`;
     item.className = `filmstrip-thumb flex flex-col items-center justify-center p-0.5 rounded cursor-pointer shrink-0 ${idx === currentImageIndex ? 'active' : ''}`;
     item.title = `${img.date_formatted} (${img.filename})`;
     
-    // Try to get thumbnail
+    item.innerHTML = `
+      <div class="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin mb-[5px] mt-[5px]"></div>
+      <span class="text-[9px] font-mono leading-none text-slate-700 dark:text-slate-300 truncate w-full text-center">${img.date_formatted}</span>
+    `;
+    item.onclick = () => showImage(idx);
+    container.appendChild(item);
+  }
+
+  await loadWithConcurrency(currentImages, 4, async (img, idx) => {
     const thumbRes = await callAPI('get_image_data', img.full_path, 150);
+    const item = document.getElementById(`filmstrip-item-${idx}`);
+    if (!item) return;
+
     if (thumbRes && thumbRes.success) {
       item.innerHTML = `
         <img src="${thumbRes.data}" class="w-full h-[26px] object-cover rounded mb-0.5" />
@@ -1097,11 +1143,10 @@ async function renderFilmstrip() {
         <i data-lucide="image" class="w-4 h-4 text-slate-400 mb-0.5"></i>
         <span class="text-[9px] font-mono leading-none text-slate-700 dark:text-slate-300 truncate w-full text-center">${img.date_formatted}</span>
       `;
+      lucide.createIcons();
     }
-    
-    item.onclick = () => showImage(idx);
-    container.appendChild(item);
-  }
+  });
+
   lucide.createIcons();
 }
 
@@ -1234,15 +1279,21 @@ function rotateImage() {
 function applyTransform() {
   const mainImg = document.getElementById('mainImage');
   mainImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${zoomScale}) rotate(${rotationAngle}deg)`;
-  document.getElementById('zoomLevel').innerText = `${Math.round(zoomScale * 100)}%`;
+  document.getElementById('zoomLevel').textContent = `${Math.round(zoomScale * 100)}%`;
 }
 
 function setupViewportEvents() {
   const vp = document.getElementById('viewport');
+  let rafPending = false;
   vp.addEventListener('wheel', (e) => {
     e.preventDefault();
-    if (e.deltaY < 0) zoomIn();
-    else zoomOut();
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(() => {
+      rafPending = false;
+      if (e.deltaY < 0) zoomIn();
+      else zoomOut();
+    });
   });
 
   vp.addEventListener('mousedown', (e) => {
@@ -1253,12 +1304,17 @@ function setupViewportEvents() {
     }
   });
 
+  let panRafPending = false;
   window.addEventListener('mousemove', (e) => {
-    if (isPanning) {
-      translateX = e.clientX - startX;
-      translateY = e.clientY - startY;
+    if (!isPanning) return;
+    translateX = e.clientX - startX;
+    translateY = e.clientY - startY;
+    if (panRafPending) return;
+    panRafPending = true;
+    requestAnimationFrame(() => {
+      panRafPending = false;
       applyTransform();
-    }
+    });
   });
 
   window.addEventListener('mouseup', () => {
@@ -2921,9 +2977,12 @@ async function fetchCandidateLiveOsd(consumerId, qIdx, cIdx) {
   try {
     const res = await callAPI('get_live_osd', cid);
     if (!res || !res.success || !res.data) {
+      const isOffline = res && (res.error_code === 'OFFLINE' || String(res.error).toLowerCase().includes('internet'));
+      const btnLabel = isOffline ? "Offline ↻" : "Failed ↻";
+      const tooltip = res ? (res.error || "Connection failed - Click to retry") : "Network error - Click to retry";
       cell.innerHTML = `
-        <button onclick="fetchCandidateLiveOsd('${cid}', ${qIdx}, ${cIdx})" class="px-1.5 py-0.5 rounded text-[9.5px] font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition" title="${escapeHtml(res ? res.error : 'Retry')}">
-          Failed ↻
+        <button onclick="fetchCandidateLiveOsd('${cid}', ${qIdx}, ${cIdx})" class="px-1.5 py-0.5 rounded text-[9.5px] font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition" title="${escapeHtml(tooltip)}">
+          ${btnLabel}
         </button>
       `;
       return;
@@ -3429,17 +3488,17 @@ async function selectAuditItem(id) {
 
     card.onclick = () => openAuditImageLightbox(idx);
     gallery.appendChild(card);
+  });
 
-    (async () => {
-      const thumb = await callAPI('get_image_data', img.full_path, 400);
-      const loader = document.getElementById(`audit-img-loader-${idx}`);
-      const imgEl = document.getElementById(`audit-img-${idx}`);
-      if (loader) loader.classList.add('hidden');
-      if (imgEl && thumb && thumb.success) {
-        imgEl.src = thumb.data;
-        imgEl.classList.remove('hidden');
-      }
-    })();
+  loadWithConcurrency(res.images, 4, async (img, idx) => {
+    const thumb = await callAPI('get_image_data', img.full_path, 400);
+    const loader = document.getElementById(`audit-img-loader-${idx}`);
+    const imgEl = document.getElementById(`audit-img-${idx}`);
+    if (loader) loader.classList.add('hidden');
+    if (imgEl && thumb && thumb.success) {
+      imgEl.src = thumb.data;
+      imgEl.classList.remove('hidden');
+    }
   });
 
   lucide.createIcons();

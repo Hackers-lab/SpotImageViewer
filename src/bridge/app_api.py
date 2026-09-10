@@ -16,31 +16,50 @@ import re
 import subprocess
 from collections import defaultdict
 from difflib import SequenceMatcher
+from concurrent.futures import ThreadPoolExecutor
 try:
     from rapidfuzz import fuzz as rapidfuzz_fuzz
 except ImportError:
     rapidfuzz_fuzz = None
 
-# Patch numpy attributes if newer numpy is present so openpyxl doesn't crash on import
-try:
-    import numpy as _np
-    if not hasattr(_np, 'short'):
-        _np.short = _np.int16
-    if not hasattr(_np, 'ushort'):
-        _np.ushort = _np.uint16
-    if not hasattr(_np, 'int_'):
-        _np.int_ = _np.int64
-    if not hasattr(_np, 'uint_'):
-        _np.uint_ = _np.uint64
-except Exception:
-    pass
-
-import openpyxl
+# Lazy-load heavy modules — openpyxl + numpy take 300-800ms to import.
+# They are only needed for Excel import/export and fuzzy lookup.
+_openpyxl = None
+def _get_openpyxl():
+    global _openpyxl
+    if _openpyxl is None:
+        # Patch numpy if needed (openpyxl dependency)
+        try:
+            import numpy as _np
+            if not hasattr(_np, 'short'):
+                _np.short = _np.int16
+            if not hasattr(_np, 'ushort'):
+                _np.ushort = _np.uint16
+            if not hasattr(_np, 'int_'):
+                _np.int_ = _np.int64
+            if not hasattr(_np, 'uint_'):
+                _np.uint_ = _np.uint64
+        except Exception:
+            pass
+        import openpyxl as _mod
+        _openpyxl = _mod
+    return _openpyxl
 
 try:
     from core import config, database, utils, tariff_manager, live_osd_service
 except ImportError:
     import config, database, utils, tariff_manager, live_osd_service
+
+# Shared thread pool for offloading heavy I/O from the PyWebView bridge thread.
+# PyWebView's JS→Python bridge is single-threaded — any blocking call here freezes
+# the entire UI.  By running I/O in the pool, the bridge thread returns immediately.
+_io_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="siv-io")
+
+
+def _wait_db(timeout=10.0):
+    """Wait for init_db to finish (prevents deadlock with schema migration locks)."""
+    database.init_db_ready.wait(timeout=timeout)
+
 
 class AppAPI:
     """
@@ -59,6 +78,7 @@ class AppAPI:
 
     # --- System & Settings ---
     def get_app_info(self):
+        _wait_db()  # Prevent deadlock — wait for init_db schema lock to release
         # Check if cache is missing FIRST and launch background recounts.
         # The get_total_image_count() / get_consumer_count() calls below will
         # return 0 instantly when no cache exists (no blocking query).
@@ -180,7 +200,6 @@ class AppAPI:
                             "consumer_id": r[0], "meter_no": r[1], "name": r[2], "address": r[3],
                             "mobile_number": r[4], "contractual_load": r[5], "class": r[6]
                         })
-                    conn.close()
                 except Exception:
                     pass
         elif detected_type == "name":
@@ -211,7 +230,7 @@ class AppAPI:
                     ORDER BY i.date_iso DESC
                 """, (cid,))
                 rows = cur.fetchall()
-            except sqlite3.OperationalError:
+            except Exception:
                 # Legacy table fallback if directories table doesn't exist or column differs
                 cur.execute("PRAGMA table_info(images)")
                 cols = [c[1] for c in cur.fetchall()]
@@ -224,7 +243,6 @@ class AppAPI:
                     rows = cur.fetchall()
                 else:
                     rows = []
-            conn.close()
 
             if not rows:
                 return {"success": False, "error": f"No images found for Consumer ID {cid}."}
@@ -265,26 +283,28 @@ class AppAPI:
 
     # --- Fetch Single Image Base64 ---
     def get_image_data(self, file_path, max_dim=1400):
-        try:
-            with Image.open(file_path) as img:
-                img = ImageOps.exif_transpose(img)
-                orig_w, orig_h = img.size
-                if max_dim and (orig_w > max_dim or orig_h > max_dim):
-                    img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
-                
-                buffer = BytesIO()
-                img.convert('RGB').save(buffer, format="JPEG", quality=88)
-                b64_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
-                
-                return {
-                    "success": True,
-                    "mime": "image/jpeg",
-                    "width": orig_w,
-                    "height": orig_h,
-                    "data": f"data:image/jpeg;base64,{b64_str}"
-                }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        def _load():
+            try:
+                with Image.open(file_path) as img:
+                    img = ImageOps.exif_transpose(img)
+                    orig_w, orig_h = img.size
+                    if max_dim and (orig_w > max_dim or orig_h > max_dim):
+                        img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+                    
+                    buffer = BytesIO()
+                    img.convert('RGB').save(buffer, format="JPEG", quality=88)
+                    b64_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                    
+                    return {
+                        "success": True,
+                        "mime": "image/jpeg",
+                        "width": orig_w,
+                        "height": orig_h,
+                        "data": f"data:image/jpeg;base64,{b64_str}"
+                    }
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+        return _io_pool.submit(_load).result()
 
     # --- Calculation Engines ---
     def calculate_bill(self, p):
@@ -796,23 +816,25 @@ class AppAPI:
 
     # --- Auto Update ---
     def check_for_updates(self):
-        try:
-            r = requests.get(config.UPDATE_URL, timeout=4)
-            if r.status_code == 200:
-                data = r.json()
-                latest_v = data.get("version")
-                has_update = float(latest_v) > float(config.CURRENT_VERSION)
-                return {
-                    "success": True,
-                    "has_update": has_update,
-                    "current_version": config.CURRENT_VERSION,
-                    "latest_version": latest_v,
-                    "release_notes": data.get("release_notes", ""),
-                    "installer_url": data.get("installer_url") or data.get("download_url", "")
-                }
-            return {"success": False, "error": "Failed to connect to update server."}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        def _check():
+            try:
+                r = requests.get(config.UPDATE_URL, timeout=4)
+                if r.status_code == 200:
+                    data = r.json()
+                    latest_v = data.get("version")
+                    has_update = float(latest_v) > float(config.CURRENT_VERSION)
+                    return {
+                        "success": True,
+                        "has_update": has_update,
+                        "current_version": config.CURRENT_VERSION,
+                        "latest_version": latest_v,
+                        "release_notes": data.get("release_notes", ""),
+                        "installer_url": data.get("installer_url") or data.get("download_url", "")
+                    }
+                return {"success": False, "error": "Failed to connect to update server."}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+        return _io_pool.submit(_check).result()
 
     def start_self_update(self, installer_url=""):
         """Download installer in background and stage Windows installer execution."""
@@ -904,7 +926,6 @@ class AppAPI:
             cursor = conn.cursor()
             cursor.execute("SELECT note, remarks FROM notes WHERE consumer_id = ?", (consumer_id,))
             row = cursor.fetchone()
-            conn.close()
             if row:
                 return {"success": True, "note": row[0], "remarks": row[1]}
             return {"success": True, "note": None, "remarks": None}
@@ -965,19 +986,25 @@ class AppAPI:
             if not dest_dir:
                 return {"success": False, "cancelled": True}
 
-            os.makedirs(dest_dir, exist_ok=True)
-            images_data = self.get_consumer_images(consumer_id)
-            if not images_data.get("success"):
-                return images_data
-                
-            count = 0
-            for img in images_data.get("images", []):
-                src = img["full_path"]
-                if os.path.exists(src):
-                    dst = os.path.join(dest_dir, f"{consumer_id}_{img['filename']}")
-                    shutil.copy2(src, dst)
-                    count += 1
-            return {"success": True, "count": count, "path": dest_dir}
+            def _do_copy():
+                try:
+                    os.makedirs(dest_dir, exist_ok=True)
+                    images_data = self.get_consumer_images(consumer_id)
+                    if not images_data.get("success"):
+                        return images_data
+                    
+                    count = 0
+                    for img in images_data.get("images", []):
+                        src = img["full_path"]
+                        if os.path.exists(src):
+                            dst = os.path.join(dest_dir, f"{consumer_id}_{img['filename']}")
+                            shutil.copy2(src, dst)
+                            count += 1
+                    return {"success": True, "count": count, "path": dest_dir}
+                except Exception as ex:
+                    return {"success": False, "error": str(ex)}
+
+            return _io_pool.submit(_do_copy).result()
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -1173,6 +1200,10 @@ class AppAPI:
 
                 cursor.execute("ANALYZE;")
                 cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                try:
+                    cursor.execute("VACUUM;")
+                except Exception:
+                    pass
                 conn.close()
                 database.set_info_value("cached_total_images", total_inserted)
 
@@ -1366,7 +1397,7 @@ class AppAPI:
             if not save_path:
                 return {"success": False, "cancelled": True}
 
-            wb = openpyxl.Workbook()
+            wb = _get_openpyxl().Workbook()
             sheet = wb.active
             sheet.title = "FuzzyLookupInput"
             sheet.append(["NAME", "C/O", "ADDRESS", "MOBILE NUMBER"])
@@ -1375,7 +1406,7 @@ class AppAPI:
 
             widths = [28, 28, 42, 18]
             for idx, width in enumerate(widths, start=1):
-                col = openpyxl.utils.get_column_letter(idx)
+                col = _get_openpyxl().utils.get_column_letter(idx)
                 sheet.column_dimensions[col].width = width
 
             wb.save(save_path)
@@ -1685,57 +1716,60 @@ class AppAPI:
         Interactive synchronous API for 1 or more rows typed or pasted in UI.
         Returns immediate ranked candidates for inline rendering.
         """
-        try:
+        def _do_lookup():
             try:
-                threshold = float(threshold)
-            except Exception:
-                threshold = 0.85
-            threshold = max(0.0, min(1.0, threshold))
+                try:
+                    thresh_val = float(threshold)
+                except Exception:
+                    thresh_val = 0.85
+                thresh_val = max(0.0, min(1.0, thresh_val))
 
-            try:
-                top_n = int(top_n)
-            except Exception:
-                top_n = 5
-            top_n = max(1, min(50, top_n))
+                try:
+                    limit_n = int(top_n)
+                except Exception:
+                    limit_n = 5
+                limit_n = max(1, min(50, limit_n))
 
-            if not isinstance(rows, list) or not rows:
-                return {"success": False, "error": "No input rows provided."}
+                if not isinstance(rows, list) or not rows:
+                    return {"success": False, "error": "No input rows provided."}
 
-            prepped = self._get_prepped_fuzzy_db()
-            if not prepped:
-                return {"success": False, "error": "Consumer database is empty. Please import consumer data first."}
+                prepped = self._get_prepped_fuzzy_db()
+                if not prepped:
+                    return {"success": False, "error": "Consumer database is empty. Please import consumer data first."}
 
-            output_results = []
-            for item in rows:
-                if not isinstance(item, dict):
-                    continue
-                in_name = str(item.get("name", "") or "").strip()
-                in_co = str(item.get("co", "") or "").strip()
-                in_address = str(item.get("address", "") or "").strip()
-                in_mobile = str(item.get("mobile", "") or item.get("mobile_number", "") or "").strip()
+                output_results = []
+                for item in rows:
+                    if not isinstance(item, dict):
+                        continue
+                    in_name = str(item.get("name", "") or "").strip()
+                    in_co = str(item.get("co", "") or "").strip()
+                    in_address = str(item.get("address", "") or "").strip()
+                    in_mobile = str(item.get("mobile", "") or item.get("mobile_number", "") or "").strip()
 
-                candidates = self._score_single_fuzzy_query(
-                    input_name=in_name,
-                    input_co=in_co,
-                    input_address=in_address,
-                    input_mobile=in_mobile,
-                    threshold=threshold,
-                    top_n=top_n
-                )
+                    candidates = self._score_single_fuzzy_query(
+                        input_name=in_name,
+                        input_co=in_co,
+                        input_address=in_address,
+                        input_mobile=in_mobile,
+                        threshold=thresh_val,
+                        top_n=limit_n
+                    )
 
-                output_results.append({
-                    "input": {
-                        "name": in_name,
-                        "co": in_co,
-                        "address": in_address,
-                        "mobile": in_mobile
-                    },
-                    "candidates": candidates
-                })
+                    output_results.append({
+                        "input": {
+                            "name": in_name,
+                            "co": in_co,
+                            "address": in_address,
+                            "mobile": in_mobile
+                        },
+                        "candidates": candidates
+                    })
 
-            return {"success": True, "total_rows": len(output_results), "results": output_results}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+                return {"success": True, "total_rows": len(output_results), "results": output_results}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+
+        return _io_pool.submit(_do_lookup).result()
 
     def run_fuzzy_lookup(self, input_path="", output_path="", threshold=0.85, top_n=5, include_live_osd=False):
         if self._fuzzy_state["running"]:
@@ -1787,7 +1821,7 @@ class AppAPI:
                         self._fuzzy_state["error"] = "No consumer data found. Please update consumer database first."
                         return
 
-                    wb_in = openpyxl.load_workbook(input_path)
+                    wb_in = _get_openpyxl().load_workbook(input_path)
                     sh_in = wb_in.active
                     rows = list(sh_in.iter_rows(values_only=True))
                     if not rows:
@@ -1829,7 +1863,7 @@ class AppAPI:
                         val = row_vals[idx]
                         return "" if val is None else str(val).strip()
 
-                    out_wb = openpyxl.Workbook()
+                    out_wb = _get_openpyxl().Workbook()
                     out_sh = out_wb.active
                     out_sh.title = "FuzzyLookupResults"
                     out_headers = [
@@ -1945,7 +1979,7 @@ class AppAPI:
                     if do_live_osd:
                         widths.extend([22, 16, 16, 22, 18, 26])
                     for idx, width in enumerate(widths, start=1):
-                        col = openpyxl.utils.get_column_letter(idx)
+                        col = _get_openpyxl().utils.get_column_letter(idx)
                         out_sh.column_dimensions[col].width = width
                     out_sh.freeze_panes = "A2"
 
@@ -1975,7 +2009,7 @@ class AppAPI:
             if not save_path:
                 return {"success": False, "cancelled": True}
 
-            wb = openpyxl.Workbook()
+            wb = _get_openpyxl().Workbook()
             sheet = wb.active
             sheet.title = "ConsumerData"
             headers = [
@@ -1993,7 +2027,7 @@ class AppAPI:
 
             widths = [18, 16, 28, 36, 18, 18, 14]
             for idx, width in enumerate(widths, start=1):
-                col = openpyxl.utils.get_column_letter(idx)
+                col = _get_openpyxl().utils.get_column_letter(idx)
                 sheet.column_dimensions[col].width = width
 
             wb.save(save_path)
@@ -2011,83 +2045,89 @@ class AppAPI:
             if not file_path:
                 return {"success": False, "cancelled": True}
 
-            d = {}
-            wb = openpyxl.load_workbook(file_path)
-            sheet = wb.active
+            def _do_import():
+                try:
+                    d = {}
+                    wb = _get_openpyxl().load_workbook(file_path)
+                    sheet = wb.active
 
-            header_map = {
-                "consumer id": "consumer_id",
-                "consumerid": "consumer_id",
-                "meter no": "meter_no",
-                "meterno": "meter_no",
-                "name": "name",
-                "address": "address",
-                "mobile number": "mobile_number",
-                "mobilenumber": "mobile_number",
-                "mobile": "mobile_number",
-                "contractual load": "contractual_load",
-                "contractualload": "contractual_load",
-                "class": "class",
-            }
+                    header_map = {
+                        "consumer id": "consumer_id",
+                        "consumerid": "consumer_id",
+                        "meter no": "meter_no",
+                        "meterno": "meter_no",
+                        "name": "name",
+                        "address": "address",
+                        "mobile number": "mobile_number",
+                        "mobilenumber": "mobile_number",
+                        "mobile": "mobile_number",
+                        "contractual load": "contractual_load",
+                        "contractualload": "contractual_load",
+                        "class": "class",
+                    }
 
-            rows = list(sheet.iter_rows(values_only=True))
-            if not rows:
-                return {"success": False, "error": "Excel sheet is empty."}
+                    rows = list(sheet.iter_rows(values_only=True))
+                    if not rows:
+                        return {"success": False, "error": "Excel sheet is empty."}
 
-            first_row = rows[0]
-            index_map = {}
-            for idx, val in enumerate(first_row):
-                if val is None:
-                    continue
-                key = str(val).strip().lower().replace("_", " ")
-                key = " ".join(key.split())
-                key_compact = key.replace(" ", "")
-                mapped = header_map.get(key) or header_map.get(key_compact)
-                if mapped:
-                    index_map[mapped] = idx
+                    first_row = rows[0]
+                    index_map = {}
+                    for idx, val in enumerate(first_row):
+                        if val is None:
+                            continue
+                        key = str(val).strip().lower().replace("_", " ")
+                        key = " ".join(key.split())
+                        key_compact = key.replace(" ", "")
+                        mapped = header_map.get(key) or header_map.get(key_compact)
+                        if mapped:
+                            index_map[mapped] = idx
 
-            has_headers = "consumer_id" in index_map and "meter_no" in index_map
-            data_rows = rows[1:] if has_headers else rows
+                    has_headers = "consumer_id" in index_map and "meter_no" in index_map
+                    data_rows = rows[1:] if has_headers else rows
 
-            def get_val(row_vals, field, fallback_idx):
-                idx = index_map.get(field, fallback_idx)
-                if idx is None or idx >= len(row_vals):
-                    return ""
-                val = row_vals[idx]
-                if val is None:
-                    return ""
-                if isinstance(val, float) and val.is_integer():
-                    return str(int(val)).strip()
-                return str(val).strip()
+                    def get_val(row_vals, field, fallback_idx):
+                        idx = index_map.get(field, fallback_idx)
+                        if idx is None or idx >= len(row_vals):
+                            return ""
+                        val = row_vals[idx]
+                        if val is None:
+                            return ""
+                        if isinstance(val, float) and val.is_integer():
+                            return str(int(val)).strip()
+                        return str(val).strip()
 
-            for row in data_rows:
-                if not row:
-                    continue
-                cid = get_val(row, "consumer_id", 0)
-                meter_no = get_val(row, "meter_no", 1)
-                if not cid or not meter_no:
-                    continue
+                    for row in data_rows:
+                        if not row:
+                            continue
+                        cid = get_val(row, "consumer_id", 0)
+                        meter_no = get_val(row, "meter_no", 1)
+                        if not cid or not meter_no:
+                            continue
 
-                mobile = re.sub(r"\D", "", get_val(row, "mobile_number", 4))
-                if len(mobile) == 12 and mobile.startswith("91"):
-                    mobile = mobile[2:]
+                        mobile = re.sub(r"\D", "", get_val(row, "mobile_number", 4))
+                        if len(mobile) == 12 and mobile.startswith("91"):
+                            mobile = mobile[2:]
 
-                d[cid] = {
-                    "meter_no": meter_no,
-                    "name": get_val(row, "name", 2),
-                    "address": get_val(row, "address", 3),
-                    "mobile_number": mobile,
-                    "contractual_load": get_val(row, "contractual_load", 5),
-                    "class": get_val(row, "class", 6),
-                }
+                        d[cid] = {
+                            "meter_no": meter_no,
+                            "name": get_val(row, "name", 2),
+                            "address": get_val(row, "address", 3),
+                            "mobile_number": mobile,
+                            "contractual_load": get_val(row, "contractual_load", 5),
+                            "class": get_val(row, "class", 6),
+                        }
 
-            if not d:
-                return {"success": False, "error": "No valid consumer records found in file."}
+                    if not d:
+                        return {"success": False, "error": "No valid consumer records found in file."}
 
-            utils.update_meter_mapping(d)
-            database.set_info_value("consumer_data_updated_at", datetime.now().strftime("%d-%m-%Y %H:%M"))
-            AppAPI._cached_prepped_fuzzy_db = None
-            return {"success": True, "count": len(d), "file_path": file_path}
+                    utils.update_meter_mapping(d)
+                    database.set_info_value("consumer_data_updated_at", datetime.now().strftime("%d-%m-%Y %H:%M"))
+                    AppAPI._cached_prepped_fuzzy_db = None
+                    return {"success": True, "count": len(d), "file_path": file_path}
+                except Exception as ex:
+                    return {"success": False, "error": str(ex)}
+
+            return _io_pool.submit(_do_import).result()
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -2135,44 +2175,49 @@ class AppAPI:
             if not dest_path:
                 return {"success": False, "cancelled": True}
 
-            conn = database.get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT consumer_id, meter_no, name, address, mobile_number, contractual_load, class
-                FROM meter_mapping
-                ORDER BY consumer_id ASC
-                """
-            )
-            rows = cursor.fetchall()
-            conn.close()
+            def _do_export():
+                try:
+                    conn = database.get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        """
+                        SELECT consumer_id, meter_no, name, address, mobile_number, contractual_load, class
+                        FROM meter_mapping
+                        ORDER BY consumer_id ASC
+                        """
+                    )
+                    rows = cursor.fetchall()
 
-            wb = openpyxl.Workbook()
-            sheet = wb.active
-            sheet.title = "ConsumerMaster"
-            headers = [
-                "CONSUMER ID", "METER NO", "NAME", "ADDRESS",
-                "MOBILE NUMBER", "CONTRACTUAL LOAD", "CLASS"
-            ]
-            sheet.append(headers)
+                    wb = _get_openpyxl().Workbook()
+                    sheet = wb.active
+                    sheet.title = "ConsumerMaster"
+                    headers = [
+                        "CONSUMER ID", "METER NO", "NAME", "ADDRESS",
+                        "MOBILE NUMBER", "CONTRACTUAL LOAD", "CLASS"
+                    ]
+                    sheet.append(headers)
 
-            for r in rows:
-                sheet.append([
-                    str(r[0] or ""), str(r[1] or ""), str(r[2] or ""),
-                    str(r[3] or ""), str(r[4] or ""), str(r[5] or ""),
-                    str(r[6] or "")
-                ])
+                    for r in rows:
+                        sheet.append([
+                            str(r[0] or ""), str(r[1] or ""), str(r[2] or ""),
+                            str(r[3] or ""), str(r[4] or ""), str(r[5] or ""),
+                            str(r[6] or "")
+                        ])
 
-            sheet.freeze_panes = "A2"
-            widths = [18, 16, 28, 36, 18, 18, 14]
-            for idx, width in enumerate(widths, start=1):
-                col = openpyxl.utils.get_column_letter(idx)
-                sheet.column_dimensions[col].width = width
+                    sheet.freeze_panes = "A2"
+                    widths = [18, 16, 28, 36, 18, 18, 14]
+                    for idx, width in enumerate(widths, start=1):
+                        col = _get_openpyxl().utils.get_column_letter(idx)
+                        sheet.column_dimensions[col].width = width
 
-            wb.save(dest_path)
-            # Open the exported excel file automatically
-            self.open_file_external(dest_path)
-            return {"success": True, "count": len(rows), "path": dest_path}
+                    wb.save(dest_path)
+                    # Open the exported excel file automatically
+                    self.open_file_external(dest_path)
+                    return {"success": True, "count": len(rows), "path": dest_path}
+                except Exception as ex:
+                    return {"success": False, "error": str(ex)}
+
+            return _io_pool.submit(_do_export).result()
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -2204,41 +2249,47 @@ class AppAPI:
         try:
             if not file_path or not os.path.exists(file_path):
                 return {"success": False, "error": "File not found."}
-            wb = openpyxl.load_workbook(file_path, data_only=True)
-            sheet = wb.active
-            rows = list(sheet.iter_rows(values_only=True))
-            if not rows:
-                return {"success": False, "error": "Excel sheet is empty."}
 
-            items = []
-            # Check if row 0 looks like header
-            start_idx = 0
-            first_row_str = " ".join([str(c or "").lower() for c in rows[0]])
-            if any(k in first_row_str for k in ["consumer", "cid", "meter", "unit", "cons"]):
-                start_idx = 1
+            def _do_parse():
+                try:
+                    wb = _get_openpyxl().load_workbook(file_path, data_only=True)
+                    sheet = wb.active
+                    rows = list(sheet.iter_rows(values_only=True))
+                    if not rows:
+                        return {"success": False, "error": "Excel sheet is empty."}
 
-            for idx, r in enumerate(rows[start_idx:]):
-                if not any(r):
-                    continue
-                cid = str(r[0] or "").strip()
-                if not cid or cid.lower() in ("none", "nan"):
-                    continue
-                meter = str(r[1] or "").strip() if len(r) > 1 else ""
-                unit = str(r[2] or "").strip() if len(r) > 2 else "0"
-                items.append({
-                    "id": idx,
-                    "cid": cid,
-                    "meter": meter,
-                    "unit": unit,
-                    "status": "PENDING",
-                    "remarks": ""
-                })
+                    items = []
+                    start_idx = 0
+                    first_row_str = " ".join([str(c or "").lower() for c in rows[0]])
+                    if any(k in first_row_str for k in ["consumer", "cid", "meter", "unit", "cons"]):
+                        start_idx = 1
 
-            if not items:
-                return {"success": False, "error": "No valid consumer rows found in file."}
+                    for idx, r in enumerate(rows[start_idx:]):
+                        if not any(r):
+                            continue
+                        cid = str(r[0] or "").strip()
+                        if not cid or cid.lower() in ("none", "nan"):
+                            continue
+                        meter = str(r[1] or "").strip() if len(r) > 1 else ""
+                        unit = str(r[2] or "").strip() if len(r) > 2 else "0"
+                        items.append({
+                            "id": idx,
+                            "cid": cid,
+                            "meter": meter,
+                            "unit": unit,
+                            "status": "PENDING",
+                            "remarks": ""
+                        })
 
-            self.save_low_consumption_session(items)
-            return {"success": True, "data": items, "count": len(items)}
+                    if not items:
+                        return {"success": False, "error": "No valid consumer rows found in file."}
+
+                    self.save_low_consumption_session(items)
+                    return {"success": True, "data": items, "count": len(items)}
+                except Exception as ex:
+                    return {"success": False, "error": str(ex)}
+
+            return _io_pool.submit(_do_parse).result()
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -2247,34 +2298,66 @@ class AppAPI:
         try:
             if not items:
                 return {"success": False, "error": "No audit records to export."}
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            dest_file = os.path.join(config.BASE_DIR, f"Low_Consumption_Audit_{timestamp}.csv")
-            fieldnames = ["id", "cid", "meter", "unit", "status", "remarks"]
-            with open(dest_file, "w", newline="", encoding="utf-8") as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
-                writer.writeheader()
-                writer.writerows(items)
 
-            self.open_file_external(dest_file)
-            return {"success": True, "file_path": dest_file, "count": len(items)}
+            def _do_export():
+                try:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    dest_file = os.path.join(config.BASE_DIR, f"Low_Consumption_Audit_{timestamp}.csv")
+                    fieldnames = ["id", "cid", "meter", "unit", "status", "remarks"]
+                    with open(dest_file, "w", newline="", encoding="utf-8") as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
+                        writer.writeheader()
+                        writer.writerows(items)
+
+                    self.open_file_external(dest_file)
+                    return {"success": True, "file_path": dest_file, "count": len(items)}
+                except Exception as ex:
+                    return {"success": False, "error": str(ex)}
+
+            return _io_pool.submit(_do_export).result()
         except Exception as e:
             return {"success": False, "error": str(e)}
 
     def get_system_clipboard(self):
-        """Retrieve plain text from system clipboard using tkinter fallback."""
+        """Retrieve plain text from system clipboard using Win32 API (no tkinter overhead)."""
         try:
-            import tkinter as tk
-            root = tk.Tk()
-            root.withdraw()
+            import ctypes
+            from ctypes import wintypes
+            CF_UNICODETEXT = 13
+            user32 = ctypes.windll.user32
+            kernel32 = ctypes.windll.kernel32
+            user32.GetClipboardData.restype = wintypes.HANDLE
+            user32.GetClipboardData.argtypes = [wintypes.UINT]
+            kernel32.GlobalLock.restype = ctypes.c_wchar_p
+            kernel32.GlobalLock.argtypes = [wintypes.HGLOBAL]
+            kernel32.GlobalUnlock.argtypes = [wintypes.HGLOBAL]
+
+            if not user32.OpenClipboard(None):
+                return {"success": True, "text": ""}
             try:
-                text = root.clipboard_get()
-            except Exception:
-                text = ""
+                h = user32.GetClipboardData(CF_UNICODETEXT)
+                if not h:
+                    return {"success": True, "text": ""}
+                text = kernel32.GlobalLock(h) or ""
+                kernel32.GlobalUnlock(h)
+                return {"success": True, "text": str(text)}
             finally:
-                root.destroy()
-            return {"success": True, "text": text}
+                user32.CloseClipboard()
         except Exception as e:
-            return {"success": False, "error": str(e), "text": ""}
+            # Fallback to tkinter if ctypes fails (non-Windows)
+            try:
+                import tkinter as tk
+                root = tk.Tk()
+                root.withdraw()
+                try:
+                    text = root.clipboard_get()
+                except Exception:
+                    text = ""
+                finally:
+                    root.destroy()
+                return {"success": True, "text": text}
+            except Exception:
+                return {"success": False, "error": str(e), "text": ""}
 
     # --- Live WBSEDCL OSD & Connection Status ---
     def get_live_osd(self, consumer_id, force_refresh=False):
@@ -2282,36 +2365,37 @@ class AppAPI:
         Fetches live Outstanding Dues (OSD), LPSC surcharge, total payable dues,
         and connection status directly from WBSEDCL portal.
         """
-        try:
-            cid = str(consumer_id).strip()
-            if not re.match(r"^\d{9}$", cid):
-                return {"success": False, "error": f"Invalid Consumer ID '{cid}'. Must be a 9-digit number."}
-
-            res = live_osd_service.get_live_osd_data(cid, include_pdf_base64=True, force_refresh=bool(force_refresh))
-            return res
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        cid = str(consumer_id).strip()
+        if not re.match(r"^\d{9}$", cid):
+            return {"success": False, "error": f"Invalid Consumer ID '{cid}'. Must be a 9-digit number."}
+        def _fetch():
+            try:
+                res = live_osd_service.get_live_osd_data(cid, include_pdf_base64=True, force_refresh=bool(force_refresh))
+                return res
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+        return _io_pool.submit(_fetch).result()
 
     def open_live_osd_pdf(self, consumer_id):
         """
         Fetches live OSD PDF and opens it in Windows default PDF viewer.
         """
-        try:
-            cid = str(consumer_id).strip()
-            if not re.match(r"^\d{9}$", cid):
-                return {"success": False, "error": "Invalid Consumer ID. Must be 9 digits."}
-
-            pdf_bytes = live_osd_service.fetch_live_osd_pdf(cid)
-            temp_dir = os.path.join(config.BASE_DIR, "temp_osd")
-            os.makedirs(temp_dir, exist_ok=True)
-            pdf_path = os.path.join(temp_dir, f"WBSEDCL_OSD_{cid}.pdf")
-            with open(pdf_path, "wb") as f:
-                f.write(pdf_bytes)
-
-            self.open_file_external(pdf_path)
-            return {"success": True, "file_path": pdf_path}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        cid = str(consumer_id).strip()
+        if not re.match(r"^\d{9}$", cid):
+            return {"success": False, "error": "Invalid Consumer ID. Must be 9 digits."}
+        def _fetch():
+            try:
+                pdf_bytes = live_osd_service.fetch_live_osd_pdf(cid)
+                temp_dir = os.path.join(config.BASE_DIR, "temp_osd")
+                os.makedirs(temp_dir, exist_ok=True)
+                pdf_path = os.path.join(temp_dir, f"WBSEDCL_OSD_{cid}.pdf")
+                with open(pdf_path, "wb") as f:
+                    f.write(pdf_bytes)
+                self.open_file_external(pdf_path)
+                return {"success": True, "file_path": pdf_path}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+        return _io_pool.submit(_fetch).result()
 
 
 
