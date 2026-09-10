@@ -62,24 +62,30 @@ jobs:
         shell: pwsh
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\installer.iss
-          if (-not (Test-Path "Output\SpotImageViewer_Setup.exe")) {
-            Write-Error "SpotImageViewer_Setup.exe was not created in Output directory."
+          $setupExe = Get-ChildItem -Path "Output" -Filter "SpotImageViewer_Setup*.exe" | Select-Object -First 1
+          if (-not $setupExe) {
+            Write-Error "SpotImageViewer_Setup*.exe was not created in Output directory."
             exit 1
           }
+          Write-Host "Created installer: $($setupExe.FullName)"
+          # Also create unversioned copy for backward compatibility
+          Copy-Item $setupExe.FullName "Output\SpotImageViewer_Setup.exe" -Force
 
       - name: Calculate SHA-256 Checksum
         id: sha256
         shell: pwsh
         run: |
-          $hash = (Get-FileHash Output\SpotImageViewer_Setup.exe -Algorithm SHA256).Hash.ToLower()
-          Write-Host "Setup.exe SHA256: $hash"
+          $setupExe = Get-ChildItem -Path "Output" -Filter "SpotImageViewer_Setup_v*.exe" | Select-Object -First 1
+          if (-not $setupExe) { $setupExe = Get-Item "Output\SpotImageViewer_Setup.exe" }
+          $hash = (Get-FileHash $setupExe.FullName -Algorithm SHA256).Hash.ToLower()
+          Write-Host "Setup.exe ($($setupExe.Name)) SHA256: $hash"
           echo "hash=$hash" >> $env:GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            Output/SpotImageViewer_Setup.exe
+            Output/SpotImageViewer_Setup*.exe
             dist/*.zip
           generate_release_notes: true
           draft: false

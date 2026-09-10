@@ -1,8 +1,8 @@
 {
   "version": 20.51,
   "release_notes": "V20.51 — Hotfix: PyWebView Bridge Race & Instant Search Fix:\n\n- PyWebView Bridge Lifecycle Fix: Fixed race condition where pywebviewready fired before script execution, ensuring initApp() always runs reliably on boot.\n- Search Restoration: Fixed premature bridge bailouts that caused ID, Meter, and Name searches to falsely report 'No matching consumers found'.\n- Tariff Dropdown Population: Restored automatic loading of tariff classes into Bill Calculator and Theft Assessment studios on app startup.\n- Live OSD Table & HUD: Restored immediate Live OSD dues inspection card in the main frame when a consumer is searched.\n- Resilient callAPI(): Added 3.5-second async retry loop ensuring RPC calls never falsely trigger 'PyWebView API not available'.\n- On-Canvas Navigation Chevrons: Added floating, glassmorphic Prev (<) and Next (>) buttons directly flanking the main viewport.",
-  "download_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.51/SpotImageViewer_Setup.exe",
-  "installer_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.51/SpotImageViewer_Setup.exe",
+  "download_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.51/SpotImageViewer_Setup_v20.51.exe",
+  "installer_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.51/SpotImageViewer_Setup_v20.51.exe",
   "zip_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.51/SpotImageViewerV20.51.zip",
   "install_args": "/VERYSILENT /NORESTART",
   "launch_exe": "SpotImageViewer\\SpotImageViewerV20.51.exe",

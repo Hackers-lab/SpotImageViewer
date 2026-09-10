@@ -862,7 +862,7 @@ class AppAPI:
                     raise ValueError("No valid installer URL found.")
 
                 import tempfile
-                filename = os.path.basename(target_url.split("?")[0]) or "SpotImageViewer_Setup.exe"
+                filename = os.path.basename(target_url.split("?")[0]) or f"SpotImageViewer_Setup_v{config.CURRENT_VERSION}.exe"
                 temp_dir = tempfile.gettempdir()
                 dest_path = os.path.join(temp_dir, filename)
 
