@@ -215,6 +215,7 @@ def get_live_osd_data(consumer_id: str, include_pdf_base64: bool = False, force_
         if include_pdf_base64:
             res["pdfBase64"] = base64.b64encode(pdf_bytes).decode("utf-8")
         res["cached"] = False
+        return {"success": True, "data": res}
     except requests.exceptions.ConnectionError as exc:
         err_str = str(exc)
         err_msg = "No Internet Connection"
@@ -233,6 +234,9 @@ def get_live_osd_data(consumer_id: str, include_pdf_base64: bool = False, force_
         return {"success": False, "error": str(exc), "error_code": "INVALID_INPUT", "raw_error": str(exc)}
     except Exception as exc:
         err_str = str(exc)
-        if "11001" in err_str or "getaddrinfo" in err_str:
+        if "11001" in err_str or "getaddrinfo" in err_str or "NameResolutionError" in err_str:
             return {"success": False, "error": "No Internet Connection", "error_code": "OFFLINE", "raw_error": err_str}
-        return {"success": False, "error": "Portal Error", "error_code": "UNKNOWN", "raw_error": err_str}
+        short_err = str(exc)
+        if len(short_err) > 40:
+            short_err = "Portal Parse/Network Error"
+        return {"success": False, "error": short_err, "error_code": "UNKNOWN", "raw_error": err_str}

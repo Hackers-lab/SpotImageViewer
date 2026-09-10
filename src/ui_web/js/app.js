@@ -859,15 +859,15 @@ async function loadLiveOSD(consumerId, forceRefresh = false) {
       if (statusBadge) statusBadge.className = "";
       if (statusText) {
         statusText.className = "text-[10px] font-semibold text-rose-500 dark:text-rose-400";
-        let displayError = "Offline";
+        let displayError = "Unavailable";
         if (res && res.error) {
           displayError = res.error;
           if (displayError.length > 24) {
-            displayError = (res.error_code === 'OFFLINE' || displayError.toLowerCase().includes('internet')) ? "No Internet" : "Portal Offline";
+            displayError = (res.error_code === 'OFFLINE' || displayError.toLowerCase().includes('internet')) ? "No Internet" : "Portal Error";
           }
         }
         statusText.innerText = displayError;
-        statusText.title = res ? (res.error || res.raw_error || "Could not connect to WBSEDCL portal") : "No Internet Connection";
+        statusText.title = res ? (res.error || res.raw_error || "Could not connect to WBSEDCL portal") : "Portal Error";
       }
       if (totalDuesEl) totalDuesEl.innerText = "-";
       if (unpaidEl) unpaidEl.innerText = "-";
@@ -909,7 +909,7 @@ async function loadLiveOSD(consumerId, forceRefresh = false) {
     if (cachedIndicator) cachedIndicator.innerText = d.cached ? '(cached)' : '(live)';
     if (btnPdf) btnPdf.classList.add('hidden');
 
-    lucide.createIcons();
+    safeCreateIcons();
   } catch (err) {
     console.error("Failed to load live OSD:", err);
     if (refreshIcon) refreshIcon.classList.remove('animate-spin');
