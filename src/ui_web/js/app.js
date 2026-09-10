@@ -1008,6 +1008,7 @@ async function loadConsumerImages(consumerId) {
     const dateTagContainer = document.getElementById('imgDateTagContainer');
     if (dateTagContainer) dateTagContainer.classList.add('hidden');
     if (toggleGroup) toggleGroup.classList.add('hidden');
+    updateCanvasNavButtons();
   }
 }
 
@@ -1043,6 +1044,7 @@ function switchImageViewMode(mode) {
       showImage(currentImageIndex);
     }
   }
+  updateCanvasNavButtons();
   lucide.createIcons();
 }
 
@@ -1217,7 +1219,31 @@ async function showImage(index) {
   } else {
     placeholder.innerHTML = `<p class="text-xs text-rose-500">Failed to render image file</p>`;
   }
+  updateCanvasNavButtons();
 }
+
+function updateCanvasNavButtons() {
+  const btnPrev = document.getElementById('btnCanvasPrev');
+  const btnNext = document.getElementById('btnCanvasNext');
+  if (!btnPrev || !btnNext) return;
+
+  const hasMultiple = currentImages && currentImages.length > 1;
+  const isSingleMode = currentImageViewMode === 'single';
+  const isVisible = hasMultiple && isSingleMode;
+
+  if (isVisible) {
+    btnPrev.classList.remove('hidden');
+    btnPrev.classList.add('flex');
+    btnNext.classList.remove('hidden');
+    btnNext.classList.add('flex');
+  } else {
+    btnPrev.classList.add('hidden');
+    btnPrev.classList.remove('flex');
+    btnNext.classList.add('hidden');
+    btnNext.classList.remove('flex');
+  }
+}
+window.updateCanvasNavButtons = updateCanvasNavButtons;
 
 function stepImage(direction) {
   if (currentImages.length > 0) {
@@ -1227,6 +1253,7 @@ function stepImage(direction) {
     showImage(newIdx);
   }
 }
+window.stepImage = stepImage;
 
 async function printActiveImage() {
   if (!currentImages.length) return;
@@ -1297,6 +1324,9 @@ function setupViewportEvents() {
   });
 
   vp.addEventListener('mousedown', (e) => {
+    if (e.target.closest('#singleViewControls') || e.target.closest('#viewModeToggleGroup') || e.target.closest('#btnCanvasPrev') || e.target.closest('#btnCanvasNext')) {
+      return;
+    }
     if (e.button === 0) {
       isPanning = true;
       startX = e.clientX - translateX;

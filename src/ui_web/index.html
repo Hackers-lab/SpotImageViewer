@@ -352,6 +352,14 @@
               <p class="text-sm font-medium">Search a Consumer ID or Meter to view spot images</p>
             </div>
 
+            <!-- Floating On-Canvas Prev / Next Flanking Buttons -->
+            <button id="btnCanvasPrev" onclick="event.stopPropagation(); stepImage(-1)" onmousedown="event.stopPropagation()" class="hidden absolute left-5 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/85 dark:bg-slate-900/85 hover:bg-white dark:hover:bg-slate-800 backdrop-blur-md border border-slate-200/90 dark:border-slate-700/90 shadow-2xl text-slate-700 dark:text-slate-200 hover:text-sky-600 dark:hover:text-sky-400 hover:scale-110 active:scale-95 transition-all duration-150 items-center justify-center cursor-pointer opacity-70 hover:opacity-100 group/navbtn select-none" title="Previous Photo (← or ↑)">
+              <i data-lucide="chevron-left" class="w-7 h-7 -ml-0.5 group-hover/navbtn:-translate-x-0.5 transition-transform" stroke-width="2.5"></i>
+            </button>
+            <button id="btnCanvasNext" onclick="event.stopPropagation(); stepImage(1)" onmousedown="event.stopPropagation()" class="hidden absolute right-5 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/85 dark:bg-slate-900/85 hover:bg-white dark:hover:bg-slate-800 backdrop-blur-md border border-slate-200/90 dark:border-slate-700/90 shadow-2xl text-slate-700 dark:text-slate-200 hover:text-sky-600 dark:hover:text-sky-400 hover:scale-110 active:scale-95 transition-all duration-150 items-center justify-center cursor-pointer opacity-70 hover:opacity-100 group/navbtn select-none" title="Next Photo (→ or ↓)">
+              <i data-lucide="chevron-right" class="w-7 h-7 -mr-0.5 group-hover/navbtn:translate-x-0.5 transition-transform" stroke-width="2.5"></i>
+            </button>
+
             <!-- Preview Button in bottom right of viewport: Just mesh icon and count, never overlaps filmstrip -->
             <div id="viewModeToggleGroup" class="hidden absolute bottom-5 right-5 z-20 items-center">
               <button id="btnViewPreview" onclick="switchImageViewMode(currentImageViewMode === 'grid' ? 'single' : 'grid')" class="h-9 px-3 rounded-xl flex items-center gap-1.5 font-semibold text-xs transition bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200 dark:border-slate-800 shadow-xl text-slate-700 dark:text-slate-200 hover:text-sky-600 dark:hover:text-sky-400 hover:border-sky-500/50" title="Preview All Photos">
