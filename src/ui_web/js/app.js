@@ -31,21 +31,55 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-// On window load
-window.addEventListener('pywebviewready', () => {
-  console.log("PyWebView Ready!");
-  initApp();
-});
+// Robust PyWebView lifecycle & bootloader
+let appInitialized = false;
+async function safeInitApp() {
+  if (appInitialized) return;
+  appInitialized = true;
+  await initApp();
+}
 
-// Fallback for browser testing
-window.addEventListener('DOMContentLoaded', () => {
+function bootApp() {
   lucide.createIcons();
   restoreLayoutPrefs();
-  if (!window.pywebview) {
-    console.warn("Running in standard browser mode (mocking API)");
-    setTimeout(initApp, 300);
+
+  // If pywebview is already injected before this script ran:
+  if (window.pywebview && window.pywebview.api) {
+    console.log("PyWebView API already ready at boot");
+    safeInitApp();
+    return;
   }
-});
+
+  // Otherwise listen for pywebviewready event
+  window.addEventListener('pywebviewready', () => {
+    console.log("PyWebView Ready event fired");
+    safeInitApp();
+  }, { once: true });
+
+  // Polling fallback: handles cases where pywebviewready fired at before_load
+  // before app.js was parsed, or if Edge WebView2 takes a few milliseconds
+  let elapsed = 0;
+  const pollTimer = setInterval(() => {
+    elapsed += 50;
+    if (window.pywebview && window.pywebview.api) {
+      clearInterval(pollTimer);
+      console.log(`PyWebView API detected via poll after ${elapsed}ms`);
+      safeInitApp();
+    } else if (elapsed >= 3500) {
+      clearInterval(pollTimer);
+      if (!appInitialized) {
+        console.warn("PyWebView API not detected within 3.5s — fallback init");
+        safeInitApp();
+      }
+    }
+  }, 50);
+}
+
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', bootApp);
+} else {
+  bootApp();
+}
 
 // --- Collapsible Panes ---
 const TAB_META = {
@@ -277,7 +311,16 @@ function restoreLayoutPrefs() {
 }
 
 async function callAPI(method, ...args) {
-  if (window.pywebview && window.pywebview.api && window.pywebview.api[method]) {
+  // If pywebview is not ready yet, wait up to 3500ms before giving up
+  if (!window.pywebview || !window.pywebview.api || typeof window.pywebview.api[method] !== 'function') {
+    let waited = 0;
+    while ((!window.pywebview || !window.pywebview.api || typeof window.pywebview.api[method] !== 'function') && waited < 3500) {
+      await new Promise(r => setTimeout(r, 50));
+      waited += 50;
+    }
+  }
+
+  if (window.pywebview && window.pywebview.api && typeof window.pywebview.api[method] === 'function') {
     try {
       return await window.pywebview.api[method](...args);
     } catch (e) {

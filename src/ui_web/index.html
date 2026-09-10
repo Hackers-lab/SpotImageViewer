@@ -3,8 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Spot Image Viewer & Verification Studio — v20.5</title>
+  <title>Spot Image Viewer & Verification Studio — v20.51</title>
   <script>
+    window.__capturedErrors = [];
+    window.onerror = function(msg, url, line, col, error) {
+      window.__capturedErrors.push({ msg: msg, url: url, line: line, col: col, error: String(error) });
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+      window.__capturedErrors.push({ msg: 'Unhandled Rejection: ' + (e.reason ? (e.reason.message || e.reason) : e), error: String(e.reason) });
+    });
     // Restore theme BEFORE page renders to prevent flash
     (function(){
       var t = localStorage.getItem('siv_theme') || 'dark';
