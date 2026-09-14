@@ -859,7 +859,7 @@ async function removeFolder(p) {
 
 let indexingPollTimer = null;
 
-async function startIndexing() {
+async function startIndexing(options = {}) {
   const icon = document.getElementById('reloadIndexIcon');
   const prog = document.getElementById('indexProgress');
   const topBadge = document.getElementById('topIndexStatusBadge');
@@ -867,18 +867,21 @@ async function startIndexing() {
   const topTimeline = document.getElementById('topIndexTimeline');
   const topTimelineBar = document.getElementById('topIndexTimelineBar');
 
+  const isFull = options && (options.full === true || options.full_reindex === true);
+  const targetFolders = options && options.target_folders ? options.target_folders : null;
+
   if (icon) icon.classList.add('animate-spin');
   if (prog) prog.classList.remove('hidden');
   if (topBadge) {
     topBadge.classList.remove('hidden');
     topBadge.classList.add('flex');
-    if (topText) topText.innerText = 'Scanning...';
+    if (topText) topText.innerText = isFull ? 'Re-indexing all...' : 'Syncing images...';
   }
   if (topTimeline) topTimeline.classList.remove('hidden');
   if (topTimelineBar) topTimelineBar.style.width = '15%';
-  updateStatusBar("Scanning image folders for spot bills...", "loading", 15);
+  updateStatusBar(isFull ? "Full re-indexing of all image folders in progress..." : "Scanning folders for new spot bill images...", "loading", 15);
 
-  const res = await callAPI('start_indexing');
+  const res = await callAPI('start_indexing', { target_folders: targetFolders, full_reindex: isFull });
   if (!res || !res.success) {
     if (icon) icon.classList.remove('animate-spin');
     if (prog) prog.classList.add('hidden');
@@ -892,6 +895,9 @@ async function startIndexing() {
     return;
   }
 
+  // Dismiss any folder change banner since indexing is active
+  dismissFolderChangeBanner();
+
   // Poll indexing status until finished
   if (indexingPollTimer) clearInterval(indexingPollTimer);
   indexingPollTimer = setInterval(async () => {
@@ -903,6 +909,7 @@ async function startIndexing() {
     const speed = stat.speed || 0;
     const folder = stat.current_folder || '';
     const filesSeen = stat.files_seen || 0;
+    const newAdded = stat.new_added || 0;
 
     let statusStr = "";
     let badgeStr = "";
@@ -923,7 +930,7 @@ async function startIndexing() {
       topText.innerText = badgeStr;
     }
 
-    // Dynamic progress bar percentage: animate smoothly across time
+    // Dynamic progress bar percentage
     const dynamicPct = count > 0 
       ? Math.min(95, 20 + Math.floor(Math.log10(count + 1) * 15)) 
       : Math.min(45, 10 + (elapsed * 2));
@@ -939,7 +946,10 @@ async function startIndexing() {
 
       if (topTimelineBar) topTimelineBar.style.width = '100%';
       const finalSpeed = speed > 0 ? ` @ ${speed.toLocaleString()} img/s` : '';
-      updateStatusBar(`Indexing complete: ${count.toLocaleString()} images cataloged in ${elapsed}s${finalSpeed}`, "normal", 100);
+      const summaryMsg = newAdded > 0
+        ? `Sync complete: ${newAdded.toLocaleString()} new photos added (${count.toLocaleString()} total)`
+        : `Index up to date: ${count.toLocaleString()} images cataloged`;
+      updateStatusBar(`${summaryMsg} in ${elapsed}s${finalSpeed}`, "normal", 100);
 
       // Immediately stop spin and reset indicators
       if (icon) icon.classList.remove('animate-spin');
@@ -957,7 +967,7 @@ async function startIndexing() {
       await initApp();
       if (stat.error) {
         alert(`Image indexing encountered an error:\n${stat.error}`);
-      } else {
+      } else if (isFull) {
         alert(`Image re-indexing complete!\n\nIndexed: ${count.toLocaleString()} images\nElapsed Time: ${elapsed}s\nAverage Speed: ${speed > 0 ? speed.toLocaleString() + ' images/sec' : 'N/A'}`);
       }
     }
@@ -1131,30 +1141,41 @@ async function changeAutoIndexMode(mode) {
   }
 }
 
+let lastDetectedChangedFolders = null;
+
 async function checkFolderChanges() {
   // If indexing is currently running, don't check
   if (indexingPollTimer) return;
 
-  const res = await callAPI('check_folder_changes');
-  if (!res || !res.success) return;
+  try {
+    const res = await callAPI('check_folder_changes');
+    if (!res || !res.success) return;
 
-  if (res.has_changes) {
-    const mode = document.getElementById('selectAutoIndexMode')?.value || 'prompt';
-    if (mode === 'background') {
-      console.log(`Auto-index (background): detected difference of ${res.diff} items. Triggering index...`);
-      startIndexing();
-    } else if (mode === 'prompt') {
-      const banner = document.getElementById('folderChangeBanner');
-      const text = document.getElementById('folderChangeBannerText');
-      if (banner && text) {
-        const sign = res.diff > 0 ? `+${res.diff}` : `${res.diff}`;
-        text.innerText = `Folder contents changed (${sign} items: ${res.current_files.toLocaleString()} files on disk vs ${res.indexed_count.toLocaleString()} indexed). Update index?`;
-        banner.classList.remove('hidden');
-        safeCreateIcons();
+    if (res.has_changes) {
+      lastDetectedChangedFolders = res.changed_folders || null;
+      const mode = document.getElementById('selectAutoIndexMode')?.value || 'prompt';
+      if (mode === 'background') {
+        console.log(`Auto-index (background): detected difference of ${res.diff} items. Triggering selective sync...`);
+        startIndexing({ target_folders: lastDetectedChangedFolders, full: false });
+      } else if (mode === 'prompt') {
+        const banner = document.getElementById('folderChangeBanner');
+        const text = document.getElementById('folderChangeBannerText');
+        if (banner && text) {
+          const sign = (res.diff > 0) ? `+${res.diff}` : `${res.diff}`;
+          const currentFiles = res.current_files ?? res.disk_files ?? 0;
+          const folderNames = (res.changed_folder_names && res.changed_folder_names.length > 0)
+            ? res.changed_folder_names.join(', ')
+            : 'linked folder';
+          text.innerText = `Folder contents changed in [${folderNames}] (${sign} files: ${currentFiles.toLocaleString()} files on disk). Quick sync to update index?`;
+          banner.classList.remove('hidden');
+          safeCreateIcons();
+        }
       }
+    } else {
+      dismissFolderChangeBanner();
     }
-  } else {
-    dismissFolderChangeBanner();
+  } catch (err) {
+    console.error('checkFolderChanges error:', err);
   }
 }
 
@@ -1165,7 +1186,7 @@ function dismissFolderChangeBanner() {
 
 function triggerAutoIndexNow() {
   dismissFolderChangeBanner();
-  startIndexing();
+  startIndexing({ target_folders: lastDetectedChangedFolders, full: false });
 }
 
 // Window Exports

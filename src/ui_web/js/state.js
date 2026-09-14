@@ -154,3 +154,22 @@ async function openAppWebsite() {
 window.updateStatusBar = updateStatusBar;
 window.openAppWebsite = openAppWebsite;
 
+// Forward unhandled frontend errors to backend log
+window.addEventListener('error', (event) => {
+  try {
+    const msg = `${event.message} at ${event.filename}:${event.lineno}:${event.colno}`;
+    if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.log_client_message === 'function') {
+      window.pywebview.api.log_client_message('UI-ERROR', msg);
+    }
+  } catch (_) {}
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  try {
+    const msg = `Unhandled Promise Rejection: ${event.reason}`;
+    if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.log_client_message === 'function') {
+      window.pywebview.api.log_client_message('PROMISE-ERR', msg);
+    }
+  } catch (_) {}
+});
+

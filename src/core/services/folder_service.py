@@ -1,5 +1,6 @@
 import os
 import time
+import json
 import threading
 from datetime import datetime
 try:
@@ -124,10 +125,16 @@ class FolderIndexerService:
         database.set_info_value("auto_index_mode", valid)
         return valid
 
+    def _get_baseline_stats(self):
+        return database.get_info_value("folder_baseline_stats", {}) or {}
+
+    def _save_baseline_stats(self, stats):
+        database.set_info_value("folder_baseline_stats", stats)
+
     def check_folder_changes(self):
         """
         Fast disk check to detect if file counts or directory state changed
-        since the last indexing run.
+        since the last indexing run. Compares against persistent per-folder snapshot.
         """
         if self._indexing_state["running"]:
             return {"success": True, "indexing_running": True, "has_changes": False}
@@ -140,31 +147,68 @@ class FolderIndexerService:
                 if f and path_accessible(f) and os.path.normpath(f) not in [os.path.normpath(u) for u in unique_folders]:
                     unique_folders.append(f)
 
-            disk_files = 0
+            baseline = self._get_baseline_stats()
+            total_disk_files = 0
+            changed_folders = []
+            total_diff = 0
+            is_initial_baseline = len(baseline) == 0
+
             for folder in unique_folders:
+                folder_norm = os.path.normpath(folder).lower()
+                current_count = 0
                 try:
                     for root, dirs, files in os.walk(folder):
-                        disk_files += len(files)
+                        current_count += len(files)
                 except Exception:
-                    pass
+                    continue
+
+                total_disk_files += current_count
+
+                if folder_norm not in baseline:
+                    # Initial record for this folder
+                    baseline[folder_norm] = {
+                        "path": folder,
+                        "file_count": current_count,
+                        "last_mtime": os.path.getmtime(folder) if os.path.exists(folder) else 0
+                    }
+                else:
+                    prev_count = baseline[folder_norm].get("file_count", 0)
+                    folder_diff = current_count - prev_count
+                    if folder_diff != 0:
+                        changed_folders.append(folder)
+                        total_diff += folder_diff
+
+            if is_initial_baseline:
+                # If baseline was empty, we just initialized it so save and report no changes
+                self._save_baseline_stats(baseline)
+                total_diff = 0
+                changed_folders = []
 
             indexed_count = database.get_total_image_count()
-            diff = disk_files - indexed_count
-            has_changes = diff != 0 and disk_files > 0
+            has_changes = len(changed_folders) > 0 or (total_diff != 0)
 
             return {
                 "success": True,
                 "has_changes": has_changes,
-                "disk_files": disk_files,
+                "current_files": total_disk_files,
+                "disk_files": total_disk_files,
+                "indexed_count": indexed_count,
                 "indexed_images": indexed_count,
-                "diff": diff,
+                "diff": total_diff,
+                "changed_folders": changed_folders,
+                "changed_folder_names": [os.path.basename(f) or f for f in changed_folders],
                 "mode": self.get_auto_index_mode()
             }
         except Exception as e:
             return {"success": False, "error": str(e), "has_changes": False}
 
-    def start_indexing(self):
-        """Launches background bulk scan of all registered image folders."""
+    def start_indexing(self, target_folders=None, full_reindex=False):
+        """
+        Bulk or incremental scan of registered image folders.
+        - target_folders: optional list of specific folders to scan (e.g. only changed folder)
+        - full_reindex: if True, wipes database and re-indexes all folders from scratch.
+                        if False (default for auto-sync), uses INSERT OR IGNORE and updates only new photos.
+        """
         if self._indexing_state["running"]:
             return {"success": False, "error": "Indexing already running"}
 
@@ -172,11 +216,13 @@ class FolderIndexerService:
         self._indexing_state["scanned"] = 0
         self._indexing_state["total"] = 0
         self._indexing_state["files_seen"] = 0
+        self._indexing_state["new_added"] = 0
         self._indexing_state["elapsed"] = 0
         self._indexing_state["speed"] = 0
         self._indexing_state["eta_seconds"] = None
         self._indexing_state["current_folder"] = ""
         self._indexing_state["error"] = None
+        self._indexing_state["full_reindex"] = bool(full_reindex)
 
         def _index():
             start = time.time()
@@ -186,33 +232,49 @@ class FolderIndexerService:
                 database.init_db()
 
                 additional_folders = database.get_additional_folders()
-                folders = [config.IMAGE_FOLDER] + (additional_folders or [])
+                all_registered = [config.IMAGE_FOLDER] + (additional_folders or [])
                 unique_folders = []
-                for f in folders:
-                    if f and os.path.exists(f) and os.path.normpath(f) not in [os.path.normpath(u) for u in unique_folders]:
+                for f in all_registered:
+                    if f and path_accessible(f) and os.path.normpath(f) not in [os.path.normpath(u) for u in unique_folders]:
                         unique_folders.append(f)
+
+                # Filter target folders if specified
+                if target_folders:
+                    targets_norm = [os.path.normpath(t).lower() for t in target_folders if t]
+                    scan_folders = [f for f in unique_folders if os.path.normpath(f).lower() in targets_norm]
+                    if not scan_folders:
+                        scan_folders = unique_folders
+                else:
+                    scan_folders = unique_folders
 
                 conn = database.get_db_connection()
                 cursor = conn.cursor()
                 cursor.execute("PRAGMA journal_mode=WAL;")
                 cursor.execute("PRAGMA synchronous=OFF;")
 
-                cursor.execute("DELETE FROM images")
-                cursor.execute("DELETE FROM directories")
-                conn.commit()
-
                 dir_cache = {}
                 next_dir_id = 1
 
-                cursor.execute("SELECT MAX(id) FROM directories")
-                max_id_row = cursor.fetchone()
-                if max_id_row and max_id_row[0]:
-                    next_dir_id = max_id_row[0] + 1
+                if full_reindex:
+                    cursor.execute("DELETE FROM images")
+                    cursor.execute("DELETE FROM directories")
+                    conn.commit()
+                else:
+                    # Incremental sync: retain existing images and load directory cache
+                    cursor.execute("SELECT dir_path, id FROM directories")
+                    dir_cache = {row[0]: row[1] for row in cursor.fetchall()}
+                    cursor.execute("SELECT MAX(id) FROM directories")
+                    max_id_row = cursor.fetchone()
+                    if max_id_row and max_id_row[0]:
+                        next_dir_id = max_id_row[0] + 1
+
+                cursor.execute("SELECT COUNT(*) FROM images")
+                count_before = cursor.fetchone()[0]
 
                 batch_data = []
                 BATCH_SIZE = 5000
 
-                for folder in unique_folders:
+                for folder in scan_folders:
                     self._indexing_state["current_folder"] = os.path.basename(folder) or folder
                     for root_dir, dirs, files in os.walk(folder):
                         if not files:
@@ -258,7 +320,7 @@ class FolderIndexerService:
                                     total_inserted += len(batch_data)
                                     batch_data = []
                                     elapsed = max(1, int(time.time() - start))
-                                    speed = int(total_inserted / elapsed)
+                                    speed = int(scanned_files_count / elapsed)
                                     self._indexing_state["scanned"] = total_inserted
                                     self._indexing_state["total"] = total_inserted
                                     self._indexing_state["files_seen"] = scanned_files_count
@@ -278,12 +340,32 @@ class FolderIndexerService:
                 cursor.execute("ANALYZE;")
                 cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
                 cursor.execute("PRAGMA synchronous=NORMAL;")
-                database.set_info_value("cached_total_images", total_inserted)
+
+                cursor.execute("SELECT COUNT(*) FROM images")
+                final_total = cursor.fetchone()[0]
+                new_added = max(0, final_total - count_before)
+                database.set_info_value("cached_total_images", final_total)
+
+                # Update baseline stats for the scanned folders so change detector is in sync
+                baseline = self._get_baseline_stats()
+                for folder in scan_folders:
+                    folder_norm = os.path.normpath(folder).lower()
+                    try:
+                        f_count = sum(len(f_files) for _, _, f_files in os.walk(folder))
+                        baseline[folder_norm] = {
+                            "path": folder,
+                            "file_count": f_count,
+                            "last_mtime": os.path.getmtime(folder) if os.path.exists(folder) else 0
+                        }
+                    except Exception:
+                        pass
+                self._save_baseline_stats(baseline)
 
                 elapsed = max(1, int(time.time() - start))
-                speed = int(total_inserted / elapsed) if total_inserted else 0
-                self._indexing_state["scanned"] = total_inserted
-                self._indexing_state["total"] = total_inserted
+                speed = int(scanned_files_count / elapsed) if scanned_files_count else 0
+                self._indexing_state["scanned"] = final_total
+                self._indexing_state["total"] = final_total
+                self._indexing_state["new_added"] = new_added
                 self._indexing_state["files_seen"] = scanned_files_count
                 self._indexing_state["elapsed"] = elapsed
                 self._indexing_state["speed"] = speed

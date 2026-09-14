@@ -494,8 +494,25 @@ class AppAPI:
     def remove_network_folder(self, path):
         return self.folder_service.remove_network_folder(path)
 
-    def start_indexing(self):
-        return self.folder_service.start_indexing()
+    def start_indexing(self, target_folders=None, full_reindex=False, **kwargs):
+        if isinstance(target_folders, dict):
+            full_reindex = target_folders.get("full_reindex", target_folders.get("full", False))
+            target_folders = target_folders.get("target_folders", None)
+        return self.folder_service.start_indexing(target_folders=target_folders, full_reindex=full_reindex)
+
+    def log_client_message(self, level="INFO", message=""):
+        try:
+            _project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+            log_file = os.path.join(_project_dir, "app_debug.log")
+            ts = time.strftime("%Y-%m-%d %H:%M:%S")
+            line = f"[{ts}] [JS-{str(level).upper()}] {message}\n"
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(line)
+            sys.stdout.write(line)
+            sys.stdout.flush()
+        except Exception:
+            pass
+        return {"success": True}
 
     def get_indexing_status(self):
         return self.folder_service.get_indexing_status()

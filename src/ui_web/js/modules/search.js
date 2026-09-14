@@ -170,13 +170,17 @@ function showSearchModal(results) {
   tbody.innerHTML = '';
   results.forEach(r => {
     const tr = document.createElement('tr');
-    tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer';
+    tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition';
+    const addressStr = r.address ? r.address.trim() : '-';
     tr.innerHTML = `
-      <td class="px-4 py-3 font-mono text-sky-600 dark:text-sky-400">${r.consumer_id}</td>
-      <td class="px-4 py-3 font-mono">${r.meter_no || '-'}</td>
-      <td class="px-4 py-3">${r.name || '-'}</td>
-      <td class="px-4 py-3">${r.mobile_number || '-'}</td>
-      <td class="px-4 py-3"><button class="bg-sky-600 text-white px-3 py-1 rounded text-xs">Select</button></td>
+      <td class="px-4 py-3 font-mono text-xs font-semibold text-sky-600 dark:text-sky-400">${r.consumer_id}</td>
+      <td class="px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">${r.meter_no || '-'}</td>
+      <td class="px-4 py-3 text-xs font-semibold text-slate-900 dark:text-slate-100">${r.name || '-'}</td>
+      <td class="px-4 py-3 text-xs text-slate-600 dark:text-slate-300 max-w-sm" title="${addressStr}">${addressStr}</td>
+      <td class="px-4 py-3 font-mono text-xs text-slate-600 dark:text-slate-400">${r.mobile_number || '-'}</td>
+      <td class="px-4 py-3 text-center">
+        <button class="bg-sky-600 hover:bg-sky-500 text-white font-medium px-3 py-1 rounded-md text-xs shadow-sm transition">Select</button>
+      </td>
     `;
     tr.onclick = () => {
       selectConsumer(r);
