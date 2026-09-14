@@ -136,11 +136,18 @@ def _write_migration_marker(version):
 def _needs_one_time_reset():
     return _read_migration_marker() != TARIFF_MIGRATION_VERSION
 
-def load_tariff():
-    """Returns tariff data; creates file with defaults if missing."""
+_TARIFF_CACHE = None
+
+def load_tariff(force_reload=False):
+    """Returns tariff data with in-memory caching to eliminate redundant disk I/O."""
+    global _TARIFF_CACHE
+    if _TARIFF_CACHE is not None and not force_reload:
+        return _TARIFF_CACHE
+
     if _needs_one_time_reset() or not os.path.exists(CONFIG_FILE):
         save_tariff(DEFAULT_TARIFF)
         _write_migration_marker(TARIFF_MIGRATION_VERSION)
+        _TARIFF_CACHE = DEFAULT_TARIFF
         return DEFAULT_TARIFF
     
     with open(CONFIG_FILE, "r") as f:
@@ -151,9 +158,12 @@ def load_tariff():
         save_tariff(merged_data)
         _write_migration_marker(TARIFF_MIGRATION_VERSION)
 
+    _TARIFF_CACHE = merged_data
     return merged_data
 
 def save_tariff(tariff_data):
-    """Saves updated dictionary back to JSON."""
+    """Saves updated dictionary back to JSON and refreshes cache."""
+    global _TARIFF_CACHE
     with open(CONFIG_FILE, "w") as f:
         json.dump(tariff_data, f, indent=4)
+    _TARIFF_CACHE = tariff_data

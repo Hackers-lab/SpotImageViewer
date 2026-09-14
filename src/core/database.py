@@ -109,6 +109,7 @@ def init_db(force=False):
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_cid ON images (consumer_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_date_iso ON images (date_iso)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_dir_id ON images (dir_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_cid_date ON images (consumer_id, date_iso DESC)')
         
         # Other tables...
         cursor.execute('''

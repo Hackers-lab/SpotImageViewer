@@ -227,3 +227,25 @@ def launch_windows_installer(installer_path, app_pid, install_args=""):
         creationflags=creation_flags,
         startupinfo=startupinfo,
     )
+
+
+_openpyxl = None
+def get_openpyxl():
+    """Lazy loader for openpyxl with numpy compatibility patch."""
+    global _openpyxl
+    if _openpyxl is None:
+        try:
+            import numpy as _np
+            if not hasattr(_np, 'short'):
+                _np.short = _np.int16
+            if not hasattr(_np, 'ushort'):
+                _np.ushort = _np.uint16
+            if not hasattr(_np, 'int_'):
+                _np.int_ = _np.int64
+            if not hasattr(_np, 'uint_'):
+                _np.uint_ = _np.uint64
+        except Exception:
+            pass
+        import openpyxl as _mod
+        _openpyxl = _mod
+    return _openpyxl
