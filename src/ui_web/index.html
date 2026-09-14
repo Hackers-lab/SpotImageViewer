@@ -262,14 +262,7 @@
           <span class="nav-label">Low Cons. Audit</span>
         </button>
 
-        <!-- Divider -->
-        <div class="w-full h-px bg-slate-200 dark:bg-slate-800/80 my-1"></div>
-
-        <!-- Quick Launch Tools -->
-        <button onclick="launchImageCheckGUI()" class="nav-item" title="Launch Image Check GUI">
-          <i data-lucide="scan-eye" class="w-4 h-4 text-purple-500 shrink-0"></i>
-          <span class="nav-label">Image Check GUI</span>
-        </button>
+        <!-- Tools -->
         <button onclick="switchTab('fuzzy')" class="nav-item" data-tab="fuzzy" title="Fuzzy Lookup">
           <i data-lucide="sparkles" class="w-4 h-4 text-amber-500 shrink-0"></i>
           <span class="nav-label">Fuzzy Lookup</span>
@@ -480,9 +473,9 @@
         </div>
 
         <!-- Right: Consumer Profile Card & Notes (Docked Split Pane) -->
-        <div id="detailsPanel" class="details-panel w-72 border-l border-slate-200 dark:border-slate-800/80 bg-white dark:bg-[#181818] flex flex-col justify-between shrink-0 p-3 overflow-y-auto h-full">
+        <div id="detailsPanel" class="details-panel w-72 border-l border-slate-200 dark:border-slate-800/80 bg-white dark:bg-[#181818] flex flex-col justify-between shrink-0 p-3 overflow-hidden h-full">
           <!-- Top Stack: Header + Consumer Details + Available Dates -->
-          <div class="space-y-2 flex-1 min-h-0 flex flex-col">
+          <div class="space-y-2 flex-1 min-h-0 flex flex-col overflow-hidden">
             <!-- Top Panel Bar -->
             <div class="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-slate-800/60 shrink-0">
               <span id="searchResultCount" class="text-[10.5px] font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400">0 photos</span>
@@ -589,8 +582,8 @@
               </div>
             </div>
 
-            <!-- SECTION 2: AVAILABLE DATES (Middle, Open by Default) -->
-            <div id="section-cycles" class="rounded-xl border border-slate-200/80 dark:border-slate-800 overflow-hidden transition-all duration-200 bg-white/70 dark:bg-[#1f1f1f]/70 shadow-sm flex-1 min-h-[90px] flex flex-col">
+            <!-- SECTION 2: AVAILABLE DATES (Middle, Expands to Fill Remaining Height) -->
+            <div id="section-cycles" class="rounded-xl border border-slate-200/80 dark:border-slate-800 overflow-hidden transition-all duration-200 bg-white/70 dark:bg-[#1f1f1f]/70 shadow-sm flex-1 min-h-0 flex flex-col">
               <div onclick="toggleSection('section-cycles')" class="px-2.5 py-1.5 border-b border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-[#252525] transition shrink-0">
                 <div class="flex items-center gap-2">
                   <div class="w-4 h-4 rounded bg-emerald-500/15 text-emerald-500 flex items-center justify-center">
@@ -601,8 +594,8 @@
                 <i id="icon-section-cycles" data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200"></i>
               </div>
 
-              <div id="body-section-cycles" class="p-1.5 flex-1 overflow-y-auto">
-                <div id="cyclesList" class="space-y-0.5 max-h-40 overflow-y-auto pr-1">
+              <div id="body-section-cycles" class="p-1.5 flex-1 min-h-0 flex flex-col overflow-hidden">
+                <div id="cyclesList" class="space-y-0.5 flex-1 min-h-0 overflow-y-auto pr-1">
                   <span class="text-xs text-slate-400 italic px-2 block py-1">No dates loaded</span>
                 </div>
               </div>
@@ -1934,11 +1927,76 @@
         <span class="text-slate-300 dark:text-slate-700 font-light select-none">|</span>
       </div>
 
-      <!-- Update Available Pill Button -->
-      <button id="statusUpdateBadge" onclick="handleUpdateBadgeClick()" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] transition animate-pulse cursor-pointer shadow-sm" title="Click to view update details">
-        <i data-lucide="sparkles" class="w-3 h-3 text-emerald-500"></i>
-        <span id="statusUpdateText">Update Available!</span>
-      </button>
+      <!-- Update Notification Widget with Inline Popover -->
+      <div id="statusUpdateContainer" class="relative hidden items-center gap-1.5">
+        <!-- Update Available Pill Button -->
+        <button id="statusUpdateBadge" onclick="toggleUpdatePopup()" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] transition cursor-pointer shadow-sm" title="Click to view update details">
+          <i data-lucide="sparkles" class="w-3 h-3 text-emerald-500"></i>
+          <span id="statusUpdateText">Update Available!</span>
+        </button>
+
+        <!-- Direct Update Action Buttons -->
+        <button onclick="confirmAndStartUpdate()" class="px-2 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] transition shadow-sm flex items-center gap-1 cursor-pointer" title="Download and install update immediately">
+          <i data-lucide="download" class="w-3 h-3"></i>
+          <span>Update Now</span>
+        </button>
+
+        <button onclick="dismissUpdateNotification()" class="px-1.5 py-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 text-[10px] transition cursor-pointer" title="Remind me later">
+          <span>Later</span>
+        </button>
+
+        <!-- Inline Floating Popover (Anchored Above the Button) -->
+        <div id="statusUpdatePopup" class="hidden absolute bottom-8 right-0 z-50 w-80 p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-2.5 text-left text-xs">
+          <!-- Popover Header -->
+          <div class="flex items-start justify-between gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
+            <div class="space-y-0.5">
+              <div class="flex items-center gap-1.5 font-bold text-slate-900 dark:text-slate-100">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span id="popupUpdateTitle">New Update Available</span>
+              </div>
+              <p class="text-[10px] text-slate-400" id="popupUpdateSub">A new version is ready to install</p>
+            </div>
+            <button onclick="toggleUpdatePopup(false)" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded transition">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+
+          <!-- Popover Content / Release Notes Snippet -->
+          <div class="space-y-1">
+            <span class="text-[9.5px] uppercase tracking-wider font-bold text-slate-400">Release Notes</span>
+            <div id="popupUpdateNotes" class="max-h-28 overflow-y-auto p-2 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200/60 dark:border-slate-800/80 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line font-sans">
+              Performance improvements and stability enhancements.
+            </div>
+          </div>
+
+          <!-- Inline Download Progress (hidden until downloading) -->
+          <div id="popupUpdateProgressBox" class="hidden space-y-1 pt-1">
+            <div class="flex justify-between text-[10px] font-semibold text-slate-500">
+              <span id="popupUpdateProgressStatus">Downloading update...</span>
+              <span id="popupUpdateProgressPct">0%</span>
+            </div>
+            <div class="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div id="popupUpdateProgressBar" class="h-full bg-emerald-500 rounded-full w-0 transition-all"></div>
+            </div>
+          </div>
+
+          <!-- Popover Actions -->
+          <div id="popupUpdateActions" class="flex items-center justify-between pt-1 gap-2">
+            <button onclick="toggleUpdatePopup(false)" class="px-2.5 py-1.5 text-[11px] text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition">
+              Cancel
+            </button>
+            <div class="flex items-center gap-1.5">
+              <button onclick="switchTab('settings'); switchSettingsSection('update'); toggleUpdatePopup(false);" class="px-2 py-1.5 text-[10.5px] text-sky-600 dark:text-sky-400 hover:underline">
+                Details
+              </button>
+              <button id="btnPopupStartUpdate" onclick="startUpdateFromPopup()" class="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-[11px] rounded-lg transition shadow flex items-center gap-1.5 cursor-pointer">
+                <i data-lucide="download" class="w-3 h-3"></i>
+                <span>Update Now</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Website Link (wbtools.co.in in blue) -->
       <button onclick="openAppWebsite()" class="flex items-center gap-1 text-sky-500 hover:text-sky-400 font-medium transition cursor-pointer hover:underline" title="Visit wbtools.co.in">

@@ -547,18 +547,20 @@ async function triggerUpdateCheck() {
   const res = await callAPI('check_for_updates');
   if (res && res.success) {
     latestUpdateInfo = res;
-    const badge = document.getElementById('statusUpdateBadge');
+    window.latestUpdateInfo = res;
+    const container = document.getElementById('statusUpdateContainer');
     const text = document.getElementById('statusUpdateText');
     if (res.has_update) {
-      if (badge) {
-        badge.classList.remove('hidden');
-        badge.classList.add('flex');
+      if (container) {
+        container.classList.remove('hidden');
+        container.classList.add('flex');
       }
       if (text) text.innerText = `Update Available (v${res.latest_version})`;
+      populateUpdatePopupData();
     } else {
-      if (badge) {
-        badge.classList.add('hidden');
-        badge.classList.remove('flex');
+      if (container) {
+        container.classList.add('hidden');
+        container.classList.remove('flex');
       }
     }
   }
@@ -566,13 +568,100 @@ async function triggerUpdateCheck() {
 }
 window.triggerUpdateCheck = triggerUpdateCheck;
 
+// --- Inline Update Notification Popup Controllers ---
+function toggleUpdatePopup(force) {
+  const popup = document.getElementById('statusUpdatePopup');
+  if (!popup) return;
+  if (typeof force === 'boolean') {
+    popup.classList.toggle('hidden', !force);
+  } else {
+    popup.classList.toggle('hidden');
+  }
+  if (!popup.classList.contains('hidden')) {
+    populateUpdatePopupData();
+    safeCreateIcons();
+  }
+}
+
+function populateUpdatePopupData() {
+  const info = window.latestUpdateInfo || latestUpdateInfo;
+  if (!info) return;
+  const title = document.getElementById('popupUpdateTitle');
+  const sub = document.getElementById('popupUpdateSub');
+  const notes = document.getElementById('popupUpdateNotes');
+  if (title) title.innerText = `Spot Image Viewer v${info.latest_version}`;
+  if (sub) sub.innerText = `Current installed: v${info.current_version}`;
+  if (notes) notes.innerText = info.release_notes || "Performance optimizations and stability enhancements.";
+}
+
+function confirmAndStartUpdate() {
+  const info = window.latestUpdateInfo || latestUpdateInfo;
+  if (!info || !info.has_update) {
+    alert("No update package available to install.");
+    return;
+  }
+  const installerUrl = info.installer_url || info.download_url || '';
+  if (!installerUrl) {
+    alert("No installer download link found in release.");
+    return;
+  }
+  toggleUpdatePopup(true);
+  startUpdateFromPopup();
+}
+
+function startUpdateFromPopup() {
+  const info = window.latestUpdateInfo || latestUpdateInfo;
+  const installerUrl = info ? (info.installer_url || info.download_url || '') : '';
+  const progBox = document.getElementById('popupUpdateProgressBox');
+  const actBox = document.getElementById('popupUpdateActions');
+  if (progBox) progBox.classList.remove('hidden');
+  if (actBox) actBox.classList.add('hidden');
+  startAppUpdate(installerUrl);
+}
+
+function dismissUpdateNotification() {
+  const container = document.getElementById('statusUpdateContainer');
+  if (container) container.classList.add('hidden');
+  const popup = document.getElementById('statusUpdatePopup');
+  if (popup) popup.classList.add('hidden');
+}
+
+// Close popup on outside click
+document.addEventListener('click', (e) => {
+  const container = document.getElementById('statusUpdateContainer');
+  const popup = document.getElementById('statusUpdatePopup');
+  if (popup && !popup.classList.contains('hidden')) {
+    if (container && !container.contains(e.target)) {
+      popup.classList.add('hidden');
+    }
+  }
+});
+
+window.toggleUpdatePopup = toggleUpdatePopup;
+window.populateUpdatePopupData = populateUpdatePopupData;
+window.confirmAndStartUpdate = confirmAndStartUpdate;
+window.startUpdateFromPopup = startUpdateFromPopup;
+window.dismissUpdateNotification = dismissUpdateNotification;
+
 async function startAppUpdate(installerUrl) {
+  const info = window.latestUpdateInfo || latestUpdateInfo;
+  if (!installerUrl && info) {
+    installerUrl = info.installer_url || info.download_url || '';
+  }
+
   const btn = document.getElementById('btnStartInstallUpdate');
   const progBox = document.getElementById('updateProgressBox');
   const progStatus = document.getElementById('updateProgressStatus');
   const progPct = document.getElementById('updateProgressPct');
   const progBar = document.getElementById('updateProgressBar');
   const progSub = document.getElementById('updateProgressSub');
+
+  // Also elements in the inline popup
+  const popupBar = document.getElementById('popupUpdateProgressBar');
+  const popupPct = document.getElementById('popupUpdateProgressPct');
+  const popupStatus = document.getElementById('popupUpdateProgressStatus');
+  const popupBox = document.getElementById('popupUpdateProgressBox');
+  if (popupBox) popupBox.classList.remove('hidden');
 
   if (btn) {
     btn.disabled = true;
@@ -584,11 +673,16 @@ async function startAppUpdate(installerUrl) {
 
   const res = await callAPI('start_self_update', installerUrl);
   if (!res || !res.success) {
+    const errMsg = res ? res.error : "Unknown error";
     if (progStatus) {
       progStatus.innerText = "Download failed to start";
       progStatus.className = "font-semibold text-rose-600 dark:text-rose-400";
     }
-    if (progSub) progSub.innerText = res ? res.error : "Unknown error";
+    if (progSub) progSub.innerText = errMsg;
+    if (popupStatus) {
+      popupStatus.innerText = "Failed: " + errMsg;
+      popupStatus.className = "text-rose-600 dark:text-rose-400 font-semibold text-[10px]";
+    }
     if (btn) {
       btn.disabled = false;
       btn.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -611,6 +705,13 @@ async function startAppUpdate(installerUrl) {
       if (progPct) progPct.innerText = `${pct}%`;
       if (progStatus) progStatus.innerText = `Downloading Update: ${dlMB} MB / ${totMB} MB (${pct}%)`;
       if (progSub) progSub.innerText = `Downloading latest installer package from GitHub...`;
+
+      // Update inline popup
+      if (popupBar) popupBar.style.width = `${pct}%`;
+      if (popupPct) popupPct.innerText = `${pct}%`;
+      if (popupStatus) popupStatus.innerText = `Downloading: ${dlMB} MB / ${totMB} MB (${pct}%)`;
+
+      updateStatusBar(`Downloading update: ${pct}% (${dlMB}MB / ${totMB}MB)...`, "loading", pct);
     } else if (prog.status === 'ready') {
       clearInterval(updatePollTimer);
       if (progBar) progBar.style.width = '100%';
@@ -626,6 +727,16 @@ async function startAppUpdate(installerUrl) {
       if (btn) {
         btn.innerHTML = `<i data-lucide="check-circle" class="w-4 h-4"></i> Launching Installer...`;
       }
+
+      // Update inline popup
+      if (popupBar) popupBar.style.width = '100%';
+      if (popupPct) popupPct.innerText = '100%';
+      if (popupStatus) {
+        popupStatus.innerText = "Download complete! Launching Windows installer...";
+        popupStatus.className = "font-bold text-emerald-600 dark:text-emerald-400 text-xs animate-pulse";
+      }
+
+      updateStatusBar("Update download complete! Launching installer...", "normal", 100);
       safeCreateIcons();
 
       // Close and exit to allow installer to execute
@@ -634,16 +745,22 @@ async function startAppUpdate(installerUrl) {
       }, 1500);
     } else if (prog.status === 'error') {
       clearInterval(updatePollTimer);
+      const errMsg = prog.error || "Failed to download update installer.";
       if (progStatus) {
         progStatus.innerText = "Download Failed";
         progStatus.className = "font-semibold text-rose-600 dark:text-rose-400";
       }
-      if (progSub) progSub.innerText = prog.error || "Failed to download update installer.";
+      if (progSub) progSub.innerText = errMsg;
+      if (popupStatus) {
+        popupStatus.innerText = "Failed: " + errMsg;
+        popupStatus.className = "text-rose-600 dark:text-rose-400 font-semibold text-[10px]";
+      }
       if (btn) {
         btn.disabled = false;
         btn.classList.remove('opacity-50', 'cursor-not-allowed');
         btn.innerHTML = `<i data-lucide="refresh-cw" class="w-4 h-4"></i> Retry Update`;
       }
+      updateStatusBar("Update download failed.", "error");
       safeCreateIcons();
     }
   }, 250);

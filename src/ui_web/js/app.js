@@ -130,10 +130,20 @@ function toggleDetailsPanel() {
 function toggleSection(sectionId) {
   const body = document.getElementById(`body-${sectionId}`);
   const icon = document.getElementById(`icon-${sectionId}`);
+  const sec = document.getElementById(sectionId);
   if (!body) return;
   const isHidden = body.classList.toggle('hidden');
   if (icon) {
     icon.style.transform = isHidden ? 'rotate(-90deg)' : 'rotate(0deg)';
+  }
+  if (sectionId === 'section-cycles' && sec) {
+    if (isHidden) {
+      sec.classList.remove('flex-1');
+      sec.classList.add('shrink-0');
+    } else {
+      sec.classList.add('flex-1');
+      sec.classList.remove('shrink-0');
+    }
   }
 }
 
@@ -152,13 +162,22 @@ function expandToSection(targetSectionId) {
   allSections.forEach(secId => {
     const body = document.getElementById(`body-${secId}`);
     const icon = document.getElementById(`icon-${secId}`);
+    const sec = document.getElementById(secId);
     if (!body) return;
     if (secId === targetSectionId) {
       body.classList.remove('hidden');
       if (icon) icon.style.transform = 'rotate(0deg)';
+      if (secId === 'section-cycles' && sec) {
+        sec.classList.add('flex-1');
+        sec.classList.remove('shrink-0');
+      }
     } else {
       body.classList.add('hidden');
       if (icon) icon.style.transform = 'rotate(-90deg)';
+      if (secId === 'section-cycles' && sec) {
+        sec.classList.remove('flex-1');
+        sec.classList.add('shrink-0');
+      }
     }
   });
 
@@ -358,15 +377,18 @@ async function checkUpdateSilent() {
     const res = await callAPI('check_for_updates');
     if (res && res.success) {
       latestUpdateInfo = res;
+      window.latestUpdateInfo = res;
       if (res.has_update) {
-        const badge = document.getElementById('statusUpdateBadge');
+        const container = document.getElementById('statusUpdateContainer');
         const text = document.getElementById('statusUpdateText');
-        if (badge) {
-          badge.classList.remove('hidden');
-          badge.classList.add('flex');
+        if (container) {
+          container.classList.remove('hidden');
+          container.classList.add('flex');
         }
         if (text) text.innerText = `Update Available (v${res.latest_version})`;
-        updateStatusBar(`New version v${res.latest_version} available. Click update badge to install.`, "normal");
+        if (typeof populateUpdatePopupData === 'function') populateUpdatePopupData();
+        updateStatusBar(`New version v${res.latest_version} available. Click update to install.`, "normal");
+        safeCreateIcons();
       }
     }
   } catch (e) {
