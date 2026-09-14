@@ -167,3 +167,19 @@ def save_tariff(tariff_data):
     with open(CONFIG_FILE, "w") as f:
         json.dump(tariff_data, f, indent=4)
     _TARIFF_CACHE = tariff_data
+
+
+def reset_tariff(category=None):
+    """Resets tariff settings for a specific category or all categories back to default."""
+    import copy
+    if category:
+        tariffs = load_tariff(force_reload=True)
+        if category in DEFAULT_TARIFF:
+            tariffs[category] = copy.deepcopy(DEFAULT_TARIFF[category])
+            save_tariff(tariffs)
+            return tariffs
+        return tariffs
+    else:
+        defaults = copy.deepcopy(DEFAULT_TARIFF)
+        save_tariff(defaults)
+        return defaults

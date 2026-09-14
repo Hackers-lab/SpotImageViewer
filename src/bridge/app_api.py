@@ -379,6 +379,13 @@ class AppAPI:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def reset_tariff_data(self, category=None):
+        try:
+            tariffs = tariff_manager.reset_tariff(category)
+            return {"success": True, "tariffs": tariffs}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     # =========================================================================
     # Auto-Update
     # =========================================================================
@@ -492,6 +499,16 @@ class AppAPI:
 
     def get_indexing_status(self):
         return self.folder_service.get_indexing_status()
+
+    def check_folder_changes(self):
+        return _io_pool.submit(self.folder_service.check_folder_changes).result()
+
+    def get_auto_index_settings(self):
+        return {"success": True, "mode": self.folder_service.get_auto_index_mode()}
+
+    def set_auto_index_settings(self, mode):
+        saved = self.folder_service.set_auto_index_mode(mode)
+        return {"success": True, "mode": saved}
 
     # =========================================================================
     # Native File & Folder Dialogs

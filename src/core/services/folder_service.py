@@ -114,6 +114,55 @@ class FolderIndexerService:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    @staticmethod
+    def get_auto_index_mode():
+        return database.get_info_value("auto_index_mode", "prompt")
+
+    @staticmethod
+    def set_auto_index_mode(mode):
+        valid = mode if mode in ("prompt", "background", "manual") else "prompt"
+        database.set_info_value("auto_index_mode", valid)
+        return valid
+
+    def check_folder_changes(self):
+        """
+        Fast disk check to detect if file counts or directory state changed
+        since the last indexing run.
+        """
+        if self._indexing_state["running"]:
+            return {"success": True, "indexing_running": True, "has_changes": False}
+
+        try:
+            additional_folders = database.get_additional_folders()
+            folders = [config.IMAGE_FOLDER] + (additional_folders or [])
+            unique_folders = []
+            for f in folders:
+                if f and path_accessible(f) and os.path.normpath(f) not in [os.path.normpath(u) for u in unique_folders]:
+                    unique_folders.append(f)
+
+            disk_files = 0
+            for folder in unique_folders:
+                try:
+                    for root, dirs, files in os.walk(folder):
+                        disk_files += len(files)
+                except Exception:
+                    pass
+
+            indexed_count = database.get_total_image_count()
+            diff = disk_files - indexed_count
+            has_changes = diff != 0 and disk_files > 0
+
+            return {
+                "success": True,
+                "has_changes": has_changes,
+                "disk_files": disk_files,
+                "indexed_images": indexed_count,
+                "diff": diff,
+                "mode": self.get_auto_index_mode()
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e), "has_changes": False}
+
     def start_indexing(self):
         """Launches background bulk scan of all registered image folders."""
         if self._indexing_state["running"]:

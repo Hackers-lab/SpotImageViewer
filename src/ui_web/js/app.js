@@ -328,6 +328,9 @@ async function initApp() {
   // Initialize interactive manual fuzzy lookup rows
   initManualFuzzyLookup();
 
+  // Initialize smart folder change monitoring & auto-index
+  if (typeof initAutoIndexing === 'function') initAutoIndexing();
+
   // Auto-detect empty database and prompt/start initial indexing
   if (info && info.total_images === 0) {
     console.log("Database contains 0 images. Auto-checking if image folders exist to index...");
