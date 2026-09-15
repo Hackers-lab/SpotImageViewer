@@ -186,14 +186,24 @@ class FolderIndexerService:
             total_diff = 0
             now = time.time()
 
-            # 1. Check for brand new subfolders created on disk that are not yet in the DB
+            # 1. Check for brand new folders or subfolders created on disk that are not yet in the DB
             for root_folder in unique_folders:
                 try:
+                    norm_root = os.path.normpath(root_folder).lower()
+                    if norm_root not in known_dirs:
+                        new_photos = sum(1 for f in os.listdir(root_folder) if len(f) >= 25 and f[:8].isdigit() and not f.startswith('.'))
+                        if new_photos > 0:
+                            changed_folders.append(root_folder)
+                            total_diff += new_photos
+
                     for entry in os.scandir(root_folder):
                         if entry.is_dir():
+                            name = entry.name
+                            if name.startswith('.') or name in ('$RECYCLE.BIN', 'System Volume Information', 'Recovery', '.git', 'node_modules', 'temp', 'Temp'):
+                                continue
                             norm_entry = os.path.normpath(entry.path).lower()
                             if norm_entry not in known_dirs:
-                                new_photos = sum(1 for f in os.listdir(entry.path) if len(f) >= 25 and f[:8].isdigit())
+                                new_photos = sum(1 for f in os.listdir(entry.path) if len(f) >= 25 and f[:8].isdigit() and not f.startswith('.'))
                                 if new_photos > 0:
                                     changed_folders.append(entry.path)
                                     total_diff += new_photos
@@ -337,72 +347,120 @@ class FolderIndexerService:
                 count_before = cursor.fetchone()[0]
 
                 batch_data = []
-                BATCH_SIZE = 5000
+                BATCH_SIZE = 1000
+                last_ui_update = 0.0
+
+                from collections import deque
 
                 for folder in scan_folders:
-                    self._indexing_state["current_folder"] = os.path.basename(folder) or folder
-                    for root_dir, dirs, files in os.walk(folder):
-                        if not files:
+                    folder_base = os.path.basename(folder) or folder
+                    self._indexing_state["current_folder"] = folder_base
+
+                    # Streaming queue-based directory traversal (avoids buffering 100k+ file arrays over SMB)
+                    dir_queue = deque([folder])
+
+                    while dir_queue:
+                        current_dir = dir_queue.popleft()
+                        try:
+                            rel = os.path.relpath(current_dir, folder)
+                            cur_display = folder_base if rel == '.' else f"{folder_base}\\{os.path.basename(current_dir)}"
+                            self._indexing_state["current_folder"] = cur_display
+
+                            # Register directory in DB cache
+                            if current_dir not in dir_cache:
+                                cursor.execute("INSERT OR IGNORE INTO directories (dir_path) VALUES (?)", (current_dir,))
+                                cursor.execute("SELECT id FROM directories WHERE dir_path = ?", (current_dir,))
+                                row = cursor.fetchone()
+                                if row:
+                                    dir_cache[current_dir] = row[0]
+                                else:
+                                    dir_cache[current_dir] = next_dir_id
+                                    next_dir_id += 1
+                            dir_id = dir_cache[current_dir]
+
+                            # Pre-load known filenames for this directory if incremental
+                            existing_in_dir = None
+                            if not full_reindex:
+                                cursor.execute("SELECT filename FROM images WHERE dir_id = ?", (dir_id,))
+                                existing_in_dir = set(row[0] for row in cursor.fetchall())
+
+                            with os.scandir(current_dir) as it:
+                                for entry in it:
+                                    try:
+                                        name = entry.name
+                                        # Instantly skip hidden and trash files (e.g. .trashed-*, .git, etc.)
+                                        if name.startswith('.'):
+                                            continue
+
+                                        if entry.is_dir(follow_symlinks=False):
+                                            if name not in ('$RECYCLE.BIN', 'System Volume Information', 'Recovery', '.git', 'node_modules', 'temp', 'Temp'):
+                                                dir_queue.append(entry.path)
+                                            continue
+
+                                        scanned_files_count += 1
+
+                                        # Fast skip if already indexed
+                                        if existing_in_dir is not None and name in existing_in_dir:
+                                            now = time.time()
+                                            if now - last_ui_update >= 0.3:
+                                                last_ui_update = now
+                                                elapsed = max(1, int(now - start))
+                                                self._indexing_state["files_seen"] = scanned_files_count
+                                                self._indexing_state["elapsed"] = elapsed
+                                                self._indexing_state["speed"] = int(scanned_files_count / elapsed)
+                                                self._indexing_state["current_folder"] = cur_display
+                                            continue
+
+                                        # Validate spot bill format
+                                        if len(name) < 25 or not name[:8].isdigit():
+                                            continue
+
+                                        date_orig = name[:8]
+                                        try:
+                                            dt = datetime.strptime(date_orig, "%d%m%Y")
+                                            date_iso = dt.strftime("%Y-%m-%d")
+                                        except ValueError:
+                                            continue
+
+                                        mru = name[8:16]
+                                        cid = name[16:25]
+
+                                        batch_data.append((cid, date_orig, date_iso, mru, name, dir_id))
+
+                                        if len(batch_data) >= BATCH_SIZE:
+                                            cursor.executemany(
+                                                "INSERT OR IGNORE INTO images (consumer_id, date_original, date_iso, mru, filename, dir_id) VALUES (?,?,?,?,?,?)",
+                                                batch_data
+                                            )
+                                            conn.commit()
+                                            total_inserted += len(batch_data)
+                                            batch_data = []
+
+                                            now = time.time()
+                                            last_ui_update = now
+                                            elapsed = max(1, int(now - start))
+                                            speed = int(scanned_files_count / elapsed)
+                                            self._indexing_state["scanned"] = total_inserted
+                                            self._indexing_state["total"] = total_inserted
+                                            self._indexing_state["new_added"] = total_inserted
+                                            self._indexing_state["files_seen"] = scanned_files_count
+                                            self._indexing_state["elapsed"] = elapsed
+                                            self._indexing_state["speed"] = speed
+                                            self._indexing_state["current_folder"] = cur_display
+                                        else:
+                                            now = time.time()
+                                            if now - last_ui_update >= 0.3:
+                                                last_ui_update = now
+                                                elapsed = max(1, int(now - start))
+                                                self._indexing_state["files_seen"] = scanned_files_count
+                                                self._indexing_state["elapsed"] = elapsed
+                                                self._indexing_state["speed"] = int(scanned_files_count / elapsed)
+                                                self._indexing_state["new_added"] = total_inserted
+                                                self._indexing_state["current_folder"] = cur_display
+                                    except Exception:
+                                        continue
+                        except Exception:
                             continue
-
-                        if root_dir not in dir_cache:
-                            cursor.execute("INSERT OR IGNORE INTO directories (dir_path) VALUES (?)", (root_dir,))
-                            cursor.execute("SELECT id FROM directories WHERE dir_path = ?", (root_dir,))
-                            row = cursor.fetchone()
-                            if row:
-                                dir_cache[root_dir] = row[0]
-                            else:
-                                dir_cache[root_dir] = next_dir_id
-                                next_dir_id += 1
-                        dir_id = dir_cache[root_dir]
-
-                        # Pre-load known filenames for this directory to make incremental scan instant
-                        existing_in_dir = None
-                        if not full_reindex:
-                            cursor.execute("SELECT filename FROM images WHERE dir_id = ?", (dir_id,))
-                            existing_in_dir = set(row[0] for row in cursor.fetchall())
-
-                        for filename in files:
-                            scanned_files_count += 1
-                            if existing_in_dir is not None and filename in existing_in_dir:
-                                continue
-
-                            try:
-                                if len(filename) < 25:
-                                    continue
-                                if not filename[:8].isdigit():
-                                    continue
-
-                                date_orig = filename[:8]
-                                try:
-                                    dt = datetime.strptime(date_orig, "%d%m%Y")
-                                    date_iso = dt.strftime("%Y-%m-%d")
-                                except ValueError:
-                                    continue
-
-                                mru = filename[8:16]
-                                cid = filename[16:25]
-
-                                batch_data.append((cid, date_orig, date_iso, mru, filename, dir_id))
-
-                                if len(batch_data) >= BATCH_SIZE:
-                                    cursor.executemany(
-                                        "INSERT OR IGNORE INTO images (consumer_id, date_original, date_iso, mru, filename, dir_id) VALUES (?,?,?,?,?,?)",
-                                        batch_data
-                                    )
-                                    conn.commit()
-                                    total_inserted += len(batch_data)
-                                    batch_data = []
-                                    elapsed = max(1, int(time.time() - start))
-                                    speed = int(scanned_files_count / elapsed)
-                                    self._indexing_state["scanned"] = total_inserted
-                                    self._indexing_state["total"] = total_inserted
-                                    self._indexing_state["new_added"] = total_inserted
-                                    self._indexing_state["files_seen"] = scanned_files_count
-                                    self._indexing_state["elapsed"] = elapsed
-                                    self._indexing_state["speed"] = speed
-                            except Exception:
-                                continue
 
                 if batch_data:
                     cursor.executemany(

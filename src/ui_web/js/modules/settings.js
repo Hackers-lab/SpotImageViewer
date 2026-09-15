@@ -953,7 +953,9 @@ async function startIndexing(options = {}) {
     // Dynamic progress bar percentage
     const dynamicPct = count > 0 
       ? Math.min(95, 20 + Math.floor(Math.log10(count + 1) * 15)) 
-      : Math.min(45, 10 + (elapsed * 2));
+      : (filesSeen > 0 
+          ? Math.min(85, 15 + Math.floor(Math.log10(filesSeen + 1) * 14)) 
+          : Math.min(45, 10 + (elapsed * 2)));
 
     if (topTimelineBar) {
       topTimelineBar.style.width = `${dynamicPct}%`;
