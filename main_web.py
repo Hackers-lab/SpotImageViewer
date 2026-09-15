@@ -107,9 +107,29 @@ class StreamTee:
 
 def setup_logging():
     try:
+        import logging
         log_file_path = os.path.join(BASE_DIR, "app_debug.log")
         sys.stdout = StreamTee(sys.stdout, log_file_path)
         sys.stderr = StreamTee(sys.stderr, log_file_path)
+
+        # File handler for Python logging & PyWebView engine logs
+        file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
+        file_handler.setFormatter(logging.Formatter("[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"))
+
+        # Re-target pywebview logger so all webview comments/events are recorded
+        wv_logger = logging.getLogger('pywebview')
+        wv_logger.handlers.clear()
+        wv_stream_handler = logging.StreamHandler(sys.stderr)
+        wv_stream_handler.setFormatter(logging.Formatter("[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"))
+        wv_logger.addHandler(wv_stream_handler)
+        wv_logger.addHandler(file_handler)
+        wv_logger.setLevel(logging.INFO)
+
+        # Ensure root logger also writes to log file
+        root_logger = logging.getLogger()
+        if not any(isinstance(h, logging.FileHandler) for h in root_logger.handlers):
+            root_logger.addHandler(file_handler)
+
         print(f"=== SpotImageViewer Studio Session Started: {time.strftime('%Y-%m-%d %H:%M:%S')} ===")
     except Exception:
         pass

@@ -155,7 +155,7 @@ class FolderIndexerService:
     def check_folder_changes(self):
         """
         Fast disk check to detect if unindexed spot billing photos exist on disk.
-        Compares disk spot photos against SQLite indexed images in < 0.5s.
+        Supports both top-level and nested subfolders across local and network shares in < 0.8s.
         """
         if self._indexing_state["running"]:
             return {"success": True, "indexing_running": True, "has_changes": False}
@@ -171,68 +171,89 @@ class FolderIndexerService:
             conn = database.get_db_connection()
             cursor = conn.cursor()
 
+            cursor.execute("SELECT id, dir_path FROM directories")
+            all_dirs = cursor.fetchall()
+            known_dirs = {os.path.normpath(row[1]).lower(): row[0] for row in all_dirs}
+
+            cursor.execute("SELECT dir_id, COUNT(*) FROM images GROUP BY dir_id")
+            db_counts = dict(cursor.fetchall())
+
             baseline = self._get_baseline_stats()
-            total_disk_photos = 0
+            dir_mtimes = baseline.get("dir_mtimes", {})
+            is_first_mtime_init = len(dir_mtimes) == 0
+
             changed_folders = []
             total_diff = 0
+            now = time.time()
 
-            for folder in unique_folders:
-                folder_norm = os.path.normpath(folder).lower()
-                is_local = len(folder) >= 2 and folder[1] == ':'
-
-                cursor.execute(
-                    "SELECT COUNT(*) FROM images WHERE dir_id IN (SELECT id FROM directories WHERE dir_path LIKE ?)",
-                    (f"{folder}%",)
-                )
-                db_count = cursor.fetchone()[0]
-
-                disk_photos = 0
+            # 1. Check for brand new subfolders created on disk that are not yet in the DB
+            for root_folder in unique_folders:
                 try:
-                    if is_local:
-                        for root, dirs, files in os.walk(folder):
-                            for f in files:
-                                if len(f) >= 25 and f[:8].isdigit():
-                                    disk_photos += 1
-                    else:
-                        mtime = os.path.getmtime(folder) if os.path.exists(folder) else 0
-                        prev_mtime = baseline.get(folder_norm, {}).get("last_mtime", 0)
-                        prev_count = baseline.get(folder_norm, {}).get("spot_photos", db_count)
-                        if prev_count > 0 and mtime == prev_mtime and prev_mtime > 0:
-                            disk_photos = prev_count
-                        else:
-                            for root, dirs, files in os.walk(folder):
-                                for f in files:
-                                    if len(f) >= 25 and f[:8].isdigit():
-                                        disk_photos += 1
+                    for entry in os.scandir(root_folder):
+                        if entry.is_dir():
+                            norm_entry = os.path.normpath(entry.path).lower()
+                            if norm_entry not in known_dirs:
+                                new_photos = sum(1 for f in os.listdir(entry.path) if len(f) >= 25 and f[:8].isdigit())
+                                if new_photos > 0:
+                                    changed_folders.append(entry.path)
+                                    total_diff += new_photos
                 except Exception:
-                    disk_photos = db_count
+                    pass
 
-                total_disk_photos += disk_photos
-                folder_diff = disk_photos - db_count
-                if folder_diff != 0:
-                    changed_folders.append(folder)
-                    total_diff += folder_diff
+            # 2. Check all known directories in DB (both local and network)
+            for dir_id, dir_path in all_dirs:
+                dir_norm = os.path.normpath(dir_path).lower()
+                try:
+                    if not os.path.exists(dir_path):
+                        continue
+                    mtime = os.path.getmtime(dir_path)
+                    prev_mtime = dir_mtimes.get(dir_norm)
+                    dir_mtimes[dir_norm] = mtime
 
-                baseline[folder_norm] = {
-                    "path": folder,
-                    "spot_photos": disk_photos,
-                    "last_mtime": os.path.getmtime(folder) if os.path.exists(folder) else 0
-                }
+                    needs_check = False
+                    if prev_mtime is not None:
+                        if mtime != prev_mtime:
+                            needs_check = True
+                    elif is_first_mtime_init:
+                        # On initial startup before baseline exists, scan directories modified in last 48 hours
+                        if (now - mtime) < 172800:
+                            needs_check = True
 
+                    if needs_check:
+                        disk_cnt = sum(1 for f in os.listdir(dir_path) if len(f) >= 25 and f[:8].isdigit())
+                        db_cnt = db_counts.get(dir_id, 0)
+                        diff = disk_cnt - db_cnt
+                        if diff != 0:
+                            changed_folders.append(dir_path)
+                            total_diff += diff
+                except Exception:
+                    pass
+
+            baseline["dir_mtimes"] = dir_mtimes
             self._save_baseline_stats(baseline)
+
             indexed_count = database.get_total_image_count()
             has_changes = len(changed_folders) > 0 or (total_diff != 0)
+
+            # Clean folder names for display (e.g. "ImageBackup\042022")
+            changed_display_names = []
+            for cf in changed_folders:
+                parts = os.path.normpath(cf).split(os.sep)
+                if len(parts) >= 2:
+                    changed_display_names.append(f"{parts[-2]}\\{parts[-1]}")
+                else:
+                    changed_display_names.append(parts[-1])
 
             res = {
                 "success": True,
                 "has_changes": has_changes,
-                "current_files": total_disk_photos,
-                "disk_files": total_disk_photos,
+                "current_files": indexed_count + total_diff,
+                "disk_files": indexed_count + total_diff,
                 "indexed_count": indexed_count,
                 "indexed_images": indexed_count,
                 "diff": total_diff,
                 "changed_folders": changed_folders,
-                "changed_folder_names": [os.path.basename(f) or f for f in changed_folders],
+                "changed_folder_names": changed_display_names,
                 "mode": self.get_auto_index_mode()
             }
             self._cached_folder_check_result = res
@@ -276,10 +297,14 @@ class FolderIndexerService:
                     if f and path_accessible(f) and os.path.normpath(f) not in [os.path.normpath(u) for u in unique_folders]:
                         unique_folders.append(f)
 
-                # Filter target folders if specified
+                # Filter target folders if specified (accepts both root folders and nested subfolders)
                 if target_folders:
-                    targets_norm = [os.path.normpath(t).lower() for t in target_folders if t]
-                    scan_folders = [f for f in unique_folders if os.path.normpath(f).lower() in targets_norm]
+                    scan_folders = []
+                    for t in target_folders:
+                        if t and path_accessible(t):
+                            t_norm = os.path.normpath(t).lower()
+                            if any(t_norm == os.path.normpath(u).lower() or t_norm.startswith(os.path.normpath(u).lower() + os.sep) for u in unique_folders):
+                                scan_folders.append(t)
                     if not scan_folders:
                         scan_folders = unique_folders
                 else:
@@ -396,21 +421,14 @@ class FolderIndexerService:
 
                 # Update baseline stats for the scanned folders so change detector is in sync
                 baseline = self._get_baseline_stats()
+                dir_mtimes = baseline.get("dir_mtimes", {})
                 for folder in scan_folders:
                     folder_norm = os.path.normpath(folder).lower()
                     try:
-                        cursor.execute(
-                            "SELECT COUNT(*) FROM images WHERE dir_id IN (SELECT id FROM directories WHERE dir_path LIKE ?)",
-                            (f"{folder}%",)
-                        )
-                        db_c = cursor.fetchone()[0]
-                        baseline[folder_norm] = {
-                            "path": folder,
-                            "spot_photos": db_c,
-                            "last_mtime": os.path.getmtime(folder) if os.path.exists(folder) else 0
-                        }
+                        dir_mtimes[folder_norm] = os.path.getmtime(folder) if os.path.exists(folder) else 0
                     except Exception:
                         pass
+                baseline["dir_mtimes"] = dir_mtimes
                 self._save_baseline_stats(baseline)
 
                 elapsed = max(1, int(time.time() - start))
