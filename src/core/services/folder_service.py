@@ -152,90 +152,82 @@ class FolderIndexerService:
     def _save_baseline_stats(self, stats):
         database.set_info_value("folder_baseline_stats", stats)
 
-    def check_folder_changes(self, async_check=True):
+    def check_folder_changes(self):
         """
-        Fast disk check to detect if file counts or directory state changed.
-        If async_check=True, returns immediately with the latest cached state and
-        performs disk traversal in a background daemon thread so the UI never hangs.
+        Fast disk check to detect if unindexed spot billing photos exist on disk.
+        Compares disk spot photos against SQLite indexed images in < 0.5s.
         """
         if self._indexing_state["running"]:
             return {"success": True, "indexing_running": True, "has_changes": False}
 
-        if async_check:
-            if not self._folder_check_running:
-                threading.Thread(target=self._run_folder_check, daemon=True).start()
-            return self._cached_folder_check_result
-        return self._run_folder_check()
-
-    def _run_folder_check(self):
-        if self._folder_check_running:
-            return self._cached_folder_check_result
-
-        self._folder_check_running = True
         try:
             additional_folders = database.get_additional_folders()
             folders = [config.IMAGE_FOLDER] + (additional_folders or [])
             unique_folders = []
             for f in folders:
-                if f and path_accessible(f, timeout=1.0) and os.path.normpath(f) not in [os.path.normpath(u) for u in unique_folders]:
+                if f and path_accessible(f, timeout=0.8) and os.path.normpath(f) not in [os.path.normpath(u) for u in unique_folders]:
                     unique_folders.append(f)
 
+            conn = database.get_db_connection()
+            cursor = conn.cursor()
+
             baseline = self._get_baseline_stats()
-            total_disk_files = 0
+            total_disk_photos = 0
             changed_folders = []
             total_diff = 0
-            is_initial_baseline = len(baseline) == 0
 
             for folder in unique_folders:
                 folder_norm = os.path.normpath(folder).lower()
-                current_count = 0
                 is_local = len(folder) >= 2 and folder[1] == ':'
+
+                cursor.execute(
+                    "SELECT COUNT(*) FROM images WHERE dir_id IN (SELECT id FROM directories WHERE dir_path LIKE ?)",
+                    (f"{folder}%",)
+                )
+                db_count = cursor.fetchone()[0]
+
+                disk_photos = 0
                 try:
                     if is_local:
                         for root, dirs, files in os.walk(folder):
-                            current_count += len(files)
+                            for f in files:
+                                if len(f) >= 25 and f[:8].isdigit():
+                                    disk_photos += 1
                     else:
-                        # For remote network UNC paths, check folder mtime
-                        # to prevent multi-minute SMB traversal hangs
                         mtime = os.path.getmtime(folder) if os.path.exists(folder) else 0
                         prev_mtime = baseline.get(folder_norm, {}).get("last_mtime", 0)
-                        prev_count = baseline.get(folder_norm, {}).get("file_count", 0)
-                        if prev_count > 0 and mtime == prev_mtime:
-                            current_count = prev_count
+                        prev_count = baseline.get(folder_norm, {}).get("spot_photos", db_count)
+                        if prev_count > 0 and mtime == prev_mtime and prev_mtime > 0:
+                            disk_photos = prev_count
                         else:
                             for root, dirs, files in os.walk(folder):
-                                current_count += len(files)
+                                for f in files:
+                                    if len(f) >= 25 and f[:8].isdigit():
+                                        disk_photos += 1
                 except Exception:
-                    continue
+                    disk_photos = db_count
 
-                total_disk_files += current_count
+                total_disk_photos += disk_photos
+                folder_diff = disk_photos - db_count
+                if folder_diff != 0:
+                    changed_folders.append(folder)
+                    total_diff += folder_diff
 
-                if folder_norm not in baseline:
-                    baseline[folder_norm] = {
-                        "path": folder,
-                        "file_count": current_count,
-                        "last_mtime": os.path.getmtime(folder) if os.path.exists(folder) else 0
-                    }
-                else:
-                    prev_count = baseline[folder_norm].get("file_count", 0)
-                    folder_diff = current_count - prev_count
-                    if folder_diff != 0:
-                        changed_folders.append(folder)
-                        total_diff += folder_diff
+                baseline[folder_norm] = {
+                    "path": folder,
+                    "spot_photos": disk_photos,
+                    "last_mtime": os.path.getmtime(folder) if os.path.exists(folder) else 0
+                }
 
-            if is_initial_baseline:
-                self._save_baseline_stats(baseline)
-                total_diff = 0
-                changed_folders = []
-
+            self._save_baseline_stats(baseline)
             indexed_count = database.get_total_image_count()
             has_changes = len(changed_folders) > 0 or (total_diff != 0)
 
             res = {
                 "success": True,
                 "has_changes": has_changes,
-                "current_files": total_disk_files,
-                "disk_files": total_disk_files,
+                "current_files": total_disk_photos,
+                "disk_files": total_disk_photos,
                 "indexed_count": indexed_count,
                 "indexed_images": indexed_count,
                 "diff": total_diff,
@@ -247,8 +239,6 @@ class FolderIndexerService:
             return res
         except Exception as e:
             return {"success": False, "error": str(e), "has_changes": False}
-        finally:
-            self._folder_check_running = False
 
     def start_indexing(self, target_folders=None, full_reindex=False):
         """
@@ -399,10 +389,14 @@ class FolderIndexerService:
                 for folder in scan_folders:
                     folder_norm = os.path.normpath(folder).lower()
                     try:
-                        f_count = sum(len(f_files) for _, _, f_files in os.walk(folder))
+                        cursor.execute(
+                            "SELECT COUNT(*) FROM images WHERE dir_id IN (SELECT id FROM directories WHERE dir_path LIKE ?)",
+                            (f"{folder}%",)
+                        )
+                        db_c = cursor.fetchone()[0]
                         baseline[folder_norm] = {
                             "path": folder,
-                            "file_count": f_count,
+                            "spot_photos": db_c,
                             "last_mtime": os.path.getmtime(folder) if os.path.exists(folder) else 0
                         }
                     except Exception:

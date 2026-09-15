@@ -1117,17 +1117,17 @@ async function initAutoIndexing() {
 
   // Initial check after short delay
   if (mode !== 'manual') {
-    setTimeout(checkFolderChanges, 2500);
+    setTimeout(checkFolderChanges, 800);
   }
 
-  // Periodic check every 60 seconds
+  // Periodic check every 20 seconds
   if (autoIndexCheckTimer) clearInterval(autoIndexCheckTimer);
   autoIndexCheckTimer = setInterval(() => {
     const currentMode = document.getElementById('selectAutoIndexMode')?.value || 'prompt';
     if (currentMode !== 'manual') {
       checkFolderChanges();
     }
-  }, 60000);
+  }, 20000);
 }
 
 async function changeAutoIndexMode(mode) {
@@ -1166,7 +1166,8 @@ async function checkFolderChanges() {
           const folderNames = (res.changed_folder_names && res.changed_folder_names.length > 0)
             ? res.changed_folder_names.join(', ')
             : 'linked folder';
-          text.innerText = `Folder contents changed in [${folderNames}] (${sign} files: ${currentFiles.toLocaleString()} files on disk). Quick sync to update index?`;
+          const diffText = res.diff > 0 ? `+${res.diff.toLocaleString()} unindexed photo${res.diff > 1 ? 's' : ''}` : `${sign} photos`;
+          text.innerText = `New photos detected in [${folderNames}] (${diffText}). Quick sync to update index?`;
           banner.classList.remove('hidden');
           safeCreateIcons();
         }

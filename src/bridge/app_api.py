@@ -536,7 +536,7 @@ class AppAPI:
         return self.folder_service.get_indexing_status()
 
     def check_folder_changes(self):
-        return self.folder_service.check_folder_changes(async_check=True)
+        return self.folder_service.check_folder_changes()
 
     def get_auto_index_settings(self):
         return {"success": True, "mode": self.folder_service.get_auto_index_mode()}
