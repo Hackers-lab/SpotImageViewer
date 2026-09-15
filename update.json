@@ -6,7 +6,7 @@
   "zip_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.55/SpotImageViewer_Setup_v20.55.exe",
   "install_args": "/VERYSILENT /NORESTART",
   "launch_exe": "SpotImageViewer\\SpotImageViewerV20.55.exe",
-  "sha256": "",
+  "sha256": "2959F81D242177A66EC32AA626663B32F92D7F1EB7D8EF977DB20FBE1F41D92B",
   "previous_versions": [
     {
       "version": 20.54,
