@@ -472,10 +472,23 @@ async function fetchCandidateLiveOsd(consumerId, qIdx, cIdx) {
     }
 
     const d = res.data;
+    const rawStatus = (d.connectionStatus && d.connectionStatus !== 'N/A') ? String(d.connectionStatus).trim() : '';
+    const normStatus = rawStatus.toUpperCase();
     let statusClass = "text-slate-500";
-    if (d.isLive) statusClass = "text-emerald-600 dark:text-emerald-400 font-bold";
-    else if (d.isDeemed) statusClass = "text-amber-600 dark:text-amber-400 font-bold";
-    else if (d.isDisconnected) statusClass = "text-rose-600 dark:text-rose-400 font-bold";
+    let dotClass = "bg-slate-400";
+    if (d.isDeemed || normStatus.includes('DEEMED')) {
+      statusClass = "text-amber-600 dark:text-amber-400 font-bold";
+      dotClass = "bg-amber-500";
+    } else if (d.isTempDisconnected || normStatus.includes('TEMP')) {
+      statusClass = "text-amber-600 dark:text-amber-400 font-bold";
+      dotClass = "bg-amber-500";
+    } else if (d.isDisconnected || normStatus.includes('DISCONNECT') || normStatus.includes('DISCONN')) {
+      statusClass = "text-rose-600 dark:text-rose-400 font-bold";
+      dotClass = "bg-rose-500";
+    } else if (d.isLive || normStatus === 'LIVE' || (!normStatus.includes('DISCONNECT') && normStatus.includes('CONNECT'))) {
+      statusClass = "text-emerald-600 dark:text-emerald-400 font-bold";
+      dotClass = "bg-emerald-500";
+    }
 
     const totalFmt = Number(d.totalDues || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const duesClass = (d.totalDues > 0) ? "text-amber-600 dark:text-amber-400 font-bold" : "text-emerald-600 dark:text-emerald-400 font-medium";
@@ -484,8 +497,8 @@ async function fetchCandidateLiveOsd(consumerId, qIdx, cIdx) {
       <div class="text-left py-0.5 leading-tight">
         <div class="font-mono text-[10.5px] ${duesClass}">\u20B9 ${totalFmt}</div>
         <div class="text-[9px] ${statusClass} flex items-center gap-1">
-          <span class="w-1.5 h-1.5 rounded-full ${d.isLive ? 'bg-emerald-500' : (d.isDeemed ? 'bg-amber-500' : 'bg-rose-500')}"></span>
-          <span>${escapeHtml(d.connectionStatus || 'LIVE')}</span>
+          <span class="w-1.5 h-1.5 rounded-full ${dotClass}"></span>
+          <span>${escapeHtml(rawStatus || 'LIVE')}</span>
         </div>
       </div>
     `;

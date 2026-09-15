@@ -106,20 +106,27 @@ function renderSingleOsdResult(d) {
 
   // Connection Status Badge
   const statusBadge = document.getElementById('osdResStatusBadge');
-  const normStatus = String(d.connectionStatus || '').toUpperCase();
+  const rawStatus = (d.connectionStatus && d.connectionStatus !== 'N/A') ? String(d.connectionStatus).trim() : '';
+  const normStatus = rawStatus.toUpperCase();
   if (statusBadge) {
-    if (d.isLive || normStatus === 'LIVE' || normStatus.includes('CONNECT')) {
-      statusBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1";
-      statusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Connected`;
-    } else if (d.isDeemed || normStatus.includes('DEEMED')) {
+    if (d.isDeemed || normStatus.includes('DEEMED')) {
       statusBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1";
-      statusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Deemed Disconnected`;
-    } else if (d.isDisconnected || normStatus.includes('DISCONNECT')) {
+      statusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> ${escapeHtml(rawStatus || 'Deemed Disconnected')}`;
+    } else if (d.isTempDisconnected || normStatus.includes('TEMP')) {
+      statusBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1";
+      statusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> ${escapeHtml(rawStatus || 'Temp Disconnected')}`;
+    } else if (d.isDisconnected || normStatus.includes('DISCONNECT') || normStatus.includes('DISCONN')) {
       statusBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 flex items-center gap-1";
-      statusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Disconnected`;
+      statusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> ${escapeHtml(rawStatus || 'Disconnected')}`;
+    } else if (d.isLive || normStatus === 'LIVE' || (!normStatus.includes('DISCONNECT') && normStatus.includes('CONNECT'))) {
+      statusBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1";
+      statusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> ${escapeHtml(rawStatus || 'Connected')}`;
+    } else if (rawStatus) {
+      statusBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-500/15 text-slate-600 dark:text-slate-400 border border-slate-500/30";
+      statusBadge.innerText = rawStatus;
     } else {
       statusBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-500/15 text-slate-600 dark:text-slate-400 border border-slate-500/30";
-      statusBadge.innerText = d.connectionStatus || 'Status Unknown';
+      statusBadge.innerText = 'Status Unknown';
     }
   }
 
@@ -413,7 +420,7 @@ function renderBulkTable(results) {
     const st = String(r.connectionStatus || '').toUpperCase();
     if (filter === 'dues') return tot > 0;
     if (filter === 'nodues') return tot === 0 && r.status === 'Success';
-    if (filter === 'disconnected') return st.includes('DISCONNECT') || st.includes('DEEMED');
+    if (filter === 'disconnected') return st.includes('DISCONNECT') || st.includes('DEEMED') || st.includes('TEMP');
     return true;
   });
 
@@ -422,18 +429,23 @@ function renderBulkTable(results) {
     const osdVal = Number(r.osd || 0);
     const lpscVal = Number(r.lpsc || 0);
     const totVal = Number(r.totalDues || 0);
-    const st = String(r.connectionStatus || '').toUpperCase();
+    const rawStatus = (r.connectionStatus && r.connectionStatus !== 'N/A') ? String(r.connectionStatus).trim() : '';
+    const st = rawStatus.toUpperCase();
 
-    // Status Pill
+    // Status Pill - displays actual status fetched from PDF
     let statusPill = `<span class="text-[10px] text-slate-400 font-semibold">-</span>`;
     if (r.status === 'Failed') {
       statusPill = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20" title="${escapeHtml(r.error || '')}">Error</span>`;
-    } else if (r.isLive || st === 'LIVE' || st.includes('CONNECT')) {
-      statusPill = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">Connected</span>`;
     } else if (r.isDeemed || st.includes('DEEMED')) {
-      statusPill = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">Deemed</span>`;
-    } else if (r.isDisconnected || st.includes('DISCONNECT')) {
-      statusPill = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25">Disconnected</span>`;
+      statusPill = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">${escapeHtml(rawStatus || 'Deemed')}</span>`;
+    } else if (r.isTempDisconnected || st.includes('TEMP')) {
+      statusPill = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">${escapeHtml(rawStatus || 'Temp Disconnected')}</span>`;
+    } else if (r.isDisconnected || st.includes('DISCONNECT') || st.includes('DISCONN')) {
+      statusPill = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25">${escapeHtml(rawStatus || 'Disconnected')}</span>`;
+    } else if (r.isLive || st === 'LIVE' || (!st.includes('DISCONNECT') && st.includes('CONNECT'))) {
+      statusPill = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">${escapeHtml(rawStatus || 'Connected')}</span>`;
+    } else if (rawStatus) {
+      statusPill = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/15 text-slate-600 dark:text-slate-400 border border-slate-500/25">${escapeHtml(rawStatus)}</span>`;
     }
 
     // Office snippet

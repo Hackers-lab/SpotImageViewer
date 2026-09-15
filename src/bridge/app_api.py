@@ -280,9 +280,29 @@ class AppAPI:
             if not rows:
                 return {"success": False, "error": f"No images found for Consumer ID {cid}."}
 
+            # Deduplicate by date: when multiple images of the same date exist from different folders,
+            # select only ONE best image per date (preferring existing files and local storage)
+            from collections import OrderedDict
+            by_date = OrderedDict()
+            for date_orig, mru, dir_path, filename in rows:
+                if date_orig not in by_date:
+                    by_date[date_orig] = []
+                by_date[date_orig].append((mru, dir_path, filename))
+
             grouped = {}
             flat_images = []
-            for date_orig, mru, dir_path, filename in rows:
+            for date_orig, candidates in by_date.items():
+                chosen = candidates[0]
+                # If multiple candidates exist for the same date, prefer one whose file exists on disk
+                if len(candidates) > 1:
+                    for cand in candidates:
+                        mru, dir_path, filename = cand
+                        fp = os.path.join(dir_path, filename)
+                        if os.path.exists(fp):
+                            chosen = cand
+                            break
+
+                mru, dir_path, filename = chosen
                 full_path = os.path.join(dir_path, filename)
                 pretty_date = f"{date_orig[:2]}-{date_orig[2:4]}-{date_orig[4:]}" if len(date_orig) == 8 else date_orig
 
@@ -294,9 +314,7 @@ class AppAPI:
                     "full_path": full_path,
                     "exists": True
                 }
-                if pretty_date not in grouped:
-                    grouped[pretty_date] = []
-                grouped[pretty_date].append(item)
+                grouped[pretty_date] = [item]
                 flat_images.append(item)
 
             profile = database.get_consumer_profile(cid)
@@ -305,8 +323,8 @@ class AppAPI:
                 "success": True,
                 "consumer_id": cid,
                 "profile": profile,
-                "mru": rows[0][1] if rows else "",
-                "total_images": len(rows),
+                "mru": flat_images[0]["mru"] if flat_images else "",
+                "total_images": len(flat_images),
                 "dates": list(grouped.keys()),
                 "grouped": grouped,
                 "images": flat_images
@@ -683,33 +701,38 @@ class AppAPI:
         try:
             if self._window and hasattr(self._window, 'gui'):
                 uid = getattr(self._window, 'uid', None)
-                from webview.platforms.winforms import BrowserView
+                from webview.platforms.winforms import BrowserView, OpenFolderDialog
                 inst = BrowserView.instances.get(uid)
                 if inst:
-                    import clr
-                    clr.AddReference('System.Windows.Forms')
-                    clr.AddReference('System')
-                    from System.Windows.Forms import FolderBrowserDialog, DialogResult
                     from System import Func, Object
 
-                    def _show_fbd():
+                    def _show_native_folder():
                         try:
-                            fbd = FolderBrowserDialog()
-                            fbd.Description = title
-                            fbd.ShowNewFolderButton = True
-                            if initial_dir and os.path.exists(initial_dir):
-                                fbd.SelectedPath = initial_dir
-                            res = fbd.ShowDialog(inst)
-                            if res == DialogResult.OK:
-                                return fbd.SelectedPath
+                            # Uses native Windows Vista/7/10/11 IFileDialog with FOS_PICKFOLDERS
+                            # providing full Windows Explorer navigation with Search box,
+                            # expandable Network locations, and address bar.
+                            res = OpenFolderDialog.show(inst, initial_dir or None, False, title)
+                            if res and len(res) > 0:
+                                return res[0]
                             return ""
                         finally:
                             self._ensure_window_enabled()
 
-                    chosen = inst.Invoke(Func[Object](_show_fbd))
+                    chosen = inst.Invoke(Func[Object](_show_native_folder))
                     return str(chosen) if chosen else ""
         except Exception as e:
-            print(f"[pick_folder WinForms Invoke error]: {e}")
+            print(f"[pick_folder WinForms OpenFolderDialog error]: {e}")
+
+        try:
+            if self._window and hasattr(self._window, "create_file_dialog"):
+                import webview
+                res = self._window.create_file_dialog(webview.FOLDER_DIALOG, directory=initial_dir or "")
+                self._ensure_window_enabled()
+                if res and len(res) > 0:
+                    return res[0]
+                return ""
+        except Exception as e:
+            print(f"[pick_folder webview error]: {e}")
 
         try:
             import tkinter as tk

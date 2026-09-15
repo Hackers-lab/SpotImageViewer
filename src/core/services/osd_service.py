@@ -180,6 +180,7 @@ class OSDService:
                         "totalDues": float(d.get("totalDues", 0.0) or 0.0),
                         "isLive": bool(d.get("isLive", False)),
                         "isDeemed": bool(d.get("isDeemed", False)),
+                        "isTempDisconnected": bool(d.get("isTempDisconnected", False)),
                         "isDisconnected": bool(d.get("isDisconnected", False)),
                         "status": "Success",
                         "error": ""
@@ -385,12 +386,15 @@ class OSDService:
                             c.font = red_font if tot_val > 0 else green_font
                     elif c_idx == 6:
                         c.alignment = Alignment(horizontal="center")
-                        if "LIVE" in conn_status or "CONNECTED" in conn_status:
-                            c.font = green_font
-                        elif "DEEMED" in conn_status:
+                        upper_status = conn_status.upper()
+                        if "DEEMED" in upper_status:
                             c.font = amber_font
-                        elif "DISCONNECT" in conn_status:
+                        elif "TEMP" in upper_status:
+                            c.font = amber_font
+                        elif "DISCONNECT" in upper_status or "DISCONN" in upper_status:
                             c.font = red_font
+                        elif "LIVE" in upper_status or "CONNECTED" in upper_status:
+                            c.font = green_font
 
                 ws.row_dimensions[curr_row].height = 20
                 curr_row += 1

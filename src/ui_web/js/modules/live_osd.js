@@ -138,19 +138,23 @@ function _renderLiveOsdData(res) {
   // Status styling - Simple clean text without pill
   if (statusBadge) statusBadge.className = "";
   if (statusText) {
-    const connStatus = String(d.connectionStatus || '').toUpperCase();
-    if (d.isLive || connStatus === 'LIVE') {
-      statusText.className = "text-[10.5px] font-bold text-emerald-600 dark:text-emerald-400";
-      statusText.innerText = "Connected";
-    } else if (d.isDeemed || connStatus === 'DEEMED') {
+    const rawStatus = (d.connectionStatus && d.connectionStatus !== 'N/A') ? String(d.connectionStatus).trim() : '';
+    const connStatus = rawStatus.toUpperCase();
+    if (d.isDeemed || connStatus.includes('DEEMED')) {
       statusText.className = "text-[10px] font-bold text-amber-600 dark:text-amber-400";
-      statusText.innerText = d.connectionStatus || "Deemed";
-    } else if (d.isDisconnected || connStatus === 'DISCONNECTED') {
+      statusText.innerText = rawStatus || "Deemed";
+    } else if (d.isTempDisconnected || connStatus.includes('TEMP')) {
+      statusText.className = "text-[10px] font-bold text-amber-600 dark:text-amber-400";
+      statusText.innerText = rawStatus || "Temp Disconnected";
+    } else if (d.isDisconnected || connStatus.includes('DISCONNECT') || connStatus.includes('DISCONN')) {
       statusText.className = "text-[10px] font-bold text-rose-600 dark:text-rose-400";
-      statusText.innerText = d.connectionStatus || "Disconnected";
+      statusText.innerText = rawStatus || "Disconnected";
+    } else if (d.isLive || connStatus === 'LIVE' || (!connStatus.includes('DISCONNECT') && connStatus.includes('CONNECT'))) {
+      statusText.className = "text-[10.5px] font-bold text-emerald-600 dark:text-emerald-400";
+      statusText.innerText = rawStatus || "Connected";
     } else {
       statusText.className = "text-[10px] font-semibold text-slate-600 dark:text-slate-400";
-      statusText.innerText = d.connectionStatus || "-";
+      statusText.innerText = rawStatus || "-";
     }
   }
 

@@ -5,9 +5,9 @@ PROJECT_ROOT = os.path.abspath(os.path.join(SPECPATH, '..'))
 sys.path.insert(0, os.path.join(PROJECT_ROOT, 'src', 'core'))
 try:
     import config
-    APP_VERSION = str(getattr(config, 'CURRENT_VERSION', '20.53'))
+    APP_VERSION = str(getattr(config, 'CURRENT_VERSION', '20.54'))
 except Exception:
-    APP_VERSION = '20.53'
+    APP_VERSION = '20.54'
 APP_NAME = f'SpotImageViewerV{APP_VERSION}'
 
 a_main = Analysis(

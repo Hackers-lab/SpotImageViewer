@@ -138,7 +138,9 @@ def parse_osd_pdf(pdf_bytes: bytes, consumer_id: str) -> Dict[str, Any]:
     office_m = re.search(r"Office Name\s*:\s*(.+)", text)
     office = office_m.group(1).strip() if office_m else "N/A"
 
-    status_m = re.search(r"Connection Status\s*:\s*(.+)", text)
+    status_m = re.search(r"Connection Status\s*:\s*([^\n\r]+?)(?=\s{2,}|Date of Service Connection|Office Name|\t|\n|\r|$)", text, re.IGNORECASE)
+    if not status_m:
+        status_m = re.search(r"Connection Status\s*:\s*([^\n\r]+)", text, re.IGNORECASE)
     connection_status = status_m.group(1).strip() if status_m else "N/A"
 
     conn_date_m = re.search(r"Date of Service Connection\s*:\s*(.+)", text)
@@ -160,12 +162,14 @@ def parse_osd_pdf(pdf_bytes: bytes, consumer_id: str) -> Dict[str, Any]:
     total_dues = round(osd + lpsc, 2)
 
     # Status Flags
-    norm_status = connection_status.upper()
+    norm_status = connection_status.upper().strip()
     is_deemed = "DEEMED" in norm_status
-    is_disconnected = not is_deemed and "DISCONNECT" in norm_status
+    is_temp = "TEMP" in norm_status
+    is_disconnected = not is_deemed and not is_temp and ("DISCONNECT" in norm_status or "DISCONN" in norm_status)
     is_live = (
         not is_deemed
         and not is_disconnected
+        and not is_temp
         and ("LIVE" in norm_status or bool(re.search(r"\bCONNECTED\b", norm_status)))
     )
 
@@ -182,6 +186,7 @@ def parse_osd_pdf(pdf_bytes: bytes, consumer_id: str) -> Dict[str, Any]:
         "totalDues": total_dues,
         "isLive": is_live,
         "isDeemed": is_deemed,
+        "isTempDisconnected": is_temp,
         "isDisconnected": is_disconnected,
         "fileSizeKb": round(len(pdf_bytes) / 1024, 1),
     }
