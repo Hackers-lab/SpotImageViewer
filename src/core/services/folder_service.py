@@ -208,16 +208,13 @@ class FolderIndexerService:
                         continue
                     mtime = os.path.getmtime(dir_path)
                     prev_mtime = dir_mtimes.get(dir_norm)
-                    dir_mtimes[dir_norm] = mtime
-
                     needs_check = False
                     if prev_mtime is not None:
                         if mtime != prev_mtime:
                             needs_check = True
-                    elif is_first_mtime_init:
-                        # On initial startup before baseline exists, scan directories modified in last 48 hours
-                        if (now - mtime) < 172800:
-                            needs_check = True
+                    else:
+                        # Scan directory if not yet recorded in baseline
+                        needs_check = True
 
                     if needs_check:
                         disk_cnt = sum(1 for f in os.listdir(dir_path) if len(f) >= 25 and f[:8].isdigit())
@@ -226,6 +223,11 @@ class FolderIndexerService:
                         if diff != 0:
                             changed_folders.append(dir_path)
                             total_diff += diff
+                            # Do NOT update dir_mtimes while diff != 0 so notification persists until indexed
+                        else:
+                            dir_mtimes[dir_norm] = mtime
+                    else:
+                        dir_mtimes[dir_norm] = mtime
                 except Exception:
                     pass
 
