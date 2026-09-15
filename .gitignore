@@ -51,6 +51,12 @@ venv.bak/
 *.sqlite3
 *.log
 
+# Local Excel / Data sheets
+*.xlsm
+*.xlsx
+*.xls
+
+
 # IDE & Editor settings
 .vscode/
 .idea/

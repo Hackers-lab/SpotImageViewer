@@ -18,6 +18,7 @@ try:
     from core.services.folder_service import FolderIndexerService, path_accessible
     from core.services.update_service import UpdateService
     from core.services.osd_service import OSDService
+    from core.services import dcrc_parser, dcrc_processor, dcrc_exporter
 except ImportError:
     import config, database, utils, tariff_manager, live_osd_service
     from services.billing_service import BillingService
@@ -28,6 +29,7 @@ except ImportError:
     from services.folder_service import FolderIndexerService, path_accessible
     from services.update_service import UpdateService
     from services.osd_service import OSDService
+    from services import dcrc_parser, dcrc_processor, dcrc_exporter
 
 # Shared thread pool for offloading heavy I/O from the PyWebView bridge thread.
 _io_pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="siv-io")
@@ -55,6 +57,7 @@ class AppAPI:
         self._folder_service = FolderIndexerService()
         self._update_service = UpdateService()
         self._osd_service = OSDService()
+        self._last_dcrc_result = None
 
     def set_window(self, window):
         self._window = window
@@ -552,7 +555,79 @@ class AppAPI:
         except Exception:
             pass
 
+    @staticmethod
+    def _format_file_filters(file_types):
+        """
+        Normalizes arbitrary file_types specifications into valid formats for:
+        1. WinForms OpenFileDialog/SaveFileDialog: 'Desc1 (*.ext)|*.ext|All Files (*.*)|*.*'
+        2. pywebview Window.create_file_dialog: ('Desc1 (*.ext)', 'All Files (*.*)')
+        3. tkinter.filedialog: [('Desc1', '*.ext'), ('All Files', '*.*')]
+        """
+        pairs = []
+        if not file_types:
+            pairs = [("All Files", "*.*")]
+        elif isinstance(file_types, str):
+            if "|" in file_types:
+                parts = [p.strip() for p in file_types.split("|") if p.strip()]
+                for i in range(0, len(parts) - 1, 2):
+                    pairs.append((parts[i], parts[i + 1]))
+            else:
+                pairs.append((file_types, file_types))
+        elif isinstance(file_types, (list, tuple)):
+            for item in file_types:
+                if isinstance(item, (tuple, list)) and len(item) >= 2:
+                    pairs.append((str(item[0]), str(item[1])))
+                elif isinstance(item, str):
+                    m = re.match(r'^(.*?)\s*\((.*?)\)$', item.strip())
+                    if m:
+                        pairs.append((m.group(1).strip(), m.group(2).strip()))
+                    else:
+                        pairs.append((item.strip(), item.strip()))
+
+        normalized_pairs = []
+        has_all = False
+        for desc, patt in pairs:
+            clean_desc = re.sub(r'\s*\(.*?\)\s*$', '', desc).strip()
+            clean_patt = patt.strip('() ').strip()
+            if clean_patt == '*.*' or clean_desc.lower() == 'all files':
+                has_all = True
+                normalized_pairs.append(('All Files', '*.*'))
+            else:
+                normalized_pairs.append((clean_desc or 'Supported Files', clean_patt))
+
+        if not has_all:
+            normalized_pairs.append(('All Files', '*.*'))
+
+        # 1. WinForms filter string: "Description (pattern)|pattern|All Files (*.*)|*.*"
+        wf_parts = []
+        for desc, patt in normalized_pairs:
+            if patt == '*.*':
+                wf_parts.append('All Files (*.*)')
+                wf_parts.append('*.*')
+            else:
+                wf_parts.append(f'{desc} ({patt})')
+                wf_parts.append(patt)
+        winforms_str = '|'.join(wf_parts)
+
+        # 2. PyWebView filter tuple: ('Safe Description (*.ext)', ...)
+        pwv_list = []
+        for desc, patt in normalized_pairs:
+            safe_desc = re.sub(r'[^\w ]', ' ', desc)
+            safe_desc = ' '.join(safe_desc.split()) or 'Files'
+            clean_pw_patt = patt.replace(' ', '')
+            pwv_str = f'{safe_desc} ({clean_pw_patt})'
+            pwv_list.append(pwv_str)
+
+        # 3. Tkinter filetypes list: [('Description', '*.ext1 *.ext2'), ...]
+        tk_list = []
+        for desc, patt in normalized_pairs:
+            tk_patt = patt.replace(';', ' ')
+            tk_list.append((desc, tk_patt))
+
+        return winforms_str, tuple(pwv_list), tk_list
+
     def pick_file(self, title="Select File", file_types=None):
+        wf_filter, pwv_filter, tk_filter = self._format_file_filters(file_types)
         try:
             if self._window and hasattr(self._window, 'gui'):
                 uid = getattr(self._window, 'uid', None)
@@ -570,13 +645,8 @@ class AppAPI:
                             ofd = OpenFileDialog()
                             ofd.Title = title
                             ofd.RestoreDirectory = True
-                            if file_types:
-                                if isinstance(file_types, (list, tuple)):
-                                    ofd.Filter = "|".join(file_types)
-                                else:
-                                    ofd.Filter = str(file_types)
-                            else:
-                                ofd.Filter = "All Files (*.*)|*.*"
+                            ofd.Filter = wf_filter
+                            ofd.FilterIndex = 1
                             res = ofd.ShowDialog(inst)
                             if res == DialogResult.OK:
                                 return ofd.FileName
@@ -592,10 +662,7 @@ class AppAPI:
         try:
             if self._window and hasattr(self._window, "create_file_dialog"):
                 import webview
-                file_filter = ()
-                if file_types:
-                    file_filter = tuple(file_types) if isinstance(file_types, (list, tuple)) else (str(file_types),)
-                res = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=False, file_types=file_filter)
+                res = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=False, file_types=pwv_filter)
                 self._ensure_window_enabled()
                 if res and len(res) > 0:
                     return res[0]
@@ -609,15 +676,7 @@ class AppAPI:
             root = tk.Tk()
             root.withdraw()
             root.attributes('-topmost', True)
-            tk_types = [("Excel Files", "*.xlsx *.xls"), ("All Files", "*.*")]
-            if file_types and isinstance(file_types, list):
-                tk_types = []
-                for ft in file_types:
-                    if isinstance(ft, (list, tuple)) and len(ft) >= 2:
-                        tk_types.append((ft[0], ft[1]))
-                    elif isinstance(ft, str):
-                        tk_types.append(("Files", ft))
-            chosen = filedialog.askopenfilename(title=title, filetypes=tk_types or [("All Files", "*.*")])
+            chosen = filedialog.askopenfilename(title=title, filetypes=tk_filter)
             root.destroy()
             self._ensure_window_enabled()
             return chosen or ""
@@ -627,6 +686,7 @@ class AppAPI:
             return ""
 
     def pick_save_file(self, title="Save File", default_filename="export.xlsx", file_types=None):
+        wf_filter, pwv_filter, tk_filter = self._format_file_filters(file_types)
         try:
             if self._window and hasattr(self._window, 'gui'):
                 uid = getattr(self._window, 'uid', None)
@@ -645,13 +705,8 @@ class AppAPI:
                             sfd.Title = title
                             sfd.FileName = default_filename
                             sfd.RestoreDirectory = True
-                            if file_types:
-                                if isinstance(file_types, (list, tuple)):
-                                    sfd.Filter = "|".join(file_types)
-                                else:
-                                    sfd.Filter = str(file_types)
-                            else:
-                                sfd.Filter = "All Files (*.*)|*.*"
+                            sfd.Filter = wf_filter
+                            sfd.FilterIndex = 1
                             res = sfd.ShowDialog(inst)
                             if res == DialogResult.OK:
                                 return sfd.FileName
@@ -667,10 +722,7 @@ class AppAPI:
         try:
             if self._window and hasattr(self._window, "create_file_dialog"):
                 import webview
-                file_filter = ()
-                if file_types:
-                    file_filter = tuple(file_types) if isinstance(file_types, (list, tuple)) else (str(file_types),)
-                res = self._window.create_file_dialog(webview.FileDialog.SAVE, save_filename=default_filename, file_types=file_filter)
+                res = self._window.create_file_dialog(webview.FileDialog.SAVE, save_filename=default_filename, file_types=pwv_filter)
                 self._ensure_window_enabled()
                 if res and len(res) > 0:
                     return res[0] if isinstance(res, (list, tuple)) else str(res)
@@ -687,7 +739,7 @@ class AppAPI:
             chosen = filedialog.asksaveasfilename(
                 title=title,
                 initialfile=default_filename,
-                filetypes=file_types or [("All Files", "*.*")]
+                filetypes=tk_filter
             )
             root.destroy()
             self._ensure_window_enabled()
@@ -1045,3 +1097,264 @@ class AppAPI:
         if not save_path:
             return {"success": False, "cancelled": True}
         return self._osd_service.generate_template(save_path)
+
+    # =========================================================================
+    # DCRC & Agency PO Generator Bridge Methods
+    # =========================================================================
+    def pick_files_multiple(self, title="Select Files", file_types=None):
+        """Allows selecting multiple files via WinForms, webview, or tkinter fallback."""
+        wf_filter, pwv_filter, tk_filter = self._format_file_filters(file_types)
+        try:
+            if self._window and hasattr(self._window, 'gui'):
+                uid = getattr(self._window, 'uid', None)
+                from webview.platforms.winforms import BrowserView
+                inst = BrowserView.instances.get(uid)
+                if inst:
+                    import clr
+                    clr.AddReference('System.Windows.Forms')
+                    clr.AddReference('System')
+                    from System.Windows.Forms import OpenFileDialog, DialogResult
+                    from System import Func, Object
+
+                    def _show_ofd_multi():
+                        try:
+                            ofd = OpenFileDialog()
+                            ofd.Title = title
+                            ofd.Multiselect = True
+                            ofd.RestoreDirectory = True
+                            ofd.Filter = wf_filter
+                            ofd.FilterIndex = 1
+                            res = ofd.ShowDialog(inst)
+                            if res == DialogResult.OK:
+                                return list(ofd.FileNames)
+                            return []
+                        finally:
+                            self._ensure_window_enabled()
+
+                    chosen = inst.Invoke(Func[Object](_show_ofd_multi))
+                    return list(chosen) if chosen else []
+        except Exception as e:
+            print(f"[pick_files_multiple WinForms Invoke error]: {e}")
+
+        try:
+            if self._window and hasattr(self._window, "create_file_dialog"):
+                import webview
+                res = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True, file_types=pwv_filter)
+                self._ensure_window_enabled()
+                if res:
+                    return list(res)
+                return []
+        except Exception as e:
+            print(f"[pick_files_multiple webview error]: {e}")
+
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes('-topmost', True)
+            chosen = filedialog.askopenfilenames(title=title, filetypes=tk_filter)
+            root.destroy()
+            self._ensure_window_enabled()
+            return list(chosen) if chosen else []
+        except Exception as e:
+            print(f"[Error in pick_files_multiple]: {e}")
+            self._ensure_window_enabled()
+            return []
+
+    def pick_dcrc_events_files(self):
+        """Selects one or more DCRC SAP export files (DC.XLS, RC.XLS, DR.xls, ONLINE DR.XLS)."""
+        files = self.pick_files_multiple(
+            title="Select DCRC Files (DC, RC, DR, ONLINE DR)",
+            file_types=["SAP / Excel Files (*.xls;*.xlsx;*.csv)", "All Files (*.*)"]
+        )
+        return {"success": True, "files": files, "count": len(files)}
+
+    def pick_cash_payment_files(self):
+        """Selects one or more SAP Cash Payment Register files (cash1.XLSX, CASH2.XLSX)."""
+        files = self.pick_files_multiple(
+            title="Select Payment / Cash Files (cash1, CASH2)",
+            file_types=["Excel / SAP Files (*.xlsx;*.xls;*.csv)", "All Files (*.*)"]
+        )
+        return {"success": True, "files": files, "count": len(files)}
+
+    def pick_zone_mapping_file(self):
+        """Selects the Zone-Agency Mapping file (Zones.xlsx)."""
+        f = self.pick_file(
+            title="Select Zone-Agency Mapping File (Zones.xlsx)",
+            file_types=["Excel / CSV Files (*.xlsx;*.xls;*.csv)", "All Files (*.*)"]
+        )
+        return {"success": True, "file": f}
+
+    def pick_consumer_master_file(self):
+        """Selects the Consumer Master Data file (Consumer Data.xlsx)."""
+        f = self.pick_file(
+            title="Select Consumer Master File (Consumer Data.xlsx)",
+            file_types=["Excel / CSV Files (*.xlsx;*.xls;*.csv)", "All Files (*.*)"]
+        )
+        return {"success": True, "file": f}
+
+    def pick_dcrc_output_folder(self):
+        """Selects the folder where Agency Workbooks & Reports will be saved."""
+        folder = self.pick_folder(title="Select Output Folder for Agency Workbooks")
+        return {"success": True, "folder": folder}
+
+    def get_dcrc_defaults(self):
+        """Returns paths to default templates and configured standard rates."""
+        template_dir = r"C:\spotbillfiles\dcrc_templates"
+        zone_tpl = os.path.join(template_dir, "Zones_Template.xlsx")
+        cm_tpl = os.path.join(template_dir, "Consumer_Master_Template.xlsx")
+        default_out = r"C:\spotbillfiles\DCRC_PO_Output"
+
+        return {
+            "success": True,
+            "template_dir": template_dir,
+            "zone_template": zone_tpl if os.path.exists(zone_tpl) else "",
+            "consumer_template": cm_tpl if os.path.exists(cm_tpl) else "",
+            "default_output": default_out,
+            "standard_rates": dcrc_processor.DEFAULT_STANDARD_RATES,
+            "custom_rates": dcrc_processor.DEFAULT_CUSTOM_AGENCY_RATES
+        }
+
+    def process_dcrc_data(self, dcrc_files, cash_files, zone_file, consumer_file=None, custom_rates=None):
+        """
+        Processes the DCRC run asynchronously in the I/O pool.
+        Stores the result in self._last_dcrc_result for instant export.
+        """
+        def _run():
+            try:
+                # If consumer_file is empty or not provided, check if default template exists
+                cm_path = consumer_file
+                if not cm_path or not os.path.exists(cm_path):
+                    default_cm = r"C:\spotbillfiles\dcrc_templates\Consumer_Master_Template.xlsx"
+                    if os.path.exists(default_cm):
+                        cm_path = default_cm
+
+                res = dcrc_processor.process_dcrc_run(
+                    dcrc_file_paths=dcrc_files,
+                    cash_file_paths=cash_files,
+                    zone_file_path=zone_file,
+                    consumer_master_file_path=cm_path,
+                    custom_rates=custom_rates
+                )
+                self._last_dcrc_result = res
+                # Return lightweight summary to frontend (omit full records array for fast serialization)
+                return {
+                    "success": True,
+                    "summary": res.get("summary", []),
+                    "totals": res.get("totals", {}),
+                    "discrepancies": res.get("discrepancies", [])[:100],
+                    "total_records_processed": res.get("total_records_processed", 0),
+                    "total_discrepancies": res.get("total_discrepancies", 0),
+                    "zone_cutoffs": res.get("zone_cutoffs", []),
+                    "sample_records": res.get("records", [])[:30]
+                }
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                return {"success": False, "error": str(e)}
+
+        return _io_pool.submit(_run).result()
+
+    def export_dcrc_files(self, output_folder=None):
+        """
+        Exports individual <Agency>.xlsx workbooks, PO Summary Report, and MAIN LIST.
+        """
+        if not self._last_dcrc_result:
+            return {"success": False, "error": "No processed DCRC data available. Please process files first."}
+
+        out_dir = output_folder or r"C:\spotbillfiles\DCRC_PO_Output"
+        try:
+            ag_files = dcrc_exporter.export_agency_workbooks(self._last_dcrc_result, out_dir)
+            rep_file = dcrc_exporter.export_summary_report(self._last_dcrc_result, out_dir)
+            main_file = dcrc_exporter.export_master_list(self._last_dcrc_result, out_dir)
+
+            return {
+                "success": True,
+                "output_dir": out_dir,
+                "agency_files_count": len(ag_files),
+                "summary_report": rep_file,
+                "main_list": main_file
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def open_folder_in_explorer(self, folder_path):
+        """Opens the specified folder in Windows Explorer."""
+        try:
+            if os.path.exists(folder_path):
+                os.startfile(folder_path)
+                return {"success": True}
+            return {"success": False, "error": "Folder does not exist"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def _get_sample_template_path(self, sample_type):
+        filename_map = {
+            "dcrc": "Sample_DCRC_List.xlsx",
+            "payment": "Sample_Payment_Cash.xlsx",
+            "zone": "Sample_Zone_Map.xlsx",
+            "consumer_master": "Sample_Consumer_Master.xlsx"
+        }
+        fname = filename_map.get(sample_type)
+        if not fname:
+            return None, None
+
+        # Priority 1: C:\spotbillfiles\dcrc_templates
+        p1 = os.path.join(r"C:\spotbillfiles\dcrc_templates", fname)
+        if os.path.exists(p1):
+            return p1, fname
+
+        # Priority 2: src/resources/templates
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        p2 = os.path.join(base_dir, "resources", "templates", fname)
+        if os.path.exists(p2):
+            return p2, fname
+
+        return None, fname
+
+    def download_dcrc_sample(self, sample_type):
+        """Allows user to save a sample template to a location of their choice."""
+        src_path, fname = self._get_sample_template_path(sample_type)
+        if not src_path:
+            return {"success": False, "error": f"Sample template '{fname}' not found."}
+
+        dest = self.pick_save_file(
+            title=f"Save {fname}",
+            default_filename=fname,
+            file_types=[("Excel Files", "*.xlsx")]
+        )
+        if not dest:
+            return {"success": False, "cancelled": True}
+
+        try:
+            shutil.copyfile(src_path, dest)
+            return {"success": True, "saved_path": dest, "filename": fname}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def open_dcrc_sample(self, sample_type):
+        """Directly opens the requested sample template in default spreadsheet application."""
+        src_path, fname = self._get_sample_template_path(sample_type)
+        if not src_path:
+            return {"success": False, "error": f"Sample template '{fname}' not found."}
+        try:
+            os.startfile(src_path)
+            return {"success": True, "path": src_path}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def open_dcrc_templates_folder(self):
+        """Opens the folder containing sample templates in Windows Explorer."""
+        p = r"C:\spotbillfiles\dcrc_templates"
+        if not os.path.exists(p):
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            p = os.path.join(base_dir, "resources", "templates")
+        try:
+            os.makedirs(p, exist_ok=True)
+            os.startfile(p)
+            return {"success": True, "folder": p}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+

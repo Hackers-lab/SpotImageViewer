@@ -5,9 +5,9 @@ PROJECT_ROOT = os.path.abspath(os.path.join(SPECPATH, '..'))
 sys.path.insert(0, os.path.join(PROJECT_ROOT, 'src', 'core'))
 try:
     import config
-    APP_VERSION = str(getattr(config, 'CURRENT_VERSION', '20.54'))
+    APP_VERSION = str(getattr(config, 'CURRENT_VERSION', '20.55'))
 except Exception:
-    APP_VERSION = '20.54'
+    APP_VERSION = '20.55'
 APP_NAME = f'SpotImageViewerV{APP_VERSION}'
 
 a_main = Analysis(
@@ -46,6 +46,12 @@ a_main = Analysis(
         'core.services.folder_service',
         'core.services.update_service',
         'core.services.osd_service',
+        'core.services.dcrc_parser',
+        'core.services.dcrc_processor',
+        'core.services.dcrc_exporter',
+        'dcrc_parser',
+        'dcrc_processor',
+        'dcrc_exporter',
         'bridge',
         'bridge.app_api',
         'PIL',

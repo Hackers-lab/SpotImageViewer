@@ -23,7 +23,7 @@ def _add_column_if_missing(cursor, table_name, column_name, column_def):
     if column_name not in existing:
         cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_def}")
 
-CURRENT_DB_SCHEMA_VERSION = 4  # Bumped for FTS5 migration
+CURRENT_DB_SCHEMA_VERSION = 5  # Bumped for conn_phase and mru in meter_mapping
 
 def get_db_connection():
     """Return a thread-local cached connection.  PRAGMAs execute once per thread."""
@@ -153,6 +153,8 @@ def init_db(force=False):
         _add_column_if_missing(cursor, "meter_mapping", "mobile_number", "TEXT")
         _add_column_if_missing(cursor, "meter_mapping", "contractual_load", "TEXT")
         _add_column_if_missing(cursor, "meter_mapping", "class", "TEXT")
+        _add_column_if_missing(cursor, "meter_mapping", "mru", "TEXT")
+        _add_column_if_missing(cursor, "meter_mapping", "conn_phase", "INTEGER DEFAULT 1")
 
         # Drop redundant duplicate indexes (consumer_id is already indexed by PRIMARY KEY,
         # and meter_no is indexed by idx_meter_no)
@@ -558,3 +560,59 @@ def get_all_consumer_profiles():
         ]
     except:
         return []
+
+
+def get_consumer_master_map():
+    """
+    Returns a dictionary mapping consumer_id -> {'mru': str, 'phase': int}.
+    Pulls from meter_mapping (with fallback to images table for mru if missing).
+    """
+    result = {}
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        # 1. Fetch from meter_mapping
+        cursor.execute("SELECT consumer_id, mru, conn_phase FROM meter_mapping")
+        for cid, mru, phase in cursor.fetchall():
+            if cid:
+                c_str = str(cid).strip()
+                result[c_str] = {
+                    "mru": (str(mru).strip() if mru else ""),
+                    "phase": int(phase) if phase in (1, 3) else 1
+                }
+        
+        # 2. For any consumers missing an MRU, attempt fill from images table
+        missing_mru = [cid for cid, data in result.items() if not data["mru"]]
+        if missing_mru:
+            cursor.execute("SELECT consumer_id, mru FROM images WHERE mru IS NOT NULL AND length(mru) > 0")
+            for cid, mru in cursor.fetchall():
+                c_str = str(cid).strip()
+                if c_str in result and not result[c_str]["mru"] and mru:
+                    result[c_str]["mru"] = str(mru).strip()
+    except Exception as e:
+        print(f"[get_consumer_master_map] Error: {e}")
+    return result
+
+
+def batch_update_consumer_master(records):
+    """
+    Updates or inserts records: list of (consumer_id, mru, conn_phase)
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.executemany(
+            """
+            INSERT INTO meter_mapping (consumer_id, mru, conn_phase)
+            VALUES (?, ?, ?)
+            ON CONFLICT(consumer_id) DO UPDATE SET
+                mru = CASE WHEN excluded.mru != '' THEN excluded.mru ELSE meter_mapping.mru END,
+                conn_phase = excluded.conn_phase
+            """,
+            records
+        )
+        conn.commit()
+        return True, len(records)
+    except Exception as e:
+        return False, str(e)
+

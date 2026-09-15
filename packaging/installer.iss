@@ -2,7 +2,7 @@
 ; Generated for automated packaging & silent self-updating
 
 #ifndef MyAppVersion
-  #define MyAppVersion "20.54"
+  #define MyAppVersion "20.55"
 #endif
 #define MyAppName "Spot Image Viewer"
 #define MyAppPublisher "WBSEDCL / Pramod Kumar Verma"

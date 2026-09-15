@@ -1,13 +1,17 @@
 {
-  "version": 20.54,
-  "release_notes": "V20.54 — Native Folder Picker, Image Deduplication & OSD Status Accuracy:\n\n- Native Windows Folder Selector: Switched to Windows Explorer native folder browser with top-right search box, path autocomplete, and expandable Network shares.\n- Image Date Deduplication: Automatically filters duplicate images of the same date across different folders so only one image per date is displayed in viewer, filmstrip, and navigation.\n- Accurate OSD Status from PDF: Fixed substring matching bug to properly extract and display actual connection status from WBSEDCL PDFs (Connected, Temp Disconnected, Deemed Disconnected, Disconnected) with corresponding color-coded badges.\n- Excel & CSV Dues Export: Corrected connection status styling and data fidelity in bulk verification reports.",
-  "download_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.54/SpotImageViewer_Setup_v20.54.exe",
-  "installer_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.54/SpotImageViewer_Setup_v20.54.exe",
-  "zip_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.54/SpotImageViewer_Setup_v20.54.exe",
+  "version": 20.55,
+  "release_notes": "V20.55 — Agency PO Billing Generator & Chronological Date Engine:\n\n- Agency PO & DCRC Billing Generator: Automated reconciliation of SAP DCRC events, cash payment registers, and zone allocations.\n- True Chronological Date Engine: Accurate time-based agency mapping across contractual cutoff dates, resolving alphabetical text-comparison date anomalies.\n- Executive Printable Workbooks: Complete print-ready Portrait A4 workbooks with breakup reports, countable consumer lists, and separate pages for 1PH and 3PH.\n- File Dialog & Selector Fix: Proper WinForms and webview filter handling for seamless Excel/CSV file selection.",
+  "download_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.55/SpotImageViewer_Setup_v20.55.exe",
+  "installer_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.55/SpotImageViewer_Setup_v20.55.exe",
+  "zip_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.55/SpotImageViewer_Setup_v20.55.exe",
   "install_args": "/VERYSILENT /NORESTART",
-  "launch_exe": "SpotImageViewer\\SpotImageViewerV20.54.exe",
+  "launch_exe": "SpotImageViewer\\SpotImageViewerV20.55.exe",
   "sha256": "",
   "previous_versions": [
+    {
+      "version": 20.54,
+      "release_notes": "V20.54 — Native Folder Picker, Image Deduplication & OSD Status Accuracy:\n\n- Native Windows Folder Selector: Switched to Windows Explorer native folder browser with top-right search box, path autocomplete, and expandable Network shares.\n- Image Date Deduplication: Automatically filters duplicate images of the same date across different folders so only one image per date is displayed in viewer, filmstrip, and navigation.\n- Accurate OSD Status from PDF: Fixed substring matching bug to properly extract and display actual connection status from WBSEDCL PDFs (Connected, Temp Disconnected, Deemed Disconnected, Disconnected) with corresponding color-coded badges.\n- Excel & CSV Dues Export: Corrected connection status styling and data fidelity in bulk verification reports."
+    },
     {
       "version": 20.53,
       "release_notes": "V20.53 — Consumer Dues Verification Studio & Streamlined Release Packaging:\n\n- Consumer Dues Studio: Comprehensive Single and Bulk verification engine with parallel batch queries, live arrears check, and rate throttling.\n- Prominent Address Details: Displays consumer address prominently in single check and as a dedicated column in bulk verification lists.\n- Floating Top Notification Banner: Compact, real-time notification bar tracks batch progress and consumer ID counts without taking table space.\n- Spacious Bulk Layout: Expanded full-width and full-height live preview table with one-click Excel (.xlsx) and CSV report generation.\n- Streamlined Distribution: Lightweight, dedicated setup installer without redundant zip archives or unversioned binaries."

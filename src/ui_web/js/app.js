@@ -7,6 +7,7 @@ const TAB_META = {
   audit:    { title: 'Low Cons. Audit',       icon: 'file-spreadsheet' },
   fuzzy:    { title: 'Batch Fuzzy Lookup',    icon: 'sparkles' },
   osd:      { title: 'OSD Report Studio',     icon: 'file-check-2' },
+  dcrc:     { title: 'Agency PO & DCRC Billing', icon: 'receipt' },
   settings: { title: 'Global Settings',       icon: 'settings' },
 };
 
@@ -420,6 +421,9 @@ function switchTab(tabId) {
   }
 
   updatePageHeader(tabId);
+  if (tabId === 'dcrc' && typeof initDcrcModule === 'function') {
+    initDcrcModule();
+  }
   safeCreateIcons();
 }
 
