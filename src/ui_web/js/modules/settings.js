@@ -837,13 +837,20 @@ function renderFolders(folders) {
   safeCreateIcons();
 }
 
+let isAddingFolder = false;
 async function addFolder() {
-  const res = await callAPI('add_network_folder');
-  if (res && res.success) {
-    const fRes = await callAPI('get_folder_status');
-    if (fRes && fRes.success) renderFolders(fRes.folders);
-  } else if (res && res.error) {
-    alert("Failed to add folder: " + res.error);
+  if (isAddingFolder) return;
+  isAddingFolder = true;
+  try {
+    const res = await callAPI('add_network_folder');
+    if (res && res.success) {
+      const fRes = await callAPI('get_folder_status');
+      if (fRes && fRes.success) renderFolders(fRes.folders);
+    } else if (res && res.error) {
+      alert("Failed to add folder: " + res.error);
+    }
+  } finally {
+    isAddingFolder = false;
   }
 }
 

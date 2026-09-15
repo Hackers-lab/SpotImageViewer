@@ -519,7 +519,58 @@ class AppAPI:
     # =========================================================================
     # Native File & Folder Dialogs
     # =========================================================================
+    def _ensure_window_enabled(self):
+        """Ensures the PyWebView main window is enabled and brought to foreground."""
+        try:
+            if self._window and hasattr(self._window, 'gui'):
+                uid = getattr(self._window, 'uid', None)
+                from webview.platforms.winforms import BrowserView
+                inst = BrowserView.instances.get(uid)
+                if inst and hasattr(inst, 'Handle'):
+                    import ctypes
+                    hwnd = inst.Handle.ToInt64()
+                    ctypes.windll.user32.EnableWindow(hwnd, True)
+                    ctypes.windll.user32.SetForegroundWindow(hwnd)
+        except Exception:
+            pass
+
     def pick_file(self, title="Select File", file_types=None):
+        try:
+            if self._window and hasattr(self._window, 'gui'):
+                uid = getattr(self._window, 'uid', None)
+                from webview.platforms.winforms import BrowserView
+                inst = BrowserView.instances.get(uid)
+                if inst:
+                    import clr
+                    clr.AddReference('System.Windows.Forms')
+                    clr.AddReference('System')
+                    from System.Windows.Forms import OpenFileDialog, DialogResult
+                    from System import Func, Object
+
+                    def _show_ofd():
+                        try:
+                            ofd = OpenFileDialog()
+                            ofd.Title = title
+                            ofd.RestoreDirectory = True
+                            if file_types:
+                                if isinstance(file_types, (list, tuple)):
+                                    ofd.Filter = "|".join(file_types)
+                                else:
+                                    ofd.Filter = str(file_types)
+                            else:
+                                ofd.Filter = "All Files (*.*)|*.*"
+                            res = ofd.ShowDialog(inst)
+                            if res == DialogResult.OK:
+                                return ofd.FileName
+                            return ""
+                        finally:
+                            self._ensure_window_enabled()
+
+                    chosen = inst.Invoke(Func[Object](_show_ofd))
+                    return str(chosen) if chosen else ""
+        except Exception as e:
+            print(f"[pick_file WinForms Invoke error]: {e}")
+
         try:
             if self._window and hasattr(self._window, "create_file_dialog"):
                 import webview
@@ -527,10 +578,14 @@ class AppAPI:
                 if file_types:
                     file_filter = tuple(file_types) if isinstance(file_types, (list, tuple)) else (str(file_types),)
                 res = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=False, file_types=file_filter)
+                self._ensure_window_enabled()
                 if res and len(res) > 0:
                     return res[0]
                 return ""
+        except Exception as e:
+            print(f"[pick_file webview error]: {e}")
 
+        try:
             import tkinter as tk
             from tkinter import filedialog
             root = tk.Tk()
@@ -546,12 +601,51 @@ class AppAPI:
                         tk_types.append(("Files", ft))
             chosen = filedialog.askopenfilename(title=title, filetypes=tk_types or [("All Files", "*.*")])
             root.destroy()
+            self._ensure_window_enabled()
             return chosen or ""
         except Exception as e:
             print(f"[Error in pick_file]: {e}")
+            self._ensure_window_enabled()
             return ""
 
     def pick_save_file(self, title="Save File", default_filename="export.xlsx", file_types=None):
+        try:
+            if self._window and hasattr(self._window, 'gui'):
+                uid = getattr(self._window, 'uid', None)
+                from webview.platforms.winforms import BrowserView
+                inst = BrowserView.instances.get(uid)
+                if inst:
+                    import clr
+                    clr.AddReference('System.Windows.Forms')
+                    clr.AddReference('System')
+                    from System.Windows.Forms import SaveFileDialog, DialogResult
+                    from System import Func, Object
+
+                    def _show_sfd():
+                        try:
+                            sfd = SaveFileDialog()
+                            sfd.Title = title
+                            sfd.FileName = default_filename
+                            sfd.RestoreDirectory = True
+                            if file_types:
+                                if isinstance(file_types, (list, tuple)):
+                                    sfd.Filter = "|".join(file_types)
+                                else:
+                                    sfd.Filter = str(file_types)
+                            else:
+                                sfd.Filter = "All Files (*.*)|*.*"
+                            res = sfd.ShowDialog(inst)
+                            if res == DialogResult.OK:
+                                return sfd.FileName
+                            return ""
+                        finally:
+                            self._ensure_window_enabled()
+
+                    chosen = inst.Invoke(Func[Object](_show_sfd))
+                    return str(chosen) if chosen else ""
+        except Exception as e:
+            print(f"[pick_save_file WinForms Invoke error]: {e}")
+
         try:
             if self._window and hasattr(self._window, "create_file_dialog"):
                 import webview
@@ -559,10 +653,14 @@ class AppAPI:
                 if file_types:
                     file_filter = tuple(file_types) if isinstance(file_types, (list, tuple)) else (str(file_types),)
                 res = self._window.create_file_dialog(webview.FileDialog.SAVE, save_filename=default_filename, file_types=file_filter)
+                self._ensure_window_enabled()
                 if res and len(res) > 0:
                     return res[0] if isinstance(res, (list, tuple)) else str(res)
                 return ""
+        except Exception as e:
+            print(f"[pick_save_file webview error]: {e}")
 
+        try:
             import tkinter as tk
             from tkinter import filedialog
             root = tk.Tk()
@@ -574,20 +672,46 @@ class AppAPI:
                 filetypes=file_types or [("All Files", "*.*")]
             )
             root.destroy()
+            self._ensure_window_enabled()
             return chosen or ""
         except Exception as e:
             print(f"[Error in pick_save_file]: {e}")
+            self._ensure_window_enabled()
             return ""
 
-    def pick_folder(self, title="Select Folder"):
+    def pick_folder(self, title="Select Folder to Add", initial_dir=""):
         try:
-            if self._window and hasattr(self._window, "create_file_dialog"):
-                import webview
-                res = self._window.create_file_dialog(webview.FileDialog.FOLDER)
-                if res and len(res) > 0:
-                    return res[0]
-                return ""
+            if self._window and hasattr(self._window, 'gui'):
+                uid = getattr(self._window, 'uid', None)
+                from webview.platforms.winforms import BrowserView
+                inst = BrowserView.instances.get(uid)
+                if inst:
+                    import clr
+                    clr.AddReference('System.Windows.Forms')
+                    clr.AddReference('System')
+                    from System.Windows.Forms import FolderBrowserDialog, DialogResult
+                    from System import Func, Object
 
+                    def _show_fbd():
+                        try:
+                            fbd = FolderBrowserDialog()
+                            fbd.Description = title
+                            fbd.ShowNewFolderButton = True
+                            if initial_dir and os.path.exists(initial_dir):
+                                fbd.SelectedPath = initial_dir
+                            res = fbd.ShowDialog(inst)
+                            if res == DialogResult.OK:
+                                return fbd.SelectedPath
+                            return ""
+                        finally:
+                            self._ensure_window_enabled()
+
+                    chosen = inst.Invoke(Func[Object](_show_fbd))
+                    return str(chosen) if chosen else ""
+        except Exception as e:
+            print(f"[pick_folder WinForms Invoke error]: {e}")
+
+        try:
             import tkinter as tk
             from tkinter import filedialog
             root = tk.Tk()
@@ -595,9 +719,11 @@ class AppAPI:
             root.attributes('-topmost', True)
             chosen = filedialog.askdirectory(title=title)
             root.destroy()
+            self._ensure_window_enabled()
             return chosen or ""
         except Exception as e:
             print(f"[Error in pick_folder]: {e}")
+            self._ensure_window_enabled()
             return ""
 
     # =========================================================================
