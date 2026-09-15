@@ -329,8 +329,17 @@ class FolderIndexerService:
                                 next_dir_id += 1
                         dir_id = dir_cache[root_dir]
 
+                        # Pre-load known filenames for this directory to make incremental scan instant
+                        existing_in_dir = None
+                        if not full_reindex:
+                            cursor.execute("SELECT filename FROM images WHERE dir_id = ?", (dir_id,))
+                            existing_in_dir = set(row[0] for row in cursor.fetchall())
+
                         for filename in files:
                             scanned_files_count += 1
+                            if existing_in_dir is not None and filename in existing_in_dir:
+                                continue
+
                             try:
                                 if len(filename) < 25:
                                     continue
@@ -361,6 +370,7 @@ class FolderIndexerService:
                                     speed = int(scanned_files_count / elapsed)
                                     self._indexing_state["scanned"] = total_inserted
                                     self._indexing_state["total"] = total_inserted
+                                    self._indexing_state["new_added"] = total_inserted
                                     self._indexing_state["files_seen"] = scanned_files_count
                                     self._indexing_state["elapsed"] = elapsed
                                     self._indexing_state["speed"] = speed
@@ -405,7 +415,7 @@ class FolderIndexerService:
 
                 elapsed = max(1, int(time.time() - start))
                 speed = int(scanned_files_count / elapsed) if scanned_files_count else 0
-                self._indexing_state["scanned"] = final_total
+                self._indexing_state["scanned"] = final_total if full_reindex else new_added
                 self._indexing_state["total"] = final_total
                 self._indexing_state["new_added"] = new_added
                 self._indexing_state["files_seen"] = scanned_files_count

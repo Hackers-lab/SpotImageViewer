@@ -914,16 +914,29 @@ async function startIndexing(options = {}) {
     let statusStr = "";
     let badgeStr = "";
 
-    if (count > 0) {
-      const speedStr = speed > 0 ? ` • ${speed.toLocaleString()} img/s` : '';
-      statusStr = `Indexing: ${count.toLocaleString()} images (${elapsed}s${speedStr}) ${folder ? '[' + folder + ']' : ''}`;
-      badgeStr = `${count.toLocaleString()} imgs (${elapsed}s${speed > 0 ? ' • ' + speed + '/s' : ''})`;
-    } else if (filesSeen > 0) {
-      statusStr = `Scanning: ${filesSeen.toLocaleString()} files inspected (${elapsed}s)...`;
-      badgeStr = `Scanning (${filesSeen.toLocaleString()} files)...`;
+    if (!isFull) {
+      if (newAdded > 0) {
+        statusStr = `Quick Sync: ${newAdded.toLocaleString()} new photo(s) added (${filesSeen.toLocaleString()} checked, ${elapsed}s)...`;
+        badgeStr = `+${newAdded.toLocaleString()} new (${elapsed}s)`;
+      } else if (filesSeen > 0) {
+        statusStr = `Quick Sync: Inspecting ${folder ? '[' + folder + ']' : 'folders'} (${filesSeen.toLocaleString()} checked, ${elapsed}s)...`;
+        badgeStr = `Checking (${elapsed}s)...`;
+      } else {
+        statusStr = `Quick Sync starting... (${elapsed}s)`;
+        badgeStr = `Quick Sync...`;
+      }
     } else {
-      statusStr = `Scanning directories... (${elapsed}s) ${folder ? '[' + folder + ']' : ''}`;
-      badgeStr = `Scanning... (${elapsed}s)`;
+      if (count > 0) {
+        const speedStr = speed > 0 ? ` • ${speed.toLocaleString()} img/s` : '';
+        statusStr = `Full Index: ${count.toLocaleString()} images (${elapsed}s${speedStr}) ${folder ? '[' + folder + ']' : ''}`;
+        badgeStr = `${count.toLocaleString()} imgs (${elapsed}s${speed > 0 ? ' • ' + speed + '/s' : ''})`;
+      } else if (filesSeen > 0) {
+        statusStr = `Full Index: ${filesSeen.toLocaleString()} files inspected (${elapsed}s)...`;
+        badgeStr = `Scanning (${filesSeen.toLocaleString()} files)...`;
+      } else {
+        statusStr = `Scanning directories... (${elapsed}s) ${folder ? '[' + folder + ']' : ''}`;
+        badgeStr = `Scanning... (${elapsed}s)`;
+      }
     }
 
     if (topText) {
@@ -946,10 +959,12 @@ async function startIndexing(options = {}) {
 
       if (topTimelineBar) topTimelineBar.style.width = '100%';
       const finalSpeed = speed > 0 ? ` @ ${speed.toLocaleString()} img/s` : '';
-      const summaryMsg = newAdded > 0
-        ? `Sync complete: ${newAdded.toLocaleString()} new photos added (${count.toLocaleString()} total)`
-        : `Index up to date: ${count.toLocaleString()} images cataloged`;
-      updateStatusBar(`${summaryMsg} in ${elapsed}s${finalSpeed}`, "normal", 100);
+      const summaryMsg = (!isFull && newAdded > 0)
+        ? `Quick sync complete: ${newAdded.toLocaleString()} new photo(s) added (${filesSeen.toLocaleString()} checked in ${elapsed}s)`
+        : (newAdded > 0
+          ? `Sync complete: ${newAdded.toLocaleString()} new photos added (${count.toLocaleString()} total)`
+          : `Index up to date: ${count.toLocaleString()} images cataloged`);
+      updateStatusBar(`${summaryMsg}${finalSpeed}`, "normal", 100);
 
       // Immediately stop spin and reset indicators
       if (icon) icon.classList.remove('animate-spin');
@@ -1160,15 +1175,18 @@ async function checkFolderChanges() {
       } else if (mode === 'prompt') {
         const banner = document.getElementById('folderChangeBanner');
         const text = document.getElementById('folderChangeBannerText');
+        const badge = document.getElementById('folderChangeDiffBadge');
         if (banner && text) {
           const sign = (res.diff > 0) ? `+${res.diff}` : `${res.diff}`;
           const currentFiles = res.current_files ?? res.disk_files ?? 0;
           const folderNames = (res.changed_folder_names && res.changed_folder_names.length > 0)
             ? res.changed_folder_names.join(', ')
             : 'linked folder';
-          const diffText = res.diff > 0 ? `+${res.diff.toLocaleString()} unindexed photo${res.diff > 1 ? 's' : ''}` : `${sign} photos`;
-          text.innerText = `New photos detected in [${folderNames}] (${diffText}). Quick sync to update index?`;
+          const diffBadgeText = res.diff > 0 ? `+${res.diff.toLocaleString()} New Photo${res.diff > 1 ? 's' : ''}` : `${sign} Photos`;
+          if (badge) badge.innerText = diffBadgeText;
+          text.innerText = `Detected in [${folderNames}] (${currentFiles.toLocaleString()} files on disk). Quick sync index?`;
           banner.classList.remove('hidden');
+          banner.classList.add('flex');
           safeCreateIcons();
         }
       }
@@ -1182,7 +1200,10 @@ async function checkFolderChanges() {
 
 function dismissFolderChangeBanner() {
   const banner = document.getElementById('folderChangeBanner');
-  if (banner) banner.classList.add('hidden');
+  if (banner) {
+    banner.classList.add('hidden');
+    banner.classList.remove('flex');
+  }
 }
 
 function triggerAutoIndexNow() {
