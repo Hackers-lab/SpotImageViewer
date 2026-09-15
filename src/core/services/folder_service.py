@@ -9,17 +9,19 @@ except ImportError:
     import config, database
 
 
-def path_accessible(p, timeout=1.5):
+def path_accessible(p, timeout=1.0):
     """
     Resilient path check with strict timeout.
-    Uses a daemon thread so it NEVER hangs on executor.shutdown(wait=True)
-    when Windows SMB/NetBIOS name resolution is stalled on unreachable network shares.
+    Uses a daemon thread so it NEVER hangs on unreachable network shares.
     """
     if not p:
         return False
-    # Fast-path for local drive letters (e.g. C:\, D:\)
-    if len(p) >= 2 and p[1] == ':' and os.path.exists(p[:3]):
+    # Fast-path for local drive letters (e.g. C:\, D:\, F:\)
+    if len(p) >= 2 and p[1] == ':':
         try:
+            drive = p[:2] + '\\'
+            if not os.path.exists(drive):
+                return False
             return os.path.exists(p)
         except Exception:
             return False
@@ -53,11 +55,30 @@ class FolderIndexerService:
             "scanned": 0,
             "total": 0,
             "files_seen": 0,
+            "new_added": 0,
             "elapsed": 0,
             "speed": 0,
             "eta_seconds": None,
             "current_folder": "",
             "error": None
+        }
+        self._folder_check_running = False
+
+        # Pre-seed cache from persisted baseline so initial response is instant
+        baseline = database.get_info_value("folder_baseline_stats", {}) or {}
+        total_baseline = sum(item.get("file_count", 0) for item in baseline.values()) if baseline else 0
+        indexed_total = database.get_total_image_count()
+        self._cached_folder_check_result = {
+            "success": True,
+            "has_changes": False,
+            "current_files": total_baseline,
+            "disk_files": total_baseline,
+            "indexed_count": indexed_total,
+            "indexed_images": indexed_total,
+            "diff": 0,
+            "changed_folders": [],
+            "changed_folder_names": [],
+            "mode": self.get_auto_index_mode()
         }
 
     def get_indexing_status(self):
@@ -131,20 +152,32 @@ class FolderIndexerService:
     def _save_baseline_stats(self, stats):
         database.set_info_value("folder_baseline_stats", stats)
 
-    def check_folder_changes(self):
+    def check_folder_changes(self, async_check=True):
         """
-        Fast disk check to detect if file counts or directory state changed
-        since the last indexing run. Compares against persistent per-folder snapshot.
+        Fast disk check to detect if file counts or directory state changed.
+        If async_check=True, returns immediately with the latest cached state and
+        performs disk traversal in a background daemon thread so the UI never hangs.
         """
         if self._indexing_state["running"]:
             return {"success": True, "indexing_running": True, "has_changes": False}
 
+        if async_check:
+            if not self._folder_check_running:
+                threading.Thread(target=self._run_folder_check, daemon=True).start()
+            return self._cached_folder_check_result
+        return self._run_folder_check()
+
+    def _run_folder_check(self):
+        if self._folder_check_running:
+            return self._cached_folder_check_result
+
+        self._folder_check_running = True
         try:
             additional_folders = database.get_additional_folders()
             folders = [config.IMAGE_FOLDER] + (additional_folders or [])
             unique_folders = []
             for f in folders:
-                if f and path_accessible(f) and os.path.normpath(f) not in [os.path.normpath(u) for u in unique_folders]:
+                if f and path_accessible(f, timeout=1.0) and os.path.normpath(f) not in [os.path.normpath(u) for u in unique_folders]:
                     unique_folders.append(f)
 
             baseline = self._get_baseline_stats()
@@ -156,16 +189,28 @@ class FolderIndexerService:
             for folder in unique_folders:
                 folder_norm = os.path.normpath(folder).lower()
                 current_count = 0
+                is_local = len(folder) >= 2 and folder[1] == ':'
                 try:
-                    for root, dirs, files in os.walk(folder):
-                        current_count += len(files)
+                    if is_local:
+                        for root, dirs, files in os.walk(folder):
+                            current_count += len(files)
+                    else:
+                        # For remote network UNC paths, check folder mtime
+                        # to prevent multi-minute SMB traversal hangs
+                        mtime = os.path.getmtime(folder) if os.path.exists(folder) else 0
+                        prev_mtime = baseline.get(folder_norm, {}).get("last_mtime", 0)
+                        prev_count = baseline.get(folder_norm, {}).get("file_count", 0)
+                        if prev_count > 0 and mtime == prev_mtime:
+                            current_count = prev_count
+                        else:
+                            for root, dirs, files in os.walk(folder):
+                                current_count += len(files)
                 except Exception:
                     continue
 
                 total_disk_files += current_count
 
                 if folder_norm not in baseline:
-                    # Initial record for this folder
                     baseline[folder_norm] = {
                         "path": folder,
                         "file_count": current_count,
@@ -179,7 +224,6 @@ class FolderIndexerService:
                         total_diff += folder_diff
 
             if is_initial_baseline:
-                # If baseline was empty, we just initialized it so save and report no changes
                 self._save_baseline_stats(baseline)
                 total_diff = 0
                 changed_folders = []
@@ -187,7 +231,7 @@ class FolderIndexerService:
             indexed_count = database.get_total_image_count()
             has_changes = len(changed_folders) > 0 or (total_diff != 0)
 
-            return {
+            res = {
                 "success": True,
                 "has_changes": has_changes,
                 "current_files": total_disk_files,
@@ -199,8 +243,12 @@ class FolderIndexerService:
                 "changed_folder_names": [os.path.basename(f) or f for f in changed_folders],
                 "mode": self.get_auto_index_mode()
             }
+            self._cached_folder_check_result = res
+            return res
         except Exception as e:
             return {"success": False, "error": str(e), "has_changes": False}
+        finally:
+            self._folder_check_running = False
 
     def start_indexing(self, target_folders=None, full_reindex=False):
         """

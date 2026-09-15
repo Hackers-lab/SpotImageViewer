@@ -179,7 +179,7 @@ class AppAPI:
                     detected_type = "cid"
                 elif query.isdigit() and len(query) == 10:
                     detected_type = "mobile"
-                elif any(c.isalpha() for c in query) and len(query) > 3 and not any(c.isdigit() for c in query):
+                elif any(c.isalpha() for c in query) and not any(c.isdigit() for c in query) and len(query) >= 2:
                     detected_type = "name"
                 else:
                     detected_type = "meter"
@@ -518,7 +518,7 @@ class AppAPI:
         return self.folder_service.get_indexing_status()
 
     def check_folder_changes(self):
-        return _io_pool.submit(self.folder_service.check_folder_changes).result()
+        return self.folder_service.check_folder_changes(async_check=True)
 
     def get_auto_index_settings(self):
         return {"success": True, "mode": self.folder_service.get_auto_index_mode()}

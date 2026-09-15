@@ -39,59 +39,27 @@ except ImportError:
     import config, database
     from app_api import AppAPI
 
+import logging
 import time
 
-class TeeLogger:
-    def __init__(self, filepath, stream):
-        self.filepath = filepath
-        self.stream = stream
-        self._at_line_start = True
-        try:
-            self.file = open(filepath, "a", encoding="utf-8", buffering=1)
-        except Exception:
-            self.file = None
-
-    def write(self, message):
-        try:
-            if self.stream:
-                self.stream.write(message)
-                self.stream.flush()
-        except Exception:
-            pass
-        if self.file and message:
-            try:
-                for char in message:
-                    if self._at_line_start and char not in ('\r', '\n'):
-                        ts = time.strftime("%Y-%m-%d %H:%M:%S")
-                        self.file.write(f"[{ts}] ")
-                        self._at_line_start = False
-                    self.file.write(char)
-                    if char == '\n':
-                        self._at_line_start = True
-                self.file.flush()
-            except Exception:
-                pass
-
-    def flush(self):
-        try:
-            if self.stream:
-                self.stream.flush()
-        except Exception:
-            pass
-        try:
-            if self.file:
-                self.file.flush()
-        except Exception:
-            pass
+def setup_logging():
+    try:
+        log_file_path = os.path.join(BASE_DIR, "app_debug.log")
+        handler = logging.FileHandler(log_file_path, encoding="utf-8", mode="a")
+        handler.setFormatter(logging.Formatter("[%(asctime)s] [%(levelname)s] %(message)s"))
+        logger = logging.getLogger()
+        logger.setLevel(logging.INFO)
+        # Avoid duplicate handlers on re-init
+        if not any(isinstance(h, logging.FileHandler) and getattr(h, 'baseFilename', '') == os.path.abspath(log_file_path) for h in logger.handlers):
+            logger.addHandler(handler)
+        logging.info(f"=== SpotImageViewer Studio Session Started: {time.strftime('%Y-%m-%d %H:%M:%S')} ===")
+    except Exception:
+        pass
 
 def main():
     import threading
 
-    # Setup file logging in project directory
-    log_file_path = os.path.join(BASE_DIR, "app_debug.log")
-    sys.stdout = TeeLogger(log_file_path, sys.stdout)
-    sys.stderr = TeeLogger(log_file_path, sys.stderr)
-    print(f"=== SpotImageViewer Studio Session Started: {time.strftime('%Y-%m-%d %H:%M:%S')} ===")
+    setup_logging()
 
     # Instantiate the Python RPC Bridge immediately
     api = AppAPI()
