@@ -44,17 +44,17 @@ class AppAPI:
     """
 
     def __init__(self, window=None):
-        self.window = window
-        self.billing_service = BillingService()
-        self.image_service = ImageService()
-        self.fuzzy_service = FuzzyService()
-        self.consumer_service = ConsumerDataService()
-        self.audit_service = AuditService()
-        self.folder_service = FolderIndexerService()
-        self.update_service = UpdateService()
+        self._window = window
+        self._billing_service = BillingService()
+        self._image_service = ImageService()
+        self._fuzzy_service = FuzzyService()
+        self._consumer_service = ConsumerDataService()
+        self._audit_service = AuditService()
+        self._folder_service = FolderIndexerService()
+        self._update_service = UpdateService()
 
     def set_window(self, window):
-        self.window = window
+        self._window = window
 
     # =========================================================================
     # System & Settings
@@ -70,8 +70,8 @@ class AppAPI:
                     import time
                     time.sleep(1.0)
                     c = database.get_total_image_count(force_recount=True)
-                    if self.window:
-                        self.window.evaluate_js(f"if (typeof updateAppCounts === 'function') {{ updateAppCounts({c}, null); }}")
+                    if self._window:
+                        self._window.evaluate_js(f"if (typeof updateAppCounts === 'function') {{ updateAppCounts({c}, null); }}")
                 except Exception:
                     pass
             threading.Thread(target=_bg_recount_images, daemon=True).start()
@@ -82,8 +82,8 @@ class AppAPI:
                     import time
                     time.sleep(1.5)
                     c = database.get_consumer_count(force_recount=True)
-                    if self.window:
-                        self.window.evaluate_js(f"if (typeof updateAppCounts === 'function') {{ updateAppCounts(null, {c}); }}")
+                    if self._window:
+                        self._window.evaluate_js(f"if (typeof updateAppCounts === 'function') {{ updateAppCounts(null, {c}); }}")
                 except Exception:
                     pass
             threading.Thread(target=_bg_recount_consumers, daemon=True).start()
@@ -318,7 +318,7 @@ class AppAPI:
     # Image Operations
     # =========================================================================
     def get_image_data(self, file_path, max_dim=1400):
-        return _io_pool.submit(lambda: self.image_service.get_image_data(file_path, max_dim)).result()
+        return _io_pool.submit(lambda: self._image_service.get_image_data(file_path, max_dim)).result()
 
     def save_image_to(self, file_path, dest_path=""):
         if not dest_path:
@@ -329,7 +329,7 @@ class AppAPI:
             )
         if not dest_path:
             return {"success": False, "cancelled": True}
-        return self.image_service.save_image_to(file_path, dest_path)
+        return self._image_service.save_image_to(file_path, dest_path)
 
     def save_all_images(self, consumer_id, dest_dir=""):
         if not dest_dir:
@@ -341,30 +341,30 @@ class AppAPI:
             images_data = self._fetch_consumer_images(consumer_id)
             if not images_data.get("success"):
                 return images_data
-            return self.image_service.save_all_images(consumer_id, dest_dir, images_data.get("images", []))
+            return self._image_service.save_all_images(consumer_id, dest_dir, images_data.get("images", []))
 
         return _io_pool.submit(_do_copy).result()
 
     def print_image(self, file_path):
-        return self.image_service.print_image(file_path)
+        return self._image_service.print_image(file_path)
 
     def open_image_external(self, file_path):
-        return self.image_service.open_image_external(file_path)
+        return self._image_service.open_image_external(file_path)
 
     # =========================================================================
     # Calculators
     # =========================================================================
     def calculate_bill(self, p):
-        return self.billing_service.calculate_bill(p)
+        return self._billing_service.calculate_bill(p)
 
     def calculate_theft(self, p):
-        return self.billing_service.calculate_theft(p)
+        return self._billing_service.calculate_theft(p)
 
     def calculate_theft_dual(self, p):
-        return self.billing_service.calculate_theft_dual(p)
+        return self._billing_service.calculate_theft_dual(p)
 
     def calculate_theft_reverse_load(self, p):
-        return self.billing_service.calculate_theft_reverse_load(p)
+        return self._billing_service.calculate_theft_reverse_load(p)
 
     def get_tariffs(self):
         try:
@@ -390,16 +390,16 @@ class AppAPI:
     # Auto-Update
     # =========================================================================
     def check_for_updates(self):
-        return _io_pool.submit(self.update_service.check_for_updates).result()
+        return _io_pool.submit(self._update_service.check_for_updates).result()
 
     def start_self_update(self, installer_url=""):
-        return self.update_service.start_self_update(installer_url)
+        return self._update_service.start_self_update(installer_url)
 
     def get_update_progress(self):
-        return self.update_service.get_progress()
+        return self._update_service.get_progress()
 
     def exit_for_update(self):
-        return self.update_service.exit_for_update(self.window)
+        return self._update_service.exit_for_update(self._window)
 
     # =========================================================================
     # Search History & Consumer Notes
@@ -482,23 +482,23 @@ class AppAPI:
     # Folder Management & Indexing
     # =========================================================================
     def get_folder_status(self):
-        return self.folder_service.get_folder_status()
+        return self._folder_service.get_folder_status()
 
     def add_network_folder(self, path=""):
         if not path:
             path = self.pick_folder(title="Select Folder to Add")
         if not path:
             return {"success": False, "cancelled": True}
-        return self.folder_service.add_network_folder(path)
+        return self._folder_service.add_network_folder(path)
 
     def remove_network_folder(self, path):
-        return self.folder_service.remove_network_folder(path)
+        return self._folder_service.remove_network_folder(path)
 
     def start_indexing(self, target_folders=None, full_reindex=False, **kwargs):
         if isinstance(target_folders, dict):
             full_reindex = target_folders.get("full_reindex", target_folders.get("full", False))
             target_folders = target_folders.get("target_folders", None)
-        return self.folder_service.start_indexing(target_folders=target_folders, full_reindex=full_reindex)
+        return self._folder_service.start_indexing(target_folders=target_folders, full_reindex=full_reindex)
 
     def log_client_message(self, level="INFO", message=""):
         try:
@@ -533,16 +533,16 @@ class AppAPI:
         return {"success": True}
 
     def get_indexing_status(self):
-        return self.folder_service.get_indexing_status()
+        return self._folder_service.get_indexing_status()
 
     def check_folder_changes(self):
-        return self.folder_service.check_folder_changes()
+        return self._folder_service.check_folder_changes()
 
     def get_auto_index_settings(self):
-        return {"success": True, "mode": self.folder_service.get_auto_index_mode()}
+        return {"success": True, "mode": self._folder_service.get_auto_index_mode()}
 
     def set_auto_index_settings(self, mode):
-        saved = self.folder_service.set_auto_index_mode(mode)
+        saved = self._folder_service.set_auto_index_mode(mode)
         return {"success": True, "mode": saved}
 
     # =========================================================================
@@ -550,12 +550,12 @@ class AppAPI:
     # =========================================================================
     def pick_file(self, title="Select File", file_types=None):
         try:
-            if self.window and hasattr(self.window, "create_file_dialog"):
+            if self._window and hasattr(self._window, "create_file_dialog"):
                 import webview
                 file_filter = ()
                 if file_types:
                     file_filter = tuple(file_types) if isinstance(file_types, (list, tuple)) else (str(file_types),)
-                res = self.window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=False, file_types=file_filter)
+                res = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=False, file_types=file_filter)
                 if res and len(res) > 0:
                     return res[0]
                 return ""
@@ -582,12 +582,12 @@ class AppAPI:
 
     def pick_save_file(self, title="Save File", default_filename="export.xlsx", file_types=None):
         try:
-            if self.window and hasattr(self.window, "create_file_dialog"):
+            if self._window and hasattr(self._window, "create_file_dialog"):
                 import webview
                 file_filter = ()
                 if file_types:
                     file_filter = tuple(file_types) if isinstance(file_types, (list, tuple)) else (str(file_types),)
-                res = self.window.create_file_dialog(webview.FileDialog.SAVE, save_filename=default_filename, file_types=file_filter)
+                res = self._window.create_file_dialog(webview.FileDialog.SAVE, save_filename=default_filename, file_types=file_filter)
                 if res and len(res) > 0:
                     return res[0] if isinstance(res, (list, tuple)) else str(res)
                 return ""
@@ -610,9 +610,9 @@ class AppAPI:
 
     def pick_folder(self, title="Select Folder"):
         try:
-            if self.window and hasattr(self.window, "create_file_dialog"):
+            if self._window and hasattr(self._window, "create_file_dialog"):
                 import webview
-                res = self.window.create_file_dialog(webview.FileDialog.FOLDER)
+                res = self._window.create_file_dialog(webview.FileDialog.FOLDER)
                 if res and len(res) > 0:
                     return res[0]
                 return ""
@@ -702,7 +702,7 @@ class AppAPI:
     # Fuzzy Lookup Engine
     # =========================================================================
     def get_fuzzy_status(self):
-        return self.fuzzy_service.get_status()
+        return self._fuzzy_service.get_status()
 
     def generate_fuzzy_template(self, save_path=""):
         if not save_path:
@@ -711,10 +711,10 @@ class AppAPI:
                 default_filename="fuzzy_lookup_input_template.xlsx",
                 file_types=[("Excel Files (*.xlsx)", "*.xlsx")]
             )
-        return self.fuzzy_service.generate_fuzzy_template(save_path)
+        return self._fuzzy_service.generate_fuzzy_template(save_path)
 
     def lookup_fuzzy_rows(self, rows, threshold=0.85, top_n=5):
-        return _io_pool.submit(lambda: self.fuzzy_service.lookup_fuzzy_rows(rows, threshold, top_n)).result()
+        return _io_pool.submit(lambda: self._fuzzy_service.lookup_fuzzy_rows(rows, threshold, top_n)).result()
 
     def run_fuzzy_lookup(self, input_path="", output_path="", threshold=0.85, top_n=5, include_live_osd=False):
         if not input_path:
@@ -733,7 +733,7 @@ class AppAPI:
                 ts = time.strftime("%Y%m%d_%H%M%S")
                 output_path = os.path.join(input_dir, f"fuzzy_lookup_results_{ts}.xlsx")
 
-        return self.fuzzy_service.start_batch_lookup(input_path, output_path, threshold, top_n, include_live_osd)
+        return self._fuzzy_service.start_batch_lookup(input_path, output_path, threshold, top_n, include_live_osd)
 
     # =========================================================================
     # Consumer Master Data Management
@@ -745,7 +745,7 @@ class AppAPI:
                 default_filename="consumer_data_template.xlsx",
                 file_types=[("Excel Files (*.xlsx)", "*.xlsx")]
             )
-        return self.consumer_service.generate_template(save_path)
+        return self._consumer_service.generate_template(save_path)
 
     def import_consumer_data(self, file_path=""):
         if not file_path:
@@ -757,9 +757,9 @@ class AppAPI:
             return {"success": False, "cancelled": True}
 
         def _do_import():
-            res = self.consumer_service.import_from_excel(file_path)
+            res = self._consumer_service.import_from_excel(file_path)
             if res.get("success"):
-                self.fuzzy_service.invalidate_cache()
+                self._fuzzy_service.invalidate_cache()
             return res
 
         return _io_pool.submit(_do_import).result()
@@ -775,7 +775,7 @@ class AppAPI:
             return {"success": False, "cancelled": True}
 
         def _do_export():
-            res = self.consumer_service.export_to_excel(dest_path)
+            res = self._consumer_service.export_to_excel(dest_path)
             if res.get("success"):
                 self.open_file_external(dest_path)
             return res
@@ -786,17 +786,17 @@ class AppAPI:
     # Low Consumption Audit Studio
     # =========================================================================
     def get_low_consumption_session(self):
-        return self.audit_service.get_session()
+        return self._audit_service.get_session()
 
     def save_low_consumption_session(self, data):
-        return self.audit_service.save_session(data)
+        return self._audit_service.save_session(data)
 
     def parse_low_consumption_file(self, file_path=""):
-        return _io_pool.submit(lambda: self.audit_service.parse_file(file_path)).result()
+        return _io_pool.submit(lambda: self._audit_service.parse_file(file_path)).result()
 
     def export_low_consumption_report(self, items):
         def _do_export():
-            res = self.audit_service.export_report(items)
+            res = self._audit_service.export_report(items)
             if res.get("success") and res.get("file_path"):
                 self.open_file_external(res["file_path"])
             return res
@@ -828,13 +828,13 @@ class AppAPI:
         def _bg_fetch():
             try:
                 result = live_osd_service.get_live_osd_data(cid, include_pdf_base64=True, force_refresh=bool(force_refresh))
-                if self.window:
+                if self._window:
                     js_data = json.dumps(result)
-                    self.window.evaluate_js(f"if (typeof onLiveOsdResult === 'function') {{ onLiveOsdResult({js_data}); }}")
+                    self._window.evaluate_js(f"if (typeof onLiveOsdResult === 'function') {{ onLiveOsdResult({js_data}); }}")
             except Exception as e:
-                if self.window:
+                if self._window:
                     err = json.dumps({"success": False, "error": str(e)})
-                    self.window.evaluate_js(f"if (typeof onLiveOsdResult === 'function') {{ onLiveOsdResult({err}); }}")
+                    self._window.evaluate_js(f"if (typeof onLiveOsdResult === 'function') {{ onLiveOsdResult({err}); }}")
 
         threading.Thread(target=_bg_fetch, daemon=True).start()
         return {"success": True, "pending": True}
