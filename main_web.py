@@ -42,17 +42,75 @@ except ImportError:
 import logging
 import time
 
+class StreamTee:
+    def __init__(self, stream, filepath):
+        self.stream = stream
+        self.filepath = filepath
+        self.encoding = getattr(stream, "encoding", "utf-8") or "utf-8"
+        self._file = None
+
+    def _get_file(self):
+        if self._file is None or self._file.closed:
+            try:
+                self._file = open(self.filepath, "a", encoding="utf-8", buffering=1)
+            except Exception:
+                self._file = None
+        return self._file
+
+    def write(self, s):
+        try:
+            if self.stream:
+                self.stream.write(s)
+                self.stream.flush()
+        except Exception:
+            pass
+        try:
+            f = self._get_file()
+            if f and s:
+                f.write(s)
+                f.flush()
+        except Exception:
+            pass
+
+    def flush(self):
+        try:
+            if self.stream:
+                self.stream.flush()
+        except Exception:
+            pass
+        try:
+            f = self._get_file()
+            if f:
+                f.flush()
+        except Exception:
+            pass
+
+    def fileno(self):
+        if hasattr(self.stream, "fileno"):
+            try:
+                return self.stream.fileno()
+            except Exception:
+                pass
+        return 1
+
+    def isatty(self):
+        if hasattr(self.stream, "isatty"):
+            try:
+                return self.stream.isatty()
+            except Exception:
+                pass
+        return False
+
+    @property
+    def buffer(self):
+        return getattr(self.stream, "buffer", self.stream)
+
 def setup_logging():
     try:
         log_file_path = os.path.join(BASE_DIR, "app_debug.log")
-        handler = logging.FileHandler(log_file_path, encoding="utf-8", mode="a")
-        handler.setFormatter(logging.Formatter("[%(asctime)s] [%(levelname)s] %(message)s"))
-        logger = logging.getLogger()
-        logger.setLevel(logging.INFO)
-        # Avoid duplicate handlers on re-init
-        if not any(isinstance(h, logging.FileHandler) and getattr(h, 'baseFilename', '') == os.path.abspath(log_file_path) for h in logger.handlers):
-            logger.addHandler(handler)
-        logging.info(f"=== SpotImageViewer Studio Session Started: {time.strftime('%Y-%m-%d %H:%M:%S')} ===")
+        sys.stdout = StreamTee(sys.stdout, log_file_path)
+        sys.stderr = StreamTee(sys.stderr, log_file_path)
+        print(f"=== SpotImageViewer Studio Session Started: {time.strftime('%Y-%m-%d %H:%M:%S')} ===")
     except Exception:
         pass
 
