@@ -120,11 +120,11 @@ function _renderLiveOsdData(res) {
       if (res && res.error) {
         displayError = res.error;
         if (displayError.length > 24) {
-          displayError = (res.error_code === 'OFFLINE' || displayError.toLowerCase().includes('internet')) ? "No Internet" : "Portal Error";
+          displayError = (res.error_code === 'OFFLINE' || displayError.toLowerCase().includes('internet')) ? "No Internet" : "Service Error";
         }
       }
       statusText.innerText = displayError;
-      statusText.title = res ? (res.error || res.raw_error || "Could not connect to WBSEDCL portal") : "Portal Error";
+      statusText.title = res ? (res.error || res.raw_error || "Could not connect to service") : "Service Error";
     }
     if (totalDuesEl) totalDuesEl.innerText = "-";
     if (unpaidEl) unpaidEl.innerText = "-";

@@ -6,6 +6,7 @@ const TAB_META = {
   theft:    { title: 'Theft Assessment',      icon: 'scale' },
   audit:    { title: 'Low Cons. Audit',       icon: 'file-spreadsheet' },
   fuzzy:    { title: 'Batch Fuzzy Lookup',    icon: 'sparkles' },
+  osd:      { title: 'OSD Report Studio',     icon: 'file-check-2' },
   settings: { title: 'Global Settings',       icon: 'settings' },
 };
 
@@ -291,6 +292,7 @@ async function initApp() {
   }
   if (info && info.version) {
     const curVer = info.version;
+    document.title = `Spot Image Viewer & Verification Studio — v${curVer}`;
     const verEl = document.getElementById('statusAppVersion');
     if (verEl) verEl.innerText = `v${curVer} Studio`;
     const setVerEl = document.getElementById('currentAppVersionSettings');

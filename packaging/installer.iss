@@ -1,10 +1,12 @@
 ; Inno Setup Script for Spot Image Viewer
 ; Generated for automated packaging & silent self-updating
 
+#ifndef MyAppVersion
+  #define MyAppVersion "20.53"
+#endif
 #define MyAppName "Spot Image Viewer"
-#define MyAppVersion "20.52"
 #define MyAppPublisher "WBSEDCL / Pramod Kumar Verma"
-#define MyAppExeName "SpotImageViewerV20.52.exe"
+#define MyAppExeName "SpotImageViewerV" + MyAppVersion + ".exe"
 #define MyAppURL "https://github.com/Hackers-lab/SpotImageViewer"
 
 [Setup]
@@ -37,7 +39,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; Source directory produced by PyInstaller (spec build)
-Source: "..\dist\SpotImageViewerV20.52\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\SpotImageViewerV{#MyAppVersion}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

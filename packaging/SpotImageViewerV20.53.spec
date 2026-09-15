@@ -1,6 +1,14 @@
 import os
+import sys
 
 PROJECT_ROOT = os.path.abspath(os.path.join(SPECPATH, '..'))
+sys.path.insert(0, os.path.join(PROJECT_ROOT, 'src', 'core'))
+try:
+    import config
+    APP_VERSION = str(getattr(config, 'CURRENT_VERSION', '20.53'))
+except Exception:
+    APP_VERSION = '20.53'
+APP_NAME = f'SpotImageViewerV{APP_VERSION}'
 
 a_main = Analysis(
     [os.path.join(PROJECT_ROOT, 'main_web.py')],
@@ -37,6 +45,7 @@ a_main = Analysis(
         'core.services.audit_service',
         'core.services.folder_service',
         'core.services.update_service',
+        'core.services.osd_service',
         'bridge',
         'bridge.app_api',
         'PIL',
@@ -63,7 +72,7 @@ exe_main = EXE(
     a_main.scripts,
     [],
     exclude_binaries=True,
-    name='SpotImageViewerV20.52',
+    name=APP_NAME,
     icon=os.path.join(PROJECT_ROOT, 'assets', 'spot_icon.ico'),
     debug=False,
     bootloader_ignore_signals=False,
@@ -138,5 +147,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name='SpotImageViewerV20.52',
+    name=APP_NAME,
 )
