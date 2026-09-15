@@ -1,13 +1,17 @@
 {
-  "version": 20.51,
-  "release_notes": "V20.51 — Hotfix: PyWebView Bridge Race & Instant Search Fix:\n\n- PyWebView Bridge Lifecycle Fix: Fixed race condition where pywebviewready fired before script execution, ensuring initApp() always runs reliably on boot.\n- Search Restoration: Fixed premature bridge bailouts that caused ID, Meter, and Name searches to falsely report 'No matching consumers found'.\n- Tariff Dropdown Population: Restored automatic loading of tariff classes into Bill Calculator and Theft Assessment studios on app startup.\n- Live OSD Table & HUD: Restored immediate Live OSD dues inspection card in the main frame when a consumer is searched.\n- Resilient callAPI(): Added 3.5-second async retry loop ensuring RPC calls never falsely trigger 'PyWebView API not available'.\n- On-Canvas Navigation Chevrons: Added floating, glassmorphic Prev (<) and Next (>) buttons directly flanking the main viewport.",
-  "download_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.51/SpotImageViewer_Setup_v20.51.exe",
-  "installer_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.51/SpotImageViewer_Setup_v20.51.exe",
-  "zip_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.51/SpotImageViewerV20.51.zip",
+  "version": 20.52,
+  "release_notes": "V20.52 — Smart Folder Sync, Offline Image Fallback & Bridge Hardening:\n\n- PyWebView Bridge Stability: Hardened Python-JS bridge attributes against recursive COM reflection crashes, eliminating 'Not Responding' freezes.\n- Deep Folder Sync & Notifications: Recursive timestamp tracking across all nested subfolders and network shares, notifying you of external image changes instantly.\n- Smart Offline Image Fallback: Automatically falls back to mirror directories when network shares go offline, prioritizing fast local drives (C:\\).\n- Interactive Tariff Editor: Full tariff class and slab rate management directly integrated into Verification Studio.\n- Lean Diagnostics: Stripped temporary logging overhead for a fast, responsive production experience.",
+  "download_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.52/SpotImageViewer_Setup_v20.52.exe",
+  "installer_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.52/SpotImageViewer_Setup_v20.52.exe",
+  "zip_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.52/SpotImageViewerV20.52.zip",
   "install_args": "/VERYSILENT /NORESTART",
-  "launch_exe": "SpotImageViewer\\SpotImageViewerV20.51.exe",
+  "launch_exe": "SpotImageViewer\\SpotImageViewerV20.52.exe",
   "sha256": "",
   "previous_versions": [
+    {
+      "version": 20.51,
+      "release_notes": "V20.51 — Hotfix: PyWebView Bridge Race & Instant Search Fix:\n\n- PyWebView Bridge Lifecycle Fix: Fixed race condition where pywebviewready fired before script execution, ensuring initApp() always runs reliably on boot.\n- Search Restoration: Fixed premature bridge bailouts that caused ID, Meter, and Name searches to falsely report 'No matching consumers found'.\n- Tariff Dropdown Population: Restored automatic loading of tariff classes into Bill Calculator and Theft Assessment studios on app startup.\n- Live OSD Table & HUD: Restored immediate Live OSD dues inspection card in the main frame when a consumer is searched.\n- Resilient callAPI(): Added 3.5-second async retry loop ensuring RPC calls never falsely trigger 'PyWebView API not available'.\n- On-Canvas Navigation Chevrons: Added floating, glassmorphic Prev (<) and Next (>) buttons directly flanking the main viewport."
+    },
     {
       "version": 20.5,
       "release_notes": "V20.5 — High-Concurrency Performance & Zero-Hang Suite:\n\n- Non-Blocking RPC Bridge: All heavy operations are now offloaded to a background thread pool, completely eliminating UI freezes and stalls.\n- Database Compaction: Eliminated fragmented freelist space, shrinking database by 72% down to under 40MB.\n- Accurate Consumer Status Bar: Fixed false 'Consumer data not updated' warnings on startup.\n- Concurrent Thumbnail Loading: Filmstrip and Overview Grid stream thumbnails in parallel batches.\n- Hardware-Throttled Viewport: Zoom and pan mouse handlers throttled with requestAnimationFrame."

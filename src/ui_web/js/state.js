@@ -1,56 +1,5 @@
 // Global State, RPC Communication & Common Utilities
 
-// Non-blocking console logger: mirrors frontend console messages to app_debug.log
-(function() {
-  const _origLog = console.log;
-  const _origWarn = console.warn;
-  const _origError = console.error;
-
-  const logBuffer = [];
-  let flushTimer = null;
-
-  function scheduleFlush() {
-    if (flushTimer) return;
-    flushTimer = setTimeout(async () => {
-      flushTimer = null;
-      if (!logBuffer.length) return;
-      const batch = logBuffer.splice(0, 50);
-      try {
-        if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.log_client_batch === 'function') {
-          await window.pywebview.api.log_client_batch(batch);
-        }
-      } catch (_) {}
-    }, 1500);
-  }
-
-  console.log = function(...args) {
-    _origLog.apply(console, args);
-    try {
-      const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-      logBuffer.push({ level: 'LOG', msg, time: new Date().toLocaleTimeString() });
-      scheduleFlush();
-    } catch (_) {}
-  };
-
-  console.warn = function(...args) {
-    _origWarn.apply(console, args);
-    try {
-      const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-      logBuffer.push({ level: 'WARN', msg, time: new Date().toLocaleTimeString() });
-      scheduleFlush();
-    } catch (_) {}
-  };
-
-  console.error = function(...args) {
-    _origError.apply(console, args);
-    try {
-      const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-      logBuffer.push({ level: 'ERROR', msg, time: new Date().toLocaleTimeString() });
-      scheduleFlush();
-    } catch (_) {}
-  };
-})();
-
 // Global Application State
 let currentImages = [];
 let currentImageIndex = 0;

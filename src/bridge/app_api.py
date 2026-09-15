@@ -500,38 +500,6 @@ class AppAPI:
             target_folders = target_folders.get("target_folders", None)
         return self._folder_service.start_indexing(target_folders=target_folders, full_reindex=full_reindex)
 
-    def log_client_message(self, level="INFO", message=""):
-        try:
-            _project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-            log_file = os.path.join(_project_dir, "app_debug.log")
-            ts = time.strftime("%Y-%m-%d %H:%M:%S")
-            line = f"[{ts}] [JS-{str(level).upper()}] {message}\n"
-            with open(log_file, "a", encoding="utf-8") as f:
-                f.write(line)
-        except Exception:
-            pass
-        return {"success": True}
-
-    def log_client_batch(self, items):
-        try:
-            if not isinstance(items, list):
-                return {"success": True}
-            _project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-            log_file = os.path.join(_project_dir, "app_debug.log")
-            lines = []
-            for it in items:
-                lvl = it.get("level", "LOG")
-                msg = str(it.get("msg", "")).strip()
-                t = it.get("time", "")
-                if msg:
-                    lines.append(f"[{t}] [JS-{lvl}] {msg}\n")
-            if lines:
-                with open(log_file, "a", encoding="utf-8") as f:
-                    f.writelines(lines)
-        except Exception:
-            pass
-        return {"success": True}
-
     def get_indexing_status(self):
         return self._folder_service.get_indexing_status()
 
