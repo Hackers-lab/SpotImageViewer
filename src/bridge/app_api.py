@@ -258,7 +258,7 @@ class AppAPI:
                     FROM images i 
                     JOIN directories d ON i.dir_id = d.id 
                     WHERE i.consumer_id = ? 
-                    ORDER BY i.date_iso DESC
+                    ORDER BY i.date_iso DESC, CASE WHEN d.dir_path LIKE '_:%' THEN 0 ELSE 1 END, i.rowid ASC
                 """, (cid,))
                 rows = cur.fetchall()
             except Exception:

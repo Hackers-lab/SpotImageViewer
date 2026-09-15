@@ -18,7 +18,30 @@ class ImageService:
         """Loads and encodes an image into JPEG base64 with EXIF orientation correction."""
         try:
             if not file_path or not os.path.exists(file_path):
-                return {"success": False, "error": f"Image not found: {file_path}"}
+                # Fallback: check if the same filename is available in another indexed directory
+                fallback_path = None
+                if file_path:
+                    fname = os.path.basename(file_path)
+                    try:
+                        from core import database
+                        conn = database.get_db_connection()
+                        cur = conn.cursor()
+                        cur.execute(
+                            "SELECT d.dir_path FROM images i JOIN directories d ON i.dir_id = d.id WHERE i.filename = ?",
+                            (fname,)
+                        )
+                        for row in cur.fetchall():
+                            candidate = os.path.join(row[0], fname)
+                            if os.path.exists(candidate):
+                                fallback_path = candidate
+                                break
+                    except Exception:
+                        pass
+
+                if fallback_path:
+                    file_path = fallback_path
+                else:
+                    return {"success": False, "error": f"Image file is offline or inaccessible: {file_path}"}
 
             with Image.open(file_path) as img:
                 img = ImageOps.exif_transpose(img)
