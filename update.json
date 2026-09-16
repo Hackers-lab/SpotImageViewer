@@ -1,13 +1,17 @@
 {
-  "version": 20.55,
-  "release_notes": "V20.55 — Agency PO Billing Generator & Chronological Date Engine:\n\n- Agency PO & DCRC Billing Generator: Automated reconciliation of SAP DCRC events, cash payment registers, and zone allocations.\n- True Chronological Date Engine: Accurate time-based agency mapping across contractual cutoff dates, resolving alphabetical text-comparison date anomalies.\n- Executive Printable Workbooks: Complete print-ready Portrait A4 workbooks with breakup reports, countable consumer lists, and separate pages for 1PH and 3PH.\n- File Dialog & Selector Fix: Proper WinForms and webview filter handling for seamless Excel/CSV file selection.",
-  "download_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.55/SpotImageViewer_Setup_v20.55.exe",
-  "installer_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.55/SpotImageViewer_Setup_v20.55.exe",
-  "zip_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.55/SpotImageViewer_Setup_v20.55.exe",
+  "version": 20.56,
+  "release_notes": "V20.56 — Modular Architecture & Instant Native Startup Splash:\n\n- Codebase Modularization: Decomposed large monolithic files (>1,000–2,000 lines) into focused domain sub-modules (<300–800 lines each) across Python RPC Bridge, DCRC Exporter, Meter Audit Tool, and Web UI partials.\n- Instant Native Startup Splash: Added independent native startup splash screen that appears in <200ms with progress bar and dynamic status updates, eliminating startup blind spots and white/black screen flicker.\n- Performance & Stability: Enhanced WebView2 lifecycle synchronization, non-blocking splash thread, and automated v20.56 release packaging.",
+  "download_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.56/SpotImageViewer_Setup_v20.56.exe",
+  "installer_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.56/SpotImageViewer_Setup_v20.56.exe",
+  "zip_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.56/SpotImageViewer_Setup_v20.56.exe",
   "install_args": "/VERYSILENT /NORESTART",
-  "launch_exe": "SpotImageViewer\\SpotImageViewerV20.55.exe",
-  "sha256": "2959F81D242177A66EC32AA626663B32F92D7F1EB7D8EF977DB20FBE1F41D92B",
+  "launch_exe": "SpotImageViewer\\SpotImageViewerV20.56.exe",
+  "sha256": "",
   "previous_versions": [
+    {
+      "version": 20.55,
+      "release_notes": "V20.55 — Agency PO Billing Generator & Chronological Date Engine:\n\n- Agency PO & DCRC Billing Generator: Automated reconciliation of SAP DCRC events, cash payment registers, and zone allocations.\n- True Chronological Date Engine: Accurate time-based agency mapping across contractual cutoff dates, resolving alphabetical text-comparison date anomalies.\n- Executive Printable Workbooks: Complete print-ready Portrait A4 workbooks with breakup reports, countable consumer lists, and separate pages for 1PH and 3PH.\n- File Dialog & Selector Fix: Proper WinForms and webview filter handling for seamless Excel/CSV file selection."
+    },
     {
       "version": 20.54,
       "release_notes": "V20.54 — Native Folder Picker, Image Deduplication & OSD Status Accuracy:\n\n- Native Windows Folder Selector: Switched to Windows Explorer native folder browser with top-right search box, path autocomplete, and expandable Network shares.\n- Image Date Deduplication: Automatically filters duplicate images of the same date across different folders so only one image per date is displayed in viewer, filmstrip, and navigation.\n- Accurate OSD Status from PDF: Fixed substring matching bug to properly extract and display actual connection status from WBSEDCL PDFs (Connected, Temp Disconnected, Deemed Disconnected, Disconnected) with corresponding color-coded badges.\n- Excel & CSV Dues Export: Corrected connection status styling and data fidelity in bulk verification reports."

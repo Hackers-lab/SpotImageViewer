@@ -11,7 +11,7 @@ from tkinter import ttk
 
 
 class SplashScreen:
-    def __init__(self, title="SPOT IMAGE VIEWER", version="v20.55"):
+    def __init__(self, title="SPOT IMAGE VIEWER", version="v20.56"):
         self.title_text = title
         self.version_text = version
         self._root = None
@@ -161,7 +161,7 @@ class SplashScreen:
 
 _global_splash = None
 
-def show_splash(title="SPOT IMAGE VIEWER", version="v20.55"):
+def show_splash(title="SPOT IMAGE VIEWER", version="v20.56"):
     global _global_splash
     if _global_splash is None:
         _global_splash = SplashScreen(title=title, version=version)
