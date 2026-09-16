@@ -39,6 +39,33 @@ except ImportError:
     import config, database
     from app_api import AppAPI
 
+def _cleanup_stale_webview_processes():
+    """
+    If no other SpotImageViewer Python process is running,
+    terminate any lingering msedgewebview2.exe processes using our storage_dir
+    so the warm profile cache can be reused immediately without lock contention.
+    """
+    try:
+        import psutil
+        current_pid = os.getpid()
+        other_pythons = [
+            p.pid for p in psutil.process_iter(['pid', 'name', 'cmdline'])
+            if p.pid != current_pid and p.info['name'] and 'python' in p.info['name'].lower()
+            and any('main.py' in arg or 'main_web.py' in arg for arg in (p.info['cmdline'] or []))
+        ]
+        if not other_pythons:
+            for p in psutil.process_iter(['pid', 'name', 'cmdline']):
+                try:
+                    if p.info['name'] and 'msedgewebview2' in p.info['name'].lower():
+                        cmd = ' '.join(p.info['cmdline'] or [])
+                        if 'spotbillfiles' in cmd.lower() or 'spot_webview' in cmd.lower():
+                            p.terminate()
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+    except Exception:
+        pass
+
+
 def main():
     import threading
     from core import perf_log
@@ -47,6 +74,9 @@ def main():
 
     # Instantiate the Python RPC Bridge immediately
     api = AppAPI()
+
+    # Clean up stale WebView2 zombies so lockfile is free and warm cache is used
+    _cleanup_stale_webview_processes()
 
     # Patch numpy in background — saves 150-500ms startup time
     threading.Thread(target=_patch_numpy, daemon=True).start()
@@ -97,11 +127,28 @@ def main():
     def _on_loaded():
         perf_log.log_perf("WEBVIEW_EVENT_LOADED", details="PyWebView window.events.loaded fired")
         try:
+            window.show()
+            perf_log.log_perf("WINDOW_SHOWN", details="App window revealed on loaded event")
+        except Exception:
+            pass
+        try:
             window.evaluate_js("if (typeof window.safeInitApp === 'function') { window.safeInitApp(); }")
         except Exception:
             pass
 
     window.events.loaded += _on_loaded
+
+    def _on_closed():
+        try:
+            import psutil
+            parent = psutil.Process(os.getpid())
+            for child in parent.children(recursive=True):
+                if 'msedgewebview2' in child.name().lower():
+                    child.terminate()
+        except Exception:
+            pass
+
+    window.events.closed += _on_closed
 
     # Fallback safety: ensure window is revealed within 2.5s even if JS initialization has a glitch
     import time
