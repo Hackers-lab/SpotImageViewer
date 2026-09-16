@@ -21,6 +21,12 @@ class SystemBridge:
             perf_log.log_perf(stage, elapsed_ms, details)
         except Exception:
             pass
+        if "INIT_APP_COMPLETE" in stage:
+            try:
+                from ui_splash import close_splash
+                close_splash()
+            except Exception:
+                pass
         return True
 
     def show_window(self):
@@ -31,6 +37,11 @@ class SystemBridge:
                 perf_log.log_perf("WINDOW_SHOWN", details="App window revealed on screen fully rendered")
             except Exception:
                 pass
+        try:
+            from ui_splash import close_splash
+            close_splash()
+        except Exception:
+            pass
         return True
 
     def get_app_info(self):

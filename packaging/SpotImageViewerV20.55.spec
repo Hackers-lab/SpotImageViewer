@@ -54,6 +54,7 @@ a_main = Analysis(
         'dcrc_exporter',
         'bridge',
         'bridge.app_api',
+        'ui_splash',
         'PIL',
         'openpyxl',
         'requests',

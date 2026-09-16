@@ -78,6 +78,15 @@ def main():
     perf_log.clear_log()
     perf_log.log_perf("PY_BOOT_START", details="Python process initialized, AppAPI ready")
 
+    # Launch independent native splash screen immediately (<50ms)
+    try:
+        from ui_splash import show_splash, close_splash
+        splash = show_splash(version=f"v{config.CURRENT_VERSION}")
+        perf_log.log_perf("SPLASH_SHOWN", details="Independent native splash screen active")
+    except Exception:
+        splash = None
+        def close_splash(): pass
+
     # Instantiate the Python RPC Bridge immediately
     api = AppAPI()
 
@@ -91,6 +100,8 @@ def main():
     # without waiting for index or disk checks on huge (2M+) databases.
     # The init_db_ready event (in database module) is set when done, preventing
     # the startup deadlock where UI reads compete with schema migration locks.
+    if splash:
+        splash.update_status("Initializing database & services...")
     threading.Thread(target=database.init_db, daemon=True).start()
 
     # Ensure modular HTML partials are assembled if updated (<2ms)
@@ -122,6 +133,8 @@ def main():
         pass
 
     # Create PyWebView window with native Edge WebView2 engine and dark background
+    if splash:
+        splash.update_status("Starting WebView2 engine...")
     perf_log.log_perf("WINDOW_CREATING", details="webview.create_window started")
     window = webview.create_window(
         title=f"Spot Image Viewer & Verification Studio (v{config.CURRENT_VERSION})",
@@ -145,6 +158,10 @@ def main():
         except Exception:
             pass
         try:
+            close_splash()
+        except Exception:
+            pass
+        try:
             window.evaluate_js("if (typeof window.safeInitApp === 'function') { window.safeInitApp(); }")
         except Exception:
             pass
@@ -152,6 +169,10 @@ def main():
     window.events.loaded += _on_loaded
 
     def _on_closed():
+        try:
+            close_splash()
+        except Exception:
+            pass
         try:
             import psutil
             parent = psutil.Process(os.getpid())
@@ -163,12 +184,16 @@ def main():
 
     window.events.closed += _on_closed
 
-    # Fallback safety: ensure window is revealed within 2.5s even if JS initialization has a glitch
+    # Fallback safety: ensure window is revealed within 3.5s even if JS initialization has a glitch
     import time
     def _safety_reveal():
-        time.sleep(2.5)
+        time.sleep(3.5)
         try:
             window.show()
+        except Exception:
+            pass
+        try:
+            close_splash()
         except Exception:
             pass
     threading.Thread(target=_safety_reveal, daemon=True).start()
