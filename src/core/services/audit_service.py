@@ -50,7 +50,7 @@ class AuditService:
                 return {"success": False, "error": "File not found."}
 
             openpyxl = utils.get_openpyxl()
-            wb = openpyxl.load_workbook(file_path, data_only=True)
+            wb = openpyxl.load_workbook(file_path, data_only=True, read_only=True)
             sheet = wb.active
             rows = list(sheet.iter_rows(values_only=True))
             if not rows:

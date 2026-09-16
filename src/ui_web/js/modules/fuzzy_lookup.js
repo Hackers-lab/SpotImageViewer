@@ -54,16 +54,14 @@ function escapeHtml(val) {
     .replace(/'/g, '&#039;');
 }
 
-function syncCurrentInputValues() {
-  const tbody = document.getElementById('manualFuzzyTableBody');
-  if (!tbody) return;
-  tbody.querySelectorAll('input').forEach(inp => {
-    const field = inp.getAttribute('data-field');
-    const idx = parseInt(inp.getAttribute('data-index'), 10);
-    if (manualFuzzyRows[idx] && field) {
-      manualFuzzyRows[idx][field] = inp.value;
+function syncCurrentInputValues(e) {
+  if (e && e.target && e.target.tagName === 'INPUT') {
+    const field = e.target.getAttribute('data-field');
+    const idx = parseInt(e.target.getAttribute('data-index'), 10);
+    if (!isNaN(idx) && manualFuzzyRows[idx] && field) {
+      manualFuzzyRows[idx][field] = e.target.value;
     }
-  });
+  }
 }
 
 function renderManualFuzzyTable() {
@@ -97,23 +95,19 @@ function renderManualFuzzyTable() {
     tbody.appendChild(tr);
   });
 
-  // Attach input sync listeners & Enter / Ctrl+Enter support
-  tbody.querySelectorAll('input').forEach(inp => {
-    inp.addEventListener('input', (e) => {
-      const field = e.target.getAttribute('data-field');
-      const idx = parseInt(e.target.getAttribute('data-index'), 10);
-      if (manualFuzzyRows[idx]) {
-        manualFuzzyRows[idx][field] = e.target.value;
+  // Attach delegated input sync listeners & Enter / Ctrl+Enter support
+  if (!tbody._hasDelegatedEvents) {
+    tbody.addEventListener('input', syncCurrentInputValues);
+    tbody.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT') {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          e.preventDefault();
+          runManualFuzzyLookup();
+        }
       }
     });
-
-    inp.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        runManualFuzzyLookup();
-      }
-    });
-  });
+    tbody._hasDelegatedEvents = true;
+  }
 
   safeCreateIcons();
 }

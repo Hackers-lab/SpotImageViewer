@@ -7,32 +7,27 @@ import shutil
 import threading
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
+_tk_lock = threading.Lock()
+_tk_root = None
+
+def _get_tk_root():
+    global _tk_root
+    with _tk_lock:
+        if _tk_root is None:
+            import tkinter as tk
+            _tk_root = tk.Tk()
+            _tk_root.withdraw()
+        return _tk_root
 
 try:
-    from core import config, database, utils, tariff_manager, live_osd_service
-    from core.services.billing_service import BillingService
-    from core.services.image_service import ImageService
-    from core.services.fuzzy_service import FuzzyService
-    from core.services.consumer_data_service import ConsumerDataService
-    from core.services.audit_service import AuditService
-    from core.services.folder_service import FolderIndexerService, path_accessible
-    from core.services.update_service import UpdateService
-    from core.services.osd_service import OSDService
-    from core.services import dcrc_parser, dcrc_processor, dcrc_exporter
+    from core import config, database, utils, tariff_manager
 except ImportError:
-    import config, database, utils, tariff_manager, live_osd_service
-    from services.billing_service import BillingService
-    from services.image_service import ImageService
-    from services.fuzzy_service import FuzzyService
-    from services.consumer_data_service import ConsumerDataService
-    from services.audit_service import AuditService
-    from services.folder_service import FolderIndexerService, path_accessible
-    from services.update_service import UpdateService
-    from services.osd_service import OSDService
-    from services import dcrc_parser, dcrc_processor, dcrc_exporter
+    import config, database, utils, tariff_manager
 
 # Shared thread pool for offloading heavy I/O from the PyWebView bridge thread.
 _io_pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="siv-io")
+# Dedicated thread pool for image decoding and resizing to prevent UI thread starvation
+_image_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="siv-img")
 
 
 def _wait_db(timeout=5.0):
@@ -45,22 +40,104 @@ class AppAPI:
     Python-to-JavaScript RPC bridge exposed to the PyWebView window.
     Acts as a clean Facade dispatching requests to core domain services.
     All methods return JSON-serializable dictionaries or primitives.
+    Heavy domain services are loaded lazily on first access to ensure
+    near-instantaneous application window startup (<600ms).
     """
 
     def __init__(self, window=None):
         self._window = window
-        self._billing_service = BillingService()
-        self._image_service = ImageService()
-        self._fuzzy_service = FuzzyService()
-        self._consumer_service = ConsumerDataService()
-        self._audit_service = AuditService()
-        self._folder_service = FolderIndexerService()
-        self._update_service = UpdateService()
-        self._osd_service = OSDService()
+        self._billing_service_inst = None
+        self._image_service_inst = None
+        self._fuzzy_service_inst = None
+        self._consumer_service_inst = None
+        self._audit_service_inst = None
+        self._folder_service_inst = None
+        self._update_service_inst = None
+        self._osd_service_inst = None
         self._last_dcrc_result = None
 
     def set_window(self, window):
         self._window = window
+
+    @property
+    def _billing_service(self):
+        if self._billing_service_inst is None:
+            try:
+                from core.services.billing_service import BillingService
+            except ImportError:
+                from services.billing_service import BillingService
+            self._billing_service_inst = BillingService()
+        return self._billing_service_inst
+
+    @property
+    def _image_service(self):
+        if self._image_service_inst is None:
+            try:
+                from core.services.image_service import ImageService
+            except ImportError:
+                from services.image_service import ImageService
+            self._image_service_inst = ImageService()
+        return self._image_service_inst
+
+    @property
+    def _fuzzy_service(self):
+        if self._fuzzy_service_inst is None:
+            try:
+                from core.services.fuzzy_service import FuzzyService
+            except ImportError:
+                from services.fuzzy_service import FuzzyService
+            self._fuzzy_service_inst = FuzzyService()
+        return self._fuzzy_service_inst
+
+    @property
+    def _consumer_service(self):
+        if self._consumer_service_inst is None:
+            try:
+                from core.services.consumer_data_service import ConsumerDataService
+            except ImportError:
+                from services.consumer_data_service import ConsumerDataService
+            self._consumer_service_inst = ConsumerDataService()
+        return self._consumer_service_inst
+
+    @property
+    def _audit_service(self):
+        if self._audit_service_inst is None:
+            try:
+                from core.services.audit_service import AuditService
+            except ImportError:
+                from services.audit_service import AuditService
+            self._audit_service_inst = AuditService()
+        return self._audit_service_inst
+
+    @property
+    def _folder_service(self):
+        if self._folder_service_inst is None:
+            try:
+                from core.services.folder_service import FolderIndexerService
+            except ImportError:
+                from services.folder_service import FolderIndexerService
+            self._folder_service_inst = FolderIndexerService()
+        return self._folder_service_inst
+
+    @property
+    def _update_service(self):
+        if self._update_service_inst is None:
+            try:
+                from core.services.update_service import UpdateService
+            except ImportError:
+                from services.update_service import UpdateService
+            self._update_service_inst = UpdateService()
+        return self._update_service_inst
+
+    @property
+    def _osd_service(self):
+        if self._osd_service_inst is None:
+            try:
+                from core.services.osd_service import OSDService
+            except ImportError:
+                from services.osd_service import OSDService
+            self._osd_service_inst = OSDService()
+        return self._osd_service_inst
 
     # =========================================================================
     # System & Settings
@@ -99,17 +176,37 @@ class AppAPI:
 
         folders = []
         primary_path = config.IMAGE_FOLDER
+        # Fast local check for primary folder
         folders.append({
             "path": primary_path,
-            "accessible": path_accessible(primary_path),
+            "accessible": os.path.exists(primary_path) if primary_path else False,
             "is_primary": True
         })
         for p in database.get_additional_folders():
             folders.append({
                 "path": p,
-                "accessible": path_accessible(p),
+                "accessible": True,  # Optimistic initial status; validated asynchronously below
                 "is_primary": False
             })
+
+        # Check all folder accessibility asynchronously so network shares or disconnected drives NEVER block startup
+        def _bg_check_folders():
+            try:
+                from core.services.folder_service import path_accessible
+                updated_folders = []
+                for f in folders:
+                    updated_folders.append({
+                        "path": f["path"],
+                        "accessible": path_accessible(f["path"], timeout=0.8),
+                        "is_primary": f["is_primary"]
+                    })
+                if self._window:
+                    import json
+                    payload = json.dumps(updated_folders).replace('\\', '\\\\')
+                    self._window.evaluate_js(f"if (typeof renderFolders === 'function') {{ renderFolders({payload}); }}")
+            except Exception:
+                pass
+        threading.Thread(target=_bg_check_folders, daemon=True).start()
 
         return {
             "version": config.CURRENT_VERSION,
@@ -157,15 +254,11 @@ class AppAPI:
                 user32.CloseClipboard()
         except Exception as e:
             try:
-                import tkinter as tk
-                root = tk.Tk()
-                root.withdraw()
+                root = _get_tk_root()
                 try:
                     text = root.clipboard_get()
                 except Exception:
                     text = ""
-                finally:
-                    root.destroy()
                 return {"success": True, "text": text}
             except Exception:
                 return {"success": False, "error": str(e), "text": ""}
@@ -342,7 +435,7 @@ class AppAPI:
     # Image Operations
     # =========================================================================
     def get_image_data(self, file_path, max_dim=1400):
-        return _io_pool.submit(lambda: self._image_service.get_image_data(file_path, max_dim)).result()
+        return _image_pool.submit(lambda: self._image_service.get_image_data(file_path, max_dim)).result()
 
     def save_image_to(self, file_path, dest_path=""):
         if not dest_path:
@@ -671,13 +764,10 @@ class AppAPI:
             print(f"[pick_file webview error]: {e}")
 
         try:
-            import tkinter as tk
             from tkinter import filedialog
-            root = tk.Tk()
-            root.withdraw()
+            root = _get_tk_root()
             root.attributes('-topmost', True)
             chosen = filedialog.askopenfilename(title=title, filetypes=tk_filter)
-            root.destroy()
             self._ensure_window_enabled()
             return chosen or ""
         except Exception as e:
@@ -731,17 +821,14 @@ class AppAPI:
             print(f"[pick_save_file webview error]: {e}")
 
         try:
-            import tkinter as tk
             from tkinter import filedialog
-            root = tk.Tk()
-            root.withdraw()
+            root = _get_tk_root()
             root.attributes('-topmost', True)
             chosen = filedialog.asksaveasfilename(
                 title=title,
                 initialfile=default_filename,
                 filetypes=tk_filter
             )
-            root.destroy()
             self._ensure_window_enabled()
             return chosen or ""
         except Exception as e:
@@ -787,13 +874,10 @@ class AppAPI:
             print(f"[pick_folder webview error]: {e}")
 
         try:
-            import tkinter as tk
             from tkinter import filedialog
-            root = tk.Tk()
-            root.withdraw()
+            root = _get_tk_root()
             root.attributes('-topmost', True)
             chosen = filedialog.askdirectory(title=title)
-            root.destroy()
             self._ensure_window_enabled()
             return chosen or ""
         except Exception as e:
@@ -983,23 +1067,20 @@ class AppAPI:
         if not re.match(r"^\d{9}$", cid):
             return {"success": False, "error": f"Invalid Consumer ID '{cid}'. Must be a 9-digit number."}
 
-        import time as _time
-        now = _time.time()
-        from core import live_osd_service as _los
-        with _los._OSD_LOCK:
-            if not force_refresh and cid in _los._OSD_CACHE:
-                cached_time, cached_result, cached_pdf = _los._OSD_CACHE[cid]
-                if (now - cached_time) < _los._CACHE_TTL:
-                    import base64 as _b64
-                    res = dict(cached_result)
-                    if cached_pdf:
-                        res["pdfBase64"] = _b64.b64encode(cached_pdf).decode("utf-8")
-                    res["cached"] = True
-                    return {"success": True, "data": res}
+        try:
+            from core import live_osd_service as _los
+        except ImportError:
+            import live_osd_service as _los
+
+        # If already cached and not force refreshing, return immediately
+        if not force_refresh:
+            cached_res = _los.get_live_osd_data(cid, include_pdf_base64=False, force_refresh=False)
+            if cached_res.get("success") and cached_res.get("data", {}).get("cached"):
+                return cached_res
 
         def _bg_fetch():
             try:
-                result = live_osd_service.get_live_osd_data(cid, include_pdf_base64=True, force_refresh=bool(force_refresh))
+                result = _los.get_live_osd_data(cid, include_pdf_base64=True, force_refresh=bool(force_refresh))
                 if self._window:
                     js_data = json.dumps(result)
                     self._window.evaluate_js(f"if (typeof onLiveOsdResult === 'function') {{ onLiveOsdResult({js_data}); }}")
@@ -1018,7 +1099,13 @@ class AppAPI:
 
         def _fetch():
             try:
-                pdf_bytes = live_osd_service.fetch_live_osd_pdf(cid)
+                try:
+                    from core import live_osd_service as _los
+                except ImportError:
+                    import live_osd_service as _los
+
+                pdf_bytes = _los.fetch_live_osd_pdf(cid)
+
                 temp_dir = os.path.join(config.BASE_DIR, "temp_osd")
                 os.makedirs(temp_dir, exist_ok=True)
                 pdf_path = os.path.join(temp_dir, f"WBSEDCL_OSD_{cid}.pdf")
@@ -1201,6 +1288,11 @@ class AppAPI:
 
     def get_dcrc_defaults(self):
         """Returns paths to default templates and configured standard rates."""
+        try:
+            from core.services import dcrc_processor
+        except ImportError:
+            from services import dcrc_processor
+
         template_dir = r"C:\spotbillfiles\dcrc_templates"
         zone_tpl = os.path.join(template_dir, "Zones_Template.xlsx")
         cm_tpl = os.path.join(template_dir, "Consumer_Master_Template.xlsx")
@@ -1223,6 +1315,11 @@ class AppAPI:
         """
         def _run():
             try:
+                try:
+                    from core.services import dcrc_processor
+                except ImportError:
+                    from services import dcrc_processor
+
                 # If consumer_file is empty or not provided, check if default template exists
                 cm_path = consumer_file
                 if not cm_path or not os.path.exists(cm_path):
@@ -1262,6 +1359,11 @@ class AppAPI:
         """
         if not self._last_dcrc_result:
             return {"success": False, "error": "No processed DCRC data available. Please process files first."}
+
+        try:
+            from core.services import dcrc_exporter
+        except ImportError:
+            from services import dcrc_exporter
 
         out_dir = output_folder or r"C:\spotbillfiles\DCRC_PO_Output"
         try:

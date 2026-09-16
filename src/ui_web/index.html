@@ -20,6 +20,16 @@
     // Fallback safe Lucide stub in case script evaluation is delayed
     window.lucide = window.lucide || { createIcons: function() {} };
   </script>
+  <style>
+    html, body {
+      background-color: #0f172a !important;
+      color: #f1f5f9 !important;
+    }
+    html[data-theme="light"], html[data-theme="light"] body {
+      background-color: #f8fafc !important;
+      color: #0f172a !important;
+    }
+  </style>
   <script src="js/tailwind.js" charset="UTF-8"></script>
   <script charset="UTF-8">
     if (typeof tailwind !== 'undefined') {
@@ -327,8 +337,8 @@
             <span id="imgDateTag"></span>
           </div>
 
-          <!-- Bottom-Left Floating Live OSD HUD Card (Compact Table Widget, docked neatly above the photo filmstrip) -->
-          <div id="liveOsdHud" class="hidden absolute bottom-[86px] left-5 z-30 pointer-events-auto select-none">
+          <!-- Bottom-Left Floating Live OSD HUD Card (Compact Table Widget) -->
+          <div id="liveOsdHud" class="hidden absolute bottom-5 left-5 z-30 pointer-events-auto select-none">
             <div class="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xl p-2.5 space-y-1.5 w-[250px] transition-all hover:border-amber-500/50">
               <!-- Header Row: Title, Status Badge & Actions -->
               <div class="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-slate-800/80">
@@ -440,26 +450,6 @@
               <div id="overviewGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
                 <!-- Dynamically populated -->
               </div>
-            </div>
-          </div>
-
-          <!-- Sleek, Symmetrical Filmstrip Track with Toggle -->
-          <div id="filmstripWrapper" class="shrink-0 z-10 select-none flex flex-col border-t border-slate-200 dark:border-slate-800/80 bg-white/95 dark:bg-[#181818]/95 backdrop-blur-md">
-            <!-- Filmstrip Mini Header Rail -->
-            <div class="h-[22px] px-3 flex items-center justify-between text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-50/60 dark:bg-slate-900/40 border-b border-slate-100 dark:border-slate-800/60 cursor-pointer" onclick="toggleFilmstrip()">
-              <div class="flex items-center gap-1.5">
-                <i data-lucide="film" class="w-3 h-3 text-sky-500"></i>
-                <span class="uppercase tracking-wider">Photo Filmstrip</span>
-                <span id="filmstripCountBadge" class="font-mono text-[9px] px-1 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">0</span>
-              </div>
-              <button id="btnFilmstripCollapse" class="flex items-center gap-1 text-[10px] hover:text-slate-900 dark:hover:text-slate-200 transition" title="Toggle filmstrip dock">
-                <i id="filmstripCollapseIcon" data-lucide="chevron-down" class="w-3 h-3 transition-transform duration-150"></i>
-              </button>
-            </div>
-
-            <!-- Compact Thumbnails Container -->
-            <div id="filmstripContainer" class="flex items-center overflow-x-auto">
-              <p class="text-[11px] text-slate-400 italic px-2">Thumbnails will appear here once images are loaded.</p>
             </div>
           </div>
         </div>

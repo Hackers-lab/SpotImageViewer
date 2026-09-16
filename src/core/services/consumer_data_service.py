@@ -48,14 +48,14 @@ class ConsumerDataService:
 
     @staticmethod
     def import_from_excel(file_path):
-        """Reads consumer records from an Excel workbook and updates SQLite meter_mapping."""
+        """Reads consumer records from an Excel workbook and updates SQLite meter_mapping with streaming."""
+        wb = None
         try:
             if not file_path or not os.path.exists(file_path):
                 return {"success": False, "error": f"File not found: {file_path}"}
 
-            d = {}
             openpyxl = utils.get_openpyxl()
-            wb = openpyxl.load_workbook(file_path)
+            wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
             sheet = wb.active
 
             header_map = {
@@ -73,11 +73,11 @@ class ConsumerDataService:
                 "class": "class",
             }
 
-            rows = list(sheet.iter_rows(values_only=True))
-            if not rows:
+            row_iter = sheet.iter_rows(values_only=True)
+            first_row = next(row_iter, None)
+            if first_row is None:
                 return {"success": False, "error": "Excel sheet is empty."}
 
-            first_row = rows[0]
             index_map = {}
             for idx, val in enumerate(first_row):
                 if val is None:
@@ -90,7 +90,6 @@ class ConsumerDataService:
                     index_map[mapped] = idx
 
             has_headers = "consumer_id" in index_map and "meter_no" in index_map
-            data_rows = rows[1:] if has_headers else rows
 
             def get_val(row_vals, field, fallback_idx):
                 idx = index_map.get(field, fallback_idx)
@@ -103,7 +102,27 @@ class ConsumerDataService:
                     return str(int(val)).strip()
                 return str(val).strip()
 
-            for row in data_rows:
+            chunk = {}
+            total_imported = 0
+
+            # If first row was not header, process it as data
+            if not has_headers:
+                cid = get_val(first_row, "consumer_id", 0)
+                meter_no = get_val(first_row, "meter_no", 1)
+                if cid and meter_no:
+                    mobile = re.sub(r"\D", "", get_val(first_row, "mobile_number", 4))
+                    if len(mobile) == 12 and mobile.startswith("91"):
+                        mobile = mobile[2:]
+                    chunk[cid] = {
+                        "meter_no": meter_no,
+                        "name": get_val(first_row, "name", 2),
+                        "address": get_val(first_row, "address", 3),
+                        "mobile_number": mobile,
+                        "contractual_load": get_val(first_row, "contractual_load", 5),
+                        "class": get_val(first_row, "class", 6),
+                    }
+
+            for row in row_iter:
                 if not row:
                     continue
                 cid = get_val(row, "consumer_id", 0)
@@ -115,7 +134,7 @@ class ConsumerDataService:
                 if len(mobile) == 12 and mobile.startswith("91"):
                     mobile = mobile[2:]
 
-                d[cid] = {
+                chunk[cid] = {
                     "meter_no": meter_no,
                     "name": get_val(row, "name", 2),
                     "address": get_val(row, "address", 3),
@@ -124,18 +143,35 @@ class ConsumerDataService:
                     "class": get_val(row, "class", 6),
                 }
 
-            if not d:
+                if len(chunk) >= 5000:
+                    utils.update_meter_mapping(chunk)
+                    total_imported += len(chunk)
+                    chunk.clear()
+
+            if chunk:
+                utils.update_meter_mapping(chunk)
+                total_imported += len(chunk)
+                chunk.clear()
+
+            if total_imported == 0:
                 return {"success": False, "error": "No valid consumer records found in file."}
 
-            utils.update_meter_mapping(d)
             database.set_info_value("consumer_data_updated_at", datetime.now().strftime("%d-%m-%Y %H:%M"))
-            return {"success": True, "count": len(d), "file_path": file_path}
+            return {"success": True, "count": total_imported, "file_path": file_path}
         except Exception as ex:
             return {"success": False, "error": str(ex)}
+        finally:
+            if wb:
+                try:
+                    wb.close()
+                except Exception:
+                    pass
 
     @staticmethod
     def export_to_excel(dest_path):
-        """Exports all consumer master mapping records from SQLite into an Excel workbook."""
+        """Exports all consumer master mapping records from SQLite into an Excel workbook using write_only streaming."""
+        cursor = None
+        wb = None
         try:
             if not dest_path:
                 return {"success": False, "cancelled": True}
@@ -149,32 +185,41 @@ class ConsumerDataService:
                 ORDER BY consumer_id ASC
                 """
             )
-            rows = cursor.fetchall()
 
             openpyxl = utils.get_openpyxl()
-            wb = openpyxl.Workbook()
-            sheet = wb.active
-            sheet.title = "ConsumerMaster"
+            wb = openpyxl.Workbook(write_only=True)
+            sheet = wb.create_sheet(title="ConsumerMaster")
             headers = [
                 "CONSUMER ID", "METER NO", "NAME", "ADDRESS",
                 "MOBILE NUMBER", "CONTRACTUAL LOAD", "CLASS"
             ]
             sheet.append(headers)
 
-            for r in rows:
-                sheet.append([
-                    str(r[0] or ""), str(r[1] or ""), str(r[2] or ""),
-                    str(r[3] or ""), str(r[4] or ""), str(r[5] or ""),
-                    str(r[6] or "")
-                ])
-
-            sheet.freeze_panes = "A2"
-            widths = [18, 16, 28, 36, 18, 18, 14]
-            for idx, width in enumerate(widths, start=1):
-                col = openpyxl.utils.get_column_letter(idx)
-                sheet.column_dimensions[col].width = width
+            total_exported = 0
+            while True:
+                chunk = cursor.fetchmany(5000)
+                if not chunk:
+                    break
+                for r in chunk:
+                    sheet.append([
+                        str(r[0] or ""), str(r[1] or ""), str(r[2] or ""),
+                        str(r[3] or ""), str(r[4] or ""), str(r[5] or ""),
+                        str(r[6] or "")
+                    ])
+                    total_exported += 1
 
             wb.save(dest_path)
-            return {"success": True, "count": len(rows), "path": dest_path}
+            return {"success": True, "count": total_exported, "path": dest_path}
         except Exception as ex:
             return {"success": False, "error": str(ex)}
+        finally:
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if wb:
+                try:
+                    wb.close()
+                except Exception:
+                    pass

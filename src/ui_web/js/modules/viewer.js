@@ -1,4 +1,38 @@
 // Spot Image Viewer, Filmstrip, Overview Grid & Canvas Navigation
+const _clientImageCache = new Map();
+const _MAX_CLIENT_CACHE = 40;
+
+function _base64ToObjectURL(dataUri) {
+  const [header, b64] = dataUri.split(',');
+  const mime = header.match(/:(.*?);/)[1];
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return URL.createObjectURL(new Blob([bytes], { type: mime }));
+}
+
+async function getCachedImageData(filePath, maxDim) {
+  const key = `${filePath}_${maxDim}`;
+  if (_clientImageCache.has(key)) {
+    const val = _clientImageCache.get(key);
+    _clientImageCache.delete(key);
+    _clientImageCache.set(key, val);
+    return val;
+  }
+  const res = await callAPI('get_image_data', filePath, maxDim);
+  if (res && res.success) {
+    res.data = _base64ToObjectURL(res.data);
+    if (_clientImageCache.size >= _MAX_CLIENT_CACHE) {
+      const oldest = _clientImageCache.keys().next().value;
+      const evicted = _clientImageCache.get(oldest);
+      if (evicted && evicted.data) URL.revokeObjectURL(evicted.data);
+      _clientImageCache.delete(oldest);
+    }
+    _clientImageCache.set(key, res);
+  }
+  return res;
+}
+
 async function loadConsumerImages(consumerId) {
   const res = await callAPI('get_consumer_images', consumerId);
   if (!res || !res.success) {
@@ -42,10 +76,6 @@ async function loadConsumerImages(consumerId) {
 
     const cyclesList = document.getElementById('cyclesList');
     if (cyclesList) cyclesList.innerHTML = '';
-    const filmstrip = document.getElementById('filmstripContainer');
-    if (filmstrip) filmstrip.innerHTML = `<p class="text-xs text-amber-500 px-4">${escapeHtml(errMsg)}</p>`;
-    const filmBadge = document.getElementById('filmstripCountBadge');
-    if (filmBadge) filmBadge.innerText = '0';
     const searchResCount = document.getElementById('searchResultCount');
     if (searchResCount) searchResCount.innerText = '0 photos';
     const countSpan = document.getElementById('viewAllPhotosCount');
@@ -94,21 +124,9 @@ async function loadConsumerImages(consumerId) {
   }
   if (countSpan) countSpan.innerText = currentImages.length;
 
-  // Render filmstrip
-  renderFilmstrip();
-
-  // Render Multi-Image Overview Grid
-  renderOverviewGrid();
-
   if (currentImages.length > 0) {
-    // Show Overview Grid first for overall consumer idea if more than 1 image exists,
-    // or jump straight to single if only 1 photo exists
-    if (currentImages.length > 1) {
-      switchImageViewMode('grid');
-    } else {
-      switchImageViewMode('single');
-      showImage(0);
-    }
+    switchImageViewMode('single');
+    showImage(0);
   } else {
     switchImageViewMode('single');
     resetZoom();
@@ -165,6 +183,7 @@ function switchImageViewMode(mode) {
     if (btnPreview) {
       btnPreview.className = 'h-9 px-3 rounded-xl flex items-center gap-1.5 font-bold text-xs bg-sky-600 text-white shadow-xl transition';
     }
+    renderOverviewGrid();
   } else {
     if (viewport) viewport.classList.remove('hidden');
     if (gridContainer) gridContainer.classList.add('hidden');
@@ -211,7 +230,7 @@ async function renderOverviewGrid() {
     card.innerHTML = `
       <div class="w-full aspect-[4/3] bg-slate-100 dark:bg-black/50 rounded-lg overflow-hidden flex items-center justify-center mb-2 relative">
         <div id="grid-loader-${idx}" class="w-5 h-5 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"></div>
-        <img id="grid-img-${idx}" class="w-full h-full object-cover hidden group-hover:scale-105 transition-transform duration-200" />
+        <img id="grid-img-${idx}" loading="lazy" class="w-full h-full object-cover hidden group-hover:scale-105 transition-transform duration-200" />
         <span class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/70 text-[9px] font-mono text-white font-semibold">#${idx + 1}</span>
       </div>
       <div class="w-full flex items-center justify-center text-xs px-0.5">
@@ -227,7 +246,7 @@ async function renderOverviewGrid() {
   }
 
   await loadWithConcurrency(currentImages, 6, async (img, idx) => {
-    const thumb = await callAPI('get_image_data', img.full_path, 350);
+    const thumb = await getCachedImageData(img.full_path, 350);
     const loader = document.getElementById(`grid-loader-${idx}`);
     const imgEl = document.getElementById(`grid-img-${idx}`);
     if (loader) loader.classList.add('hidden');
@@ -240,62 +259,11 @@ async function renderOverviewGrid() {
 
 window.switchImageViewMode = switchImageViewMode;
 
-async function renderFilmstrip() {
-  const container = document.getElementById('filmstripContainer');
-  const countBadge = document.getElementById('filmstripCountBadge');
-  if (countBadge) countBadge.innerText = currentImages.length;
-  if (!container) return;
-  container.innerHTML = '';
+// Filmstrip removed for peak performance and clean UI
+function renderFilmstrip() {}
+window.renderFilmstrip = renderFilmstrip;
 
-  if (currentImages.length === 0) {
-    container.innerHTML = '<p class="text-[11px] text-slate-400 italic px-2">Thumbnails will appear here once images are loaded.</p>';
-    return;
-  }
-
-  for (let idx = 0; idx < currentImages.length; idx++) {
-    const img = currentImages[idx];
-    const item = document.createElement('div');
-    item.id = `filmstrip-item-${idx}`;
-    item.className = `filmstrip-thumb flex flex-col items-center justify-center p-0.5 rounded cursor-pointer shrink-0 ${idx === currentImageIndex ? 'active' : ''}`;
-    item.title = `${img.date_formatted} (${img.filename})`;
-    
-    item.innerHTML = `
-      <div class="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin mb-[5px] mt-[5px]"></div>
-      <span class="text-[9px] font-mono leading-none text-slate-700 dark:text-slate-300 truncate w-full text-center">${img.date_formatted}</span>
-    `;
-    item.onclick = () => showImage(idx);
-    container.appendChild(item);
-  }
-
-  await loadWithConcurrency(currentImages, 4, async (img, idx) => {
-    const thumbRes = await callAPI('get_image_data', img.full_path, 150);
-    const item = document.getElementById(`filmstrip-item-${idx}`);
-    if (!item) return;
-
-    if (thumbRes && thumbRes.success) {
-      item.innerHTML = `
-        <img src="${thumbRes.data}" class="w-full h-[26px] object-cover rounded mb-0.5" />
-        <span class="text-[9px] font-mono leading-none text-slate-700 dark:text-slate-300 truncate w-full text-center">${img.date_formatted}</span>
-      `;
-    } else {
-      item.innerHTML = `
-        <i data-lucide="image" class="w-4 h-4 text-slate-400 mb-0.5"></i>
-        <span class="text-[9px] font-mono leading-none text-slate-700 dark:text-slate-300 truncate w-full text-center">${img.date_formatted}</span>
-      `;
-      safeCreateIcons();
-    }
-  });
-
-  safeCreateIcons();
-}
-
-function toggleFilmstrip() {
-  const wrapper = document.getElementById('filmstripWrapper');
-  if (!wrapper) return;
-  wrapper.classList.toggle('collapsed-strip');
-  safeCreateIcons();
-}
-
+function toggleFilmstrip() {}
 window.toggleFilmstrip = toggleFilmstrip;
 
 async function showImage(index) {
@@ -315,12 +283,6 @@ async function showImage(index) {
     dateContainer.classList.remove('hidden');
     dateContainer.classList.add('flex');
   }
-
-  // Update active state on filmstrip
-  document.querySelectorAll('.filmstrip-thumb').forEach((el, i) => {
-    if (i === index) el.classList.add('active');
-    else el.classList.remove('active');
-  });
 
   // Highlight active date in the dates/cycles list
   document.querySelectorAll('#cyclesList button').forEach(btn => {
@@ -343,11 +305,16 @@ async function showImage(index) {
   const mainImg = document.getElementById('mainImage');
   const placeholder = document.getElementById('imagePlaceholder');
 
-  placeholder.innerHTML = `<div class="w-8 h-8 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"></div>`;
-  placeholder.classList.remove('hidden');
-  mainImg.classList.add('hidden');
+  const cacheKey = `${item.full_path}_1600`;
+  const isCached = _clientImageCache.has(cacheKey);
 
-  const imgData = await callAPI('get_image_data', item.full_path, 1600);
+  if (!isCached) {
+    placeholder.innerHTML = `<div class="w-8 h-8 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"></div>`;
+    placeholder.classList.remove('hidden');
+    mainImg.classList.add('hidden');
+  }
+
+  const imgData = await getCachedImageData(item.full_path, 1600);
   if (imgData && imgData.success) {
     mainImg.src = imgData.data;
     mainImg.classList.remove('hidden');
@@ -446,10 +413,42 @@ function applyTransform() {
   document.getElementById('zoomLevel').textContent = `${Math.round(zoomScale * 100)}%`;
 }
 
-function setupViewportEvents() {
+let _viewportEventsInitialized = false;
+
+let _boundWindowMouseMove = null;
+let _boundWindowMouseUp = null;
+let _boundWindowKeyDown = null;
+let _boundVpWheel = null;
+let _boundVpMouseDown = null;
+
+function teardownViewportEvents() {
+  if (!_viewportEventsInitialized) return;
   const vp = document.getElementById('viewport');
+  if (vp) {
+    if (_boundVpWheel) vp.removeEventListener('wheel', _boundVpWheel);
+    if (_boundVpMouseDown) vp.removeEventListener('mousedown', _boundVpMouseDown);
+  }
+  if (_boundWindowMouseMove) window.removeEventListener('mousemove', _boundWindowMouseMove);
+  if (_boundWindowMouseUp) window.removeEventListener('mouseup', _boundWindowMouseUp);
+  if (_boundWindowKeyDown) window.removeEventListener('keydown', _boundWindowKeyDown);
+  
+  _boundVpWheel = null;
+  _boundVpMouseDown = null;
+  _boundWindowMouseMove = null;
+  _boundWindowMouseUp = null;
+  _boundWindowKeyDown = null;
+  _viewportEventsInitialized = false;
+}
+window.teardownViewportEvents = teardownViewportEvents;
+
+function setupViewportEvents() {
+  if (_viewportEventsInitialized) return;
+  const vp = document.getElementById('viewport');
+  if (!vp) return;
+  _viewportEventsInitialized = true;
   let rafPending = false;
-  vp.addEventListener('wheel', (e) => {
+  
+  _boundVpWheel = (e) => {
     e.preventDefault();
     if (rafPending) return;
     rafPending = true;
@@ -458,9 +457,10 @@ function setupViewportEvents() {
       if (e.deltaY < 0) zoomIn();
       else zoomOut();
     });
-  });
+  };
+  vp.addEventListener('wheel', _boundVpWheel);
 
-  vp.addEventListener('mousedown', (e) => {
+  _boundVpMouseDown = (e) => {
     if (e.target.closest('#singleViewControls') || e.target.closest('#viewModeToggleGroup') || e.target.closest('#btnCanvasPrev') || e.target.closest('#btnCanvasNext')) {
       return;
     }
@@ -469,10 +469,11 @@ function setupViewportEvents() {
       startX = e.clientX - translateX;
       startY = e.clientY - translateY;
     }
-  });
+  };
+  vp.addEventListener('mousedown', _boundVpMouseDown);
 
   let panRafPending = false;
-  window.addEventListener('mousemove', (e) => {
+  _boundWindowMouseMove = (e) => {
     if (!isPanning) return;
     translateX = e.clientX - startX;
     translateY = e.clientY - startY;
@@ -482,16 +483,18 @@ function setupViewportEvents() {
       panRafPending = false;
       applyTransform();
     });
-  });
+  };
+  window.addEventListener('mousemove', _boundWindowMouseMove);
 
-  window.addEventListener('mouseup', () => {
+  _boundWindowMouseUp = () => {
     isPanning = false;
-  });
+  };
+  window.addEventListener('mouseup', _boundWindowMouseUp);
 
   // Keyboard navigation for images:
   // ArrowLeft / ArrowUp -> Previous image (-1)
   // ArrowRight / ArrowDown -> Next image (+1)
-  window.addEventListener('keydown', (e) => {
+  _boundWindowKeyDown = (e) => {
     // Only navigate if not focused on text inputs, textareas, selects, or contenteditable elements
     const tag = e.target.tagName ? e.target.tagName.toLowerCase() : '';
     if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) {
@@ -578,6 +581,7 @@ function setupViewportEvents() {
       }
       return;
     }
-  });
+  };
+  window.addEventListener('keydown', _boundWindowKeyDown);
 }
 

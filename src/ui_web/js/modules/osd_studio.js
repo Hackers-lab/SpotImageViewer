@@ -320,8 +320,8 @@ async function startBulkOsdVerification() {
       return;
     }
 
-    // Start polling loop
-    bulkOsdState.pollTimer = setInterval(pollBulkOsdProgress, 750);
+    // Start polling loop with friendly interval to prevent CPU churn
+    bulkOsdState.pollTimer = setInterval(pollBulkOsdProgress, 1500);
   } catch (err) {
     console.error("Error starting bulk verification:", err);
     alert("Error starting bulk job: " + err);
@@ -346,10 +346,13 @@ async function pollBulkOsdProgress() {
       showOsdNotification("Verifying Records...", sub, percent, true);
     }
 
-    // Update table with live results
+    // Update table with live results (updates when new results arrive, up to 150 rows max)
     if (status.results && status.results.length > 0) {
-      bulkOsdState.results = status.results;
-      renderBulkTable(status.results);
+      const prevLen = bulkOsdState.results ? bulkOsdState.results.length : 0;
+      if (status.results.length !== prevLen || !status.running) {
+        bulkOsdState.results = status.results;
+        renderBulkTable(status.results);
+      }
     }
 
     // Completion or Cancellation
@@ -487,8 +490,18 @@ function renderBulkTable(results) {
     `;
   });
 
+  if (filtered.length > 150) {
+    html += `
+      <tr>
+        <td colspan="10" class="py-2.5 px-4 text-center text-xs text-slate-400 italic bg-slate-50/50 dark:bg-slate-900/30">
+          Showing first 150 of ${filtered.length} records in preview. Export full dataset to Excel.
+        </td>
+      </tr>
+    `;
+  }
+
   tbody.innerHTML = html;
-  safeCreateIcons();
+  safeCreateIcons(tbody);
 }
 
 function filterBulkOsdTable(filter) {

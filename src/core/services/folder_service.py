@@ -3,11 +3,14 @@ import time
 import json
 import threading
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
+
 try:
     from core import config, database
 except ImportError:
     import config, database
 
+_path_pool = ThreadPoolExecutor(max_workers=4)
 
 def path_accessible(p, timeout=1.0):
     """
@@ -16,31 +19,18 @@ def path_accessible(p, timeout=1.0):
     """
     if not p:
         return False
-    # Fast-path for local drive letters (e.g. C:\, D:\, F:\)
-    if len(p) >= 2 and p[1] == ':':
+    # Fast-path ONLY for local C: drive
+    if len(p) >= 2 and p[0].upper() == 'C' and p[1] == ':':
         try:
-            drive = p[:2] + '\\'
-            if not os.path.exists(drive):
-                return False
             return os.path.exists(p)
         except Exception:
             return False
 
-    res = [False]
-    ev = threading.Event()
-
-    def _worker():
-        try:
-            res[0] = os.path.exists(p)
-        except Exception:
-            res[0] = False
-        finally:
-            ev.set()
-
-    t = threading.Thread(target=_worker, daemon=True)
-    t.start()
-    ev.wait(timeout=timeout)
-    return res[0]
+    try:
+        future = _path_pool.submit(os.path.exists, p)
+        return future.result(timeout=timeout)
+    except Exception:
+        return False
 
 
 class FolderIndexerService:
@@ -191,7 +181,7 @@ class FolderIndexerService:
                 try:
                     norm_root = os.path.normpath(root_folder).lower()
                     if norm_root not in known_dirs:
-                        new_photos = sum(1 for f in os.listdir(root_folder) if len(f) >= 25 and f[:8].isdigit() and not f.startswith('.'))
+                        new_photos = sum(1 for e in os.scandir(root_folder) if len(e.name) >= 25 and e.name[:8].isdigit() and not e.name.startswith('.'))
                         if new_photos > 0:
                             changed_folders.append(root_folder)
                             total_diff += new_photos
@@ -203,7 +193,7 @@ class FolderIndexerService:
                                 continue
                             norm_entry = os.path.normpath(entry.path).lower()
                             if norm_entry not in known_dirs:
-                                new_photos = sum(1 for f in os.listdir(entry.path) if len(f) >= 25 and f[:8].isdigit() and not f.startswith('.'))
+                                new_photos = sum(1 for e in os.scandir(entry.path) if len(e.name) >= 25 and e.name[:8].isdigit() and not e.name.startswith('.'))
                                 if new_photos > 0:
                                     changed_folders.append(entry.path)
                                     total_diff += new_photos
@@ -227,7 +217,7 @@ class FolderIndexerService:
                         needs_check = True
 
                     if needs_check:
-                        disk_cnt = sum(1 for f in os.listdir(dir_path) if len(f) >= 25 and f[:8].isdigit())
+                        disk_cnt = sum(1 for e in os.scandir(dir_path) if len(e.name) >= 25 and e.name[:8].isdigit())
                         db_cnt = db_counts.get(dir_id, 0)
                         diff = disk_cnt - db_cnt
                         if diff != 0:

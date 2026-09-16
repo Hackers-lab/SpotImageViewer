@@ -244,11 +244,13 @@ class OSDService:
                     results_map[cid] = res_item
                     self._bulk_state["processed"] += 1
                     self._bulk_state["current_cid"] = cid
-                    self._bulk_state["results"] = [
-                        results_map[c] for c in consumer_ids if c in results_map
-                    ]
+                    self._bulk_state["results"].append(res_item)
 
         with self._lock:
+            # Order once at completion according to original consumer_ids
+            self._bulk_state["results"] = [
+                results_map[c] for c in consumer_ids if c in results_map
+            ]
             self._bulk_state["running"] = False
             self._bulk_state["completed_time"] = time.time()
             if self._cancel_requested:

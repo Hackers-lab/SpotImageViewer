@@ -57,6 +57,9 @@ venv.bak/
 *.xls
 
 
+# Node / npm
+node_modules/
+
 # IDE & Editor settings
 .vscode/
 .idea/

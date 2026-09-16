@@ -120,8 +120,11 @@ def _read_file_rows(file_path, sheet_name=None):
     fmt = detect_file_format(file_path)
     if fmt == 'xlsx':
         wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
-        ws = wb[sheet_name] if sheet_name and sheet_name in wb.sheetnames else wb.active
-        return list(ws.iter_rows(values_only=True))
+        try:
+            ws = wb[sheet_name] if sheet_name and sheet_name in wb.sheetnames else wb.active
+            return list(ws.iter_rows(values_only=True))
+        finally:
+            wb.close()
     elif fmt == 'utf16_tsv':
         col_names, raw_rows = parse_sap_utf16_tsv(file_path)
         return [col_names] + raw_rows

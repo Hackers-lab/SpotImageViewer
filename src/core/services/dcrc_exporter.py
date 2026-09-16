@@ -111,14 +111,11 @@ def _apply_value_based_widths(ws, headers, data_start_row=3):
     Adjusts column widths based strictly on data rows (ignoring banners and merged headers).
     Headers are styled with wrap_text=True so table columns stay compact for Portrait printing.
     """
-    for col_idx, h_text in enumerate(headers, start=1):
-        col_letter = get_column_letter(col_idx)
-        def_w = DEFAULT_COL_WIDTHS_PORTRAIT.get(h_text, 10)
-        max_val_len = 0
-        for row_idx in range(data_start_row, ws.max_row + 1):
-            cell = ws.cell(row_idx, col_idx)
-            val = cell.value
-            if val is not None:
+    max_lens = {i: 0 for i in range(1, len(headers) + 1)}
+    
+    for row in ws.iter_rows(min_row=data_start_row, values_only=True):
+        for col_idx, val in enumerate(row, start=1):
+            if val is not None and col_idx <= len(headers):
                 if col_idx == 1 and not isinstance(val, int):
                     continue
                 if col_idx == 2 and isinstance(val, str) and any(w in val for w in ("PART", "TOTAL", "GRAND")):
@@ -126,9 +123,12 @@ def _apply_value_based_widths(ws, headers, data_start_row=3):
                 s = str(val).strip()
                 if '\n' in s:
                     s = max(s.split('\n'), key=len)
-                max_val_len = max(max_val_len, len(s))
-
-        final_w = max(max_val_len + 3, def_w)
+                max_lens[col_idx] = max(max_lens[col_idx], len(s))
+                
+    for col_idx, h_text in enumerate(headers, start=1):
+        col_letter = get_column_letter(col_idx)
+        def_w = DEFAULT_COL_WIDTHS_PORTRAIT.get(h_text, 10)
+        final_w = max(max_lens[col_idx] + 3, def_w)
         ws.column_dimensions[col_letter].width = final_w
 
 
@@ -170,12 +170,20 @@ def _get_agency_metrics(agency_name, processed_result, ag_records):
         c_3_rc = summary_item.get("c_3ph_rc", 0)
         r_3_rc = summary_item.get("r_3ph_rc", 88.0)
     else:
-        c_1_dr = sum(1 for r in ag_records if r.get("phase") == 1 and str(r.get("payment_type") or "").strip().upper() == "DR")
-        c_1_dc = sum(1 for r in ag_records if r.get("phase") == 1 and str(r.get("payment_type") or "").strip().upper() == "DC")
-        c_1_rc = sum(1 for r in ag_records if r.get("phase") == 1 and str(r.get("payment_type") or "").strip().upper() == "RC")
-        c_3_dr = sum(1 for r in ag_records if r.get("phase") == 3 and str(r.get("payment_type") or "").strip().upper() == "DR")
-        c_3_dc = sum(1 for r in ag_records if r.get("phase") == 3 and str(r.get("payment_type") or "").strip().upper() == "DC")
-        c_3_rc = sum(1 for r in ag_records if r.get("phase") == 3 and str(r.get("payment_type") or "").strip().upper() == "RC")
+        c_1_dr = c_1_dc = c_1_rc = 0
+        c_3_dr = c_3_dc = c_3_rc = 0
+        for r in ag_records:
+            phase = r.get("phase")
+            ptype = str(r.get("payment_type") or "").strip().upper()
+            if phase == 1:
+                if ptype == "DR": c_1_dr += 1
+                elif ptype == "DC": c_1_dc += 1
+                elif ptype == "RC": c_1_rc += 1
+            elif phase == 3:
+                if ptype == "DR": c_3_dr += 1
+                elif ptype == "DC": c_3_dc += 1
+                elif ptype == "RC": c_3_rc += 1
+
         r_1_dr, r_1_dc, r_1_rc = 130.0, 65.0, 65.0
         r_3_dr, r_3_dc, r_3_rc = 176.0, 88.0, 88.0
 

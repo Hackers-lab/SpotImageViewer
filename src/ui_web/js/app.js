@@ -341,11 +341,11 @@ async function initApp() {
     }
   }
 
-  // Background update check to notify user in status bar if new update arrives
-  checkUpdateSilent();
-
-  // Restore previous low consumption audit session if available
-  loadAuditSession();
+  // Background update check & secondary tasks deferred to 4s after boot to keep startup 100% instantaneous
+  setTimeout(() => {
+    checkUpdateSilent();
+    loadAuditSession();
+  }, 4000);
 
   // Initialize interactive manual fuzzy lookup rows
   initManualFuzzyLookup();

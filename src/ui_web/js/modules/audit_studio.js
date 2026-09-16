@@ -3,6 +3,7 @@
 let auditData = [];
 let auditFilteredIndices = [];
 let auditCurrentId = null;
+let _activeAuditRowId = null;
 let auditFilterStatusMode = 'ALL'; // 'ALL' | 'PENDING' | 'OK' | 'CHECK'
 let auditActiveImages = [];
 let auditLightboxCurrentIndex = 0;
@@ -229,7 +230,9 @@ function filterAuditQueue() {
   }
 
   auditFilteredIndices = [];
+  _activeAuditRowId = null;
   queueEl.innerHTML = '';
+  const fragment = document.createDocumentFragment();
 
   auditData.forEach(item => {
     // Status filter
@@ -269,10 +272,11 @@ function filterAuditQueue() {
     `;
 
     row.onclick = () => selectAuditItem(item.id);
-    queueEl.appendChild(row);
+    fragment.appendChild(row);
   });
 
-  safeCreateIcons();
+  queueEl.appendChild(fragment);
+  safeCreateIcons(queueEl);
 }
 
 async function selectAuditItem(id) {
@@ -280,22 +284,22 @@ async function selectAuditItem(id) {
   const item = auditData.find(x => x.id === id);
   if (!item) return;
 
-  // Highlight active row in queue
-  document.querySelectorAll('#auditQueueList > div').forEach(r => {
-    const isThis = r.id === `audit-row-${id}`;
-    r.classList.toggle('bg-sky-500/10', isThis);
-    r.classList.toggle('dark:bg-sky-500/15', isThis);
-    r.classList.toggle('border-l-3', isThis);
-    r.classList.toggle('border-sky-500', isThis);
-    r.classList.toggle('font-bold', isThis);
-    r.classList.toggle('text-sky-600', isThis);
-    r.classList.toggle('dark:text-sky-400', isThis);
-  });
-
-  const activeRow = document.getElementById(`audit-row-${id}`);
-  if (activeRow) {
-    activeRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  // Highlight active row in queue in O(1)
+  if (_activeAuditRowId !== null && _activeAuditRowId !== id) {
+    const oldRow = document.getElementById(`audit-row-${_activeAuditRowId}`);
+    if (oldRow) {
+      oldRow.classList.remove('bg-sky-500/10', 'dark:bg-sky-500/15', 'border-l-3', 'border-sky-500', 'font-bold', 'text-sky-600', 'dark:text-sky-400');
+      oldRow.classList.add('hover:bg-slate-100/60', 'dark:hover:bg-white/[0.04]', 'text-slate-700', 'dark:text-slate-300');
+    }
   }
+
+  const newRow = document.getElementById(`audit-row-${id}`);
+  if (newRow) {
+    newRow.classList.remove('hover:bg-slate-100/60', 'dark:hover:bg-white/[0.04]', 'text-slate-700', 'dark:text-slate-300');
+    newRow.classList.add('bg-sky-500/10', 'dark:bg-sky-500/15', 'border-l-3', 'border-sky-500', 'font-bold', 'text-sky-600', 'dark:text-sky-400');
+    newRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  _activeAuditRowId = id;
 
   // Update inspection banner
   const cidEl = document.getElementById('auditActiveCid');
@@ -358,7 +362,7 @@ async function selectAuditItem(id) {
     card.innerHTML = `
       <div class="w-full aspect-[4/3] bg-slate-100 dark:bg-black/50 rounded overflow-hidden flex items-center justify-center mb-1.5 relative">
         <div id="audit-img-loader-${idx}" class="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"></div>
-        <img id="audit-img-${idx}" class="w-full h-full object-cover hidden group-hover:scale-105 transition-transform duration-200" />
+        <img id="audit-img-${idx}" loading="lazy" class="w-full h-full object-cover hidden group-hover:scale-105 transition-transform duration-200" />
         <span class="absolute top-1 left-1 px-1.5 py-0.2 rounded bg-black/75 text-[9px] font-mono text-white font-bold leading-tight">#${idx + 1}</span>
         <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
           <span class="px-2 py-0.5 rounded bg-black/80 text-[10px] font-semibold text-white flex items-center gap-1">

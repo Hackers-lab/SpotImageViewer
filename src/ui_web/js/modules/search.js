@@ -36,7 +36,7 @@ async function showSearchHistoryDropdown() {
   }
 
   dropdown.classList.remove('hidden');
-  safeCreateIcons();
+  safeCreateIcons(list);
 }
 
 function closeSearchHistoryDropdown(e) {
@@ -116,10 +116,6 @@ function clearViewerState() {
   if (viewport) viewport.classList.remove('hidden');
   currentImageViewMode = 'single';
 
-  // Clear filmstrip
-  const filmstrip = document.getElementById('filmstripContainer');
-  if (filmstrip) filmstrip.innerHTML = '<p class="text-[11px] text-slate-400 italic px-2">Thumbnails will appear here once images are loaded.</p>';
-  document.getElementById('filmstripCountBadge').innerText = '0';
   document.getElementById('searchResultCount').innerText = '0 photos';
 
   // Clear cycles list
@@ -199,21 +195,24 @@ async function selectConsumer(profile) {
   currentConsumerId = profile.consumer_id;
   populateProfile(profile);
   
-  // Load note
-  const noteRes = await callAPI('get_consumer_note', profile.consumer_id);
-  if (noteRes && noteRes.success && noteRes.note) {
-    document.getElementById('noteCategory').value = noteRes.note;
-    document.getElementById('noteRemarks').value = noteRes.remarks || '';
-  } else {
-    document.getElementById('noteCategory').value = 'OK';
-    document.getElementById('noteRemarks').value = '';
-  }
+  // Load note concurrently without blocking image loading
+  const notePromise = (async () => {
+    try {
+      const noteRes = await callAPI('get_consumer_note', profile.consumer_id);
+      if (noteRes && noteRes.success && noteRes.note) {
+        document.getElementById('noteCategory').value = noteRes.note;
+        document.getElementById('noteRemarks').value = noteRes.remarks || '';
+      } else {
+        document.getElementById('noteCategory').value = 'OK';
+        document.getElementById('noteRemarks').value = '';
+      }
+    } catch (e) {}
+  })();
 
-  // Load images
-  await loadConsumerImages(profile.consumer_id);
-
-  // Load Live WBSEDCL OSD & Connection Status in background
+  // Load images and Live OSD concurrently
+  loadConsumerImages(profile.consumer_id);
   loadLiveOSD(profile.consumer_id);
+  await notePromise;
 }
 
 function populateProfile(p) {

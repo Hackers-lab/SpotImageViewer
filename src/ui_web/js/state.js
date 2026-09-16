@@ -1,5 +1,24 @@
 // Global State, RPC Communication & Common Utilities
 
+window._debounce = function(fn, delay) {
+  let timer;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), delay);
+  };
+};
+
+window._throttle = function(fn, limit) {
+  let inThrottle;
+  return function(...args) {
+    if (!inThrottle) {
+      fn.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+  };
+};
+
 // Global Application State
 let currentImages = [];
 let currentImageIndex = 0;
@@ -46,16 +65,36 @@ if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'fu
   };
 }
 let _safeCreateIconsTimer = null;
-function safeCreateIcons() {
-  // Debounce: coalesce multiple rapid calls into a single DOM scan
+let _pendingRoots = new Set();
+
+function safeCreateIcons(targetRoot = null) {
+  if (targetRoot) {
+    if (typeof targetRoot === 'string') {
+      const el = document.querySelector(targetRoot);
+      if (el) _pendingRoots.add(el);
+    } else if (targetRoot instanceof Element) {
+      _pendingRoots.add(targetRoot);
+    }
+  }
+
   if (_safeCreateIconsTimer) clearTimeout(_safeCreateIconsTimer);
   _safeCreateIconsTimer = setTimeout(() => {
     _safeCreateIconsTimer = null;
     if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
       try {
-        lucide.createIcons();
+        if (_pendingRoots.size > 0) {
+          _pendingRoots.forEach(root => {
+            if (root && root.isConnected) {
+              lucide.createIcons({ root: root });
+            }
+          });
+        } else {
+          lucide.createIcons();
+        }
       } catch (e) {
         console.warn("safeCreateIcons warning:", e);
+      } finally {
+        _pendingRoots.clear();
       }
     }
   }, 30);

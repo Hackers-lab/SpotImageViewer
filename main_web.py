@@ -59,7 +59,7 @@ def main():
     if not os.path.exists(html_file):
         html_file = os.path.join(BASE_DIR, "ui_web", "index.html")
 
-    # Create PyWebView window with native Edge WebView2 engine
+    # Create PyWebView window with native Edge WebView2 engine and dark background
     window = webview.create_window(
         title=f"Spot Image Viewer & Verification Studio (v{config.CURRENT_VERSION})",
         url=f"file:///{html_file.replace(os.sep, '/')}",
@@ -67,7 +67,8 @@ def main():
         width=1340,
         height=850,
         min_size=(1000, 680),
-        maximized=True
+        maximized=True,
+        background_color='#0f172a'
     )
     api.set_window(window)
 

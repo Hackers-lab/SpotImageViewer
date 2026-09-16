@@ -9,6 +9,7 @@ import time
 import base64
 import threading
 from typing import Optional, Dict, Any
+from collections import OrderedDict
 from urllib.parse import urljoin
 import requests
 from pypdf import PdfReader
@@ -21,11 +22,12 @@ DEFAULT_USER_AGENT = (
 
 BASE_PORTAL_URL = "https://portal.wbsedcl.in/webdynpro/resources/wbsedcl/noduesandoutstandingreport/OutstandingReport"
 
-# In-memory cache to prevent spamming the portal for repeatedly selected consumers
-# Format: {consumer_id: (timestamp, result_dict, pdf_bytes)}
-_OSD_CACHE = {}
+# Bounded LRU in-memory cache to prevent memory bloat and portal spam
+# Format: {consumer_id: (timestamp, result_dict)}
+_OSD_CACHE = OrderedDict()
 _OSD_LOCK = threading.Lock()
 _CACHE_TTL = 900  # 15 minutes TTL
+_MAX_OSD_CACHE = 150
 
 
 def _decode_sap_url(raw_url: str) -> str:
@@ -202,19 +204,24 @@ def get_live_osd_data(consumer_id: str, include_pdf_base64: bool = False, force_
     if not force_refresh:
         with _OSD_LOCK:
             if clean_id in _OSD_CACHE:
-                cached_time, cached_result, cached_pdf = _OSD_CACHE[clean_id]
+                cached_time, cached_result = _OSD_CACHE[clean_id]
                 if (now - cached_time) < _CACHE_TTL:
-                    res = dict(cached_result)
-                    if include_pdf_base64 and cached_pdf:
-                        res["pdfBase64"] = base64.b64encode(cached_pdf).decode("utf-8")
-                    res["cached"] = True
-                    return {"success": True, "data": res}
+                    # If base64 was requested, we bypass cache because we don't cache PDFs anymore
+                    if not include_pdf_base64:
+                        _OSD_CACHE.move_to_end(clean_id)
+                        res = dict(cached_result)
+                        res["cached"] = True
+                        return {"success": True, "data": res}
 
     try:
         pdf_bytes = fetch_live_osd_pdf(clean_id)
         result = parse_osd_pdf(pdf_bytes, clean_id)
         with _OSD_LOCK:
-            _OSD_CACHE[clean_id] = (now, result, pdf_bytes)
+            if clean_id in _OSD_CACHE:
+                _OSD_CACHE.move_to_end(clean_id)
+            elif len(_OSD_CACHE) >= _MAX_OSD_CACHE:
+                _OSD_CACHE.popitem(last=False)
+            _OSD_CACHE[clean_id] = (now, result)
 
         res = dict(result)
         if include_pdf_base64:

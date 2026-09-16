@@ -29,16 +29,7 @@ def get_db_connection():
     """Return a thread-local cached connection.  PRAGMAs execute once per thread."""
     conn = getattr(_thread_local, 'conn', None)
     if conn is not None:
-        try:
-            conn.execute("SELECT 1")  # health-check
-            return conn
-        except Exception:
-            # Connection is broken — drop it and create a new one
-            try:
-                conn.close()
-            except Exception:
-                pass
-            _thread_local.conn = None
+        return conn
 
     conn = sqlite3.connect(config.DB_FILE, check_same_thread=False, timeout=30.0)
     try:
@@ -46,7 +37,7 @@ def get_db_connection():
         cursor = conn.cursor()
         cursor.execute("PRAGMA journal_mode=WAL;")
         cursor.execute("PRAGMA synchronous=NORMAL;")
-        cursor.execute("PRAGMA cache_size=-64000;")  # 64MB memory cache (default is 2MB)
+        cursor.execute("PRAGMA cache_size=-16000;")  # 16MB memory cache per thread
         cursor.execute("PRAGMA mmap_size=268435456;") # 256MB memory mapped I/O
         cursor.execute("PRAGMA temp_store=MEMORY;")
     except Exception:
@@ -110,6 +101,7 @@ def init_db(force=False):
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_date_iso ON images (date_iso)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_dir_id ON images (dir_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_cid_date ON images (consumer_id, date_iso DESC)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_images_mru ON images (consumer_id, mru) WHERE mru IS NOT NULL AND length(mru) > 0')
         
         # Other tables...
         cursor.execute('''
@@ -176,6 +168,22 @@ def init_db(force=False):
             cursor.execute('''
                 CREATE VIRTUAL TABLE IF NOT EXISTS meter_mapping_fts
                 USING fts5(consumer_id, name, address, content='meter_mapping', content_rowid='rowid')
+            ''')
+            cursor.execute('''
+                CREATE TRIGGER IF NOT EXISTS meter_mapping_ai AFTER INSERT ON meter_mapping BEGIN
+                    INSERT INTO meter_mapping_fts(rowid, consumer_id, name, address) VALUES (new.rowid, new.consumer_id, new.name, new.address);
+                END;
+            ''')
+            cursor.execute('''
+                CREATE TRIGGER IF NOT EXISTS meter_mapping_ad AFTER DELETE ON meter_mapping BEGIN
+                    INSERT INTO meter_mapping_fts(meter_mapping_fts, rowid, consumer_id, name, address) VALUES('delete', old.rowid, old.consumer_id, old.name, old.address);
+                END;
+            ''')
+            cursor.execute('''
+                CREATE TRIGGER IF NOT EXISTS meter_mapping_au AFTER UPDATE ON meter_mapping BEGIN
+                    INSERT INTO meter_mapping_fts(meter_mapping_fts, rowid, consumer_id, name, address) VALUES('delete', old.rowid, old.consumer_id, old.name, old.address);
+                    INSERT INTO meter_mapping_fts(rowid, consumer_id, name, address) VALUES (new.rowid, new.consumer_id, new.name, new.address);
+                END;
             ''')
         except Exception:
             # FTS5 may not be available in all SQLite builds — graceful fallback
@@ -463,28 +471,26 @@ def update_meter_mapping(mapping_dict):
         # You might want to clear the table first if this is a complete refresh
         cursor.execute("DELETE FROM meter_mapping") 
 
-        data_to_insert = []
-        for consumer_id, payload in mapping_dict.items():
-            if isinstance(payload, dict):
-                data_to_insert.append((
-                    str(consumer_id).strip(),
-                    str(payload.get("meter_no", "")).strip(),
-                    str(payload.get("name", "")).strip(),
-                    str(payload.get("address", "")).strip(),
-                    str(payload.get("mobile_number", "")).strip(),
-                    str(payload.get("contractual_load", "")).strip(),
-                    str(payload.get("class", "")).strip(),
-                ))
-            else:
-                data_to_insert.append((
-                    str(consumer_id).strip(),
-                    str(payload).strip(),
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                ))
+        data_generator = (
+            (
+                str(consumer_id).strip(),
+                str(payload.get("meter_no", "")).strip(),
+                str(payload.get("name", "")).strip(),
+                str(payload.get("address", "")).strip(),
+                str(payload.get("mobile_number", "")).strip(),
+                str(payload.get("contractual_load", "")).strip(),
+                str(payload.get("class", "")).strip(),
+            ) if isinstance(payload, dict) else (
+                str(consumer_id).strip(),
+                str(payload).strip(),
+                "",
+                "",
+                "",
+                "",
+                "",
+            )
+            for consumer_id, payload in mapping_dict.items()
+        )
 
         cursor.executemany(
             """
@@ -492,7 +498,7 @@ def update_meter_mapping(mapping_dict):
             (consumer_id, meter_no, name, address, mobile_number, contractual_load, class)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            data_to_insert
+            data_generator
         )
         conn.commit()
         # Rebuild FTS5 index to keep name search in sync
@@ -501,7 +507,7 @@ def update_meter_mapping(mapping_dict):
             conn.commit()
         except Exception:
             pass
-        set_info_value("cached_consumer_count", len(data_to_insert))
+        set_info_value("cached_consumer_count", len(mapping_dict))
     except Exception as e:
         print(f"DATABASE ERROR in update_meter_mapping: {e}")
 
@@ -573,7 +579,7 @@ def get_consumer_master_map():
         cursor = conn.cursor()
         # 1. Fetch from meter_mapping
         cursor.execute("SELECT consumer_id, mru, conn_phase FROM meter_mapping")
-        for cid, mru, phase in cursor.fetchall():
+        for cid, mru, phase in cursor:
             if cid:
                 c_str = str(cid).strip()
                 result[c_str] = {
@@ -581,14 +587,22 @@ def get_consumer_master_map():
                     "phase": int(phase) if phase in (1, 3) else 1
                 }
         
-        # 2. For any consumers missing an MRU, attempt fill from images table
+        # 2. For any consumers missing an MRU, query only those consumer IDs in chunks
+        # using the idx_cid index, avoiding a full table scan across 2M+ rows.
         missing_mru = [cid for cid, data in result.items() if not data["mru"]]
         if missing_mru:
-            cursor.execute("SELECT consumer_id, mru FROM images WHERE mru IS NOT NULL AND length(mru) > 0")
-            for cid, mru in cursor.fetchall():
-                c_str = str(cid).strip()
-                if c_str in result and not result[c_str]["mru"] and mru:
-                    result[c_str]["mru"] = str(mru).strip()
+            chunk_size = 900
+            for i in range(0, len(missing_mru), chunk_size):
+                chunk = missing_mru[i:i + chunk_size]
+                placeholders = ",".join(["?"] * len(chunk))
+                cursor.execute(
+                    f"SELECT consumer_id, mru FROM images WHERE consumer_id IN ({placeholders}) AND mru IS NOT NULL AND length(mru) > 0",
+                    chunk
+                )
+                for cid, mru in cursor.fetchall():
+                    c_str = str(cid).strip()
+                    if c_str in result and not result[c_str]["mru"] and mru:
+                        result[c_str]["mru"] = str(mru).strip()
     except Exception as e:
         print(f"[get_consumer_master_map] Error: {e}")
     return result

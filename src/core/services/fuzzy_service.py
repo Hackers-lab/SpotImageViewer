@@ -16,6 +16,9 @@ except ImportError:
     import utils, live_osd_service
 
 
+_cache_timestamp = 0
+_CACHE_TTL = 300
+
 class FuzzyService:
     """
     High-performance fuzzy matching service for consumer identity resolution
@@ -178,9 +181,13 @@ class FuzzyService:
 
     @classmethod
     def get_prepped_fuzzy_db(cls):
+        global _cache_timestamp
         with cls._cached_fuzzy_lock:
             if cls._cached_prepped_fuzzy_db is not None:
-                return cls._cached_prepped_fuzzy_db
+                if time.time() - _cache_timestamp > _CACHE_TTL:
+                    cls._cached_prepped_fuzzy_db = None
+                else:
+                    return cls._cached_prepped_fuzzy_db
 
             db_profiles = utils.get_all_consumer_profiles()
             if not db_profiles:
@@ -227,6 +234,7 @@ class FuzzyService:
 
             cache_data = (prepped_db, mobile_index, prefix_index, token_index)
             cls._cached_prepped_fuzzy_db = cache_data
+            _cache_timestamp = time.time()
             return cache_data
 
     @classmethod
@@ -265,7 +273,18 @@ class FuzzyService:
                 candidate_ids.update(prefix_index.get(tok[:3], set()))
 
         if not candidate_ids:
-            candidate_ids = set(range(len(prepped_db)))
+            return []
+
+        # Cap maximum candidates evaluated to top 150 to keep processing responsive
+        if len(candidate_ids) > 150 and input_tokens:
+            input_token_set = set(input_tokens)
+            ranked_cands = []
+            for cid in candidate_ids:
+                row_tokens = prepped_db[cid].get("tokens", set())
+                overlap = len(input_token_set.intersection(row_tokens)) if row_tokens else 0
+                ranked_cands.append((overlap, cid))
+            ranked_cands.sort(key=lambda x: x[0], reverse=True)
+            candidate_ids = [c[1] for c in ranked_cands[:150]]
 
         candidates = []
         for cand_idx in candidate_ids:
