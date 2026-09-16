@@ -41,19 +41,25 @@ except ImportError:
 
 def _cleanup_stale_webview_processes():
     """
-    If no other SpotImageViewer Python process is running,
+    If no other active SpotImageViewer process is running,
     terminate any lingering msedgewebview2.exe processes using our storage_dir
     so the warm profile cache can be reused immediately without lock contention.
     """
     try:
         import psutil
         current_pid = os.getpid()
-        other_pythons = [
-            p.pid for p in psutil.process_iter(['pid', 'name', 'cmdline'])
-            if p.pid != current_pid and p.info['name'] and 'python' in p.info['name'].lower()
-            and any('main.py' in arg or 'main_web.py' in arg for arg in (p.info['cmdline'] or []))
-        ]
-        if not other_pythons:
+        other_active = []
+        for p in psutil.process_iter(['pid', 'name', 'cmdline']):
+            if p.pid == current_pid:
+                continue
+            name = (p.info['name'] or '').lower()
+            cmdline = p.info['cmdline'] or []
+            if 'python' in name and any('main.py' in arg or 'main_web.py' in arg for arg in cmdline):
+                other_active.append(p.pid)
+            elif 'spotimageviewer' in name:
+                other_active.append(p.pid)
+
+        if not other_active:
             for p in psutil.process_iter(['pid', 'name', 'cmdline']):
                 try:
                     if p.info['name'] and 'msedgewebview2' in p.info['name'].lower():
@@ -92,7 +98,7 @@ def main():
     if not os.path.exists(html_file):
         html_file = os.path.join(BASE_DIR, "ui_web", "index.html")
 
-    # Ensure webview storage path is accessible or fall back to an instance-specific directory
+    # Ensure webview storage path is accessible or fall back to a persistent warm alternate directory
     storage_dir = os.path.join(config.BASE_DIR, "webview_storage")
     lock_file = os.path.join(storage_dir, "EBWebView", "lockfile")
     if os.path.exists(lock_file):
@@ -101,8 +107,8 @@ def main():
                 pass
         except (IOError, OSError, PermissionError):
             import tempfile
-            storage_dir = os.path.join(tempfile.gettempdir(), f"spot_webview_storage_{os.getpid()}")
-            perf_log.log_perf("STORAGE_LOCKED", details="Fallback to temp storage to avoid 0x800700AA freeze")
+            storage_dir = os.path.join(tempfile.gettempdir(), "spot_webview_cache_alt")
+            perf_log.log_perf("STORAGE_LOCKED", details="Using persistent warm alternate cache to prevent 0x800700AA")
     try:
         os.makedirs(storage_dir, exist_ok=True)
     except Exception:
