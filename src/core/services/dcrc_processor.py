@@ -9,13 +9,8 @@ DEFAULT_STANDARD_RATES = {
     "3PH": {"DC": 88.0, "RC": 88.0, "DR": 176.0}
 }
 
-# Known custom agency rates from historical PO contracts
-DEFAULT_CUSTOM_AGENCY_RATES = {
-    "LAIBAH": {
-        "1PH": {"DC": 66.0, "RC": 66.0, "DR": 131.0},
-        "3PH": {"DC": 89.0, "RC": 89.0, "DR": 177.0}
-    }
-}
+# Custom agency rates overrides (empty by default so all agencies use standard PO rates)
+DEFAULT_CUSTOM_AGENCY_RATES = {}
 
 
 def resolve_agency_for_zone_and_date(zone_name, payment_date_obj, zone_dict):
