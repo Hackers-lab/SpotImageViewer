@@ -93,6 +93,13 @@ def main():
     # the startup deadlock where UI reads compete with schema migration locks.
     threading.Thread(target=database.init_db, daemon=True).start()
 
+    # Ensure modular HTML partials are assembled if updated (<2ms)
+    try:
+        from ui_web.build_ui import assemble_index_html
+        assemble_index_html()
+    except Exception:
+        pass
+
     # Path to local HTML single page application
     html_file = os.path.join(SRC_DIR, "ui_web", "index.html")
     if not os.path.exists(html_file):
