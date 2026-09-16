@@ -261,6 +261,7 @@ function updateAppCounts(totalImages, consumerCount) {
 }
 
 async function initApp() {
+  if (window.__logPerf) window.__logPerf('INIT_APP_START');
   initAppFont();
 
   // Instant optimistic render from localStorage to prevent 0 / missing flash
@@ -275,7 +276,9 @@ async function initApp() {
     }
   } catch (e) {}
 
+  const tInfo0 = performance.now();
   const info = await callAPI('get_app_info');
+  if (window.__logPerf) window.__logPerf('GET_APP_INFO_DONE', `${(performance.now() - tInfo0).toFixed(1)}ms`);
   if (!info || info.success === false) {
     console.warn("get_app_info failed or returned error:", info);
     return false;
@@ -324,6 +327,8 @@ async function initApp() {
   
   setupViewportEvents();
   updateStatusBar("Ready", "normal");
+  if (window.__logPerf) window.__logPerf('INIT_APP_COMPLETE', 'App ready for user input');
+  callAPI('show_window');
   // Consumer database status check & notification in status bar (right section)
   const dbWarningContainer = document.getElementById('statusDbWarningContainer');
   const dbWarningText = document.getElementById('statusDbWarningText');
@@ -465,19 +470,20 @@ window.safeInitApp = async function() {
 };
 
 function bootApp() {
+  if (window.__logPerf) window.__logPerf('BOOT_APP_DOM_READY');
   safeCreateIcons();
   restoreLayoutPrefs();
 
   // 1. Check if already injected
   if (window.pywebview && window.pywebview.api) {
-    console.log("PyWebView API already ready at boot");
+    if (window.__logPerf) window.__logPerf('PYWEBVIEW_ALREADY_READY');
     window.safeInitApp();
     return;
   }
 
   // 2. Listen on window and document for pywebviewready
   const onReady = () => {
-    console.log("PyWebView Ready event received");
+    if (window.__logPerf) window.__logPerf('PYWEBVIEW_READY_EVENT');
     window.safeInitApp();
   };
   window.addEventListener('pywebviewready', onReady);

@@ -143,10 +143,16 @@ async function handleSearch() {
   const filterType = document.getElementById('searchType')?.value || 'auto';
   if (!query) return;
 
+  window.__lastSearchT0 = performance.now();
+  if (window.__logPerf) window.__logPerf('SEARCH_START', `query="${query}" filter="${filterType}"`);
+
   // Save to search history
   callAPI('save_search_history', 'consumer_ids', query);
 
+  const tCall0 = performance.now();
   const res = await callAPI('search_consumer', query, filterType);
+  if (window.__logPerf) window.__logPerf('SEARCH_CONSUMER_RPC_DONE', `${(performance.now() - tCall0).toFixed(1)}ms results=${res && res.results ? res.results.length : 0}`);
+
   if (!res || !res.success || !res.results || !res.results.length) {
     // Clear previous consumer state so stale images don't remain
     clearViewerState();

@@ -34,7 +34,10 @@ async function getCachedImageData(filePath, maxDim) {
 }
 
 async function loadConsumerImages(consumerId) {
+  const tImg0 = performance.now();
+  if (window.__logPerf) window.__logPerf('GET_CONSUMER_IMAGES_START', consumerId);
   const res = await callAPI('get_consumer_images', consumerId);
+  if (window.__logPerf) window.__logPerf('GET_CONSUMER_IMAGES_DONE', `${(performance.now() - tImg0).toFixed(1)}ms count=${res && res.images ? res.images.length : 0}`);
   if (!res || !res.success) {
     // Clear viewport and grid fully on failure or no images
     currentImages = [];
@@ -314,12 +317,17 @@ async function showImage(index) {
     mainImg.classList.add('hidden');
   }
 
+  const tData0 = performance.now();
   const imgData = await getCachedImageData(item.full_path, 1600);
+  if (window.__logPerf) window.__logPerf('GET_IMAGE_DATA_DONE', `${(performance.now() - tData0).toFixed(1)}ms cached=${isCached}`);
   if (imgData && imgData.success) {
     mainImg.src = imgData.data;
     mainImg.classList.remove('hidden');
     placeholder.classList.add('hidden');
     resetZoom();
+    if (window.__lastSearchT0 && window.__logPerf) {
+      window.__logPerf('SEARCH_TO_IMAGE_RENDERED', `Total time: ${(performance.now() - window.__lastSearchT0).toFixed(1)}ms`);
+    }
   } else {
     placeholder.innerHTML = `<p class="text-xs text-rose-500">Failed to render image file</p>`;
   }

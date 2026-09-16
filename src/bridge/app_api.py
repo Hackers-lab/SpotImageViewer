@@ -59,6 +59,24 @@ class AppAPI:
     def set_window(self, window):
         self._window = window
 
+    def log_perf_client(self, stage, elapsed_ms=None, details=""):
+        try:
+            from core import perf_log
+            perf_log.log_perf(stage, elapsed_ms, details)
+        except Exception:
+            pass
+        return True
+
+    def show_window(self):
+        if self._window:
+            self._window.show()
+            try:
+                from core import perf_log
+                perf_log.log_perf("WINDOW_SHOWN", details="App window revealed on screen fully rendered")
+            except Exception:
+                pass
+        return True
+
     @property
     def _billing_service(self):
         if self._billing_service_inst is None:
@@ -388,13 +406,12 @@ class AppAPI:
             grouped = {}
             flat_images = []
             for date_orig, candidates in by_date.items():
+                # SQL already sorted candidates prioritizing local drives (CASE WHEN dir_path LIKE '_:%' THEN 0 ELSE 1)
                 chosen = candidates[0]
-                # If multiple candidates exist for the same date, prefer one whose file exists on disk
-                if len(candidates) > 1:
+                # If multiple candidates exist and the first is not local, only check local candidates without blocking on network shares
+                if len(candidates) > 1 and not (len(chosen[1]) >= 2 and chosen[1][1] == ':'):
                     for cand in candidates:
-                        mru, dir_path, filename = cand
-                        fp = os.path.join(dir_path, filename)
-                        if os.path.exists(fp):
+                        if len(cand[1]) >= 2 and cand[1][1] == ':':
                             chosen = cand
                             break
 

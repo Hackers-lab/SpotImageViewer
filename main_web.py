@@ -41,6 +41,9 @@ except ImportError:
 
 def main():
     import threading
+    from core import perf_log
+    perf_log.clear_log()
+    perf_log.log_perf("PY_BOOT_START", details="Python process initialized, AppAPI ready")
 
     # Instantiate the Python RPC Bridge immediately
     api = AppAPI()
@@ -59,7 +62,24 @@ def main():
     if not os.path.exists(html_file):
         html_file = os.path.join(BASE_DIR, "ui_web", "index.html")
 
+    # Ensure webview storage path is accessible or fall back to an instance-specific directory
+    storage_dir = os.path.join(config.BASE_DIR, "webview_storage")
+    lock_file = os.path.join(storage_dir, "EBWebView", "lockfile")
+    if os.path.exists(lock_file):
+        try:
+            with open(lock_file, "a+b"):
+                pass
+        except (IOError, OSError, PermissionError):
+            import tempfile
+            storage_dir = os.path.join(tempfile.gettempdir(), f"spot_webview_storage_{os.getpid()}")
+            perf_log.log_perf("STORAGE_LOCKED", details="Fallback to temp storage to avoid 0x800700AA freeze")
+    try:
+        os.makedirs(storage_dir, exist_ok=True)
+    except Exception:
+        pass
+
     # Create PyWebView window with native Edge WebView2 engine and dark background
+    perf_log.log_perf("WINDOW_CREATING", details="webview.create_window started")
     window = webview.create_window(
         title=f"Spot Image Viewer & Verification Studio (v{config.CURRENT_VERSION})",
         url=f"file:///{html_file.replace(os.sep, '/')}",
@@ -68,11 +88,14 @@ def main():
         height=850,
         min_size=(1000, 680),
         maximized=True,
-        background_color='#0f172a'
+        background_color='#0f172a',
+        hidden=True
     )
+    perf_log.log_perf("WINDOW_CREATED", details="webview.create_window finished")
     api.set_window(window)
 
     def _on_loaded():
+        perf_log.log_perf("WEBVIEW_EVENT_LOADED", details="PyWebView window.events.loaded fired")
         try:
             window.evaluate_js("if (typeof window.safeInitApp === 'function') { window.safeInitApp(); }")
         except Exception:
@@ -80,12 +103,17 @@ def main():
 
     window.events.loaded += _on_loaded
 
-    # Start the event loop with persistent local storage
-    storage_dir = os.path.join(config.BASE_DIR, "webview_storage")
-    try:
-        os.makedirs(storage_dir, exist_ok=True)
-    except Exception:
-        pass
+    # Fallback safety: ensure window is revealed within 2.5s even if JS initialization has a glitch
+    import time
+    def _safety_reveal():
+        time.sleep(2.5)
+        try:
+            window.show()
+        except Exception:
+            pass
+    threading.Thread(target=_safety_reveal, daemon=True).start()
+
+    perf_log.log_perf("WEBVIEW_STARTING", details="Calling webview.start() event loop")
     webview.start(debug=False, private_mode=False, storage_path=storage_dir)
 
 if __name__ == "__main__":

@@ -5,6 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Spot Image Viewer & Verification Studio — v20.55</title>
   <script>
+    window.__pageLoadT0 = performance.now();
+    window.__logPerf = function(stage, details) {
+      var elapsed = (performance.now() - window.__pageLoadT0).toFixed(1);
+      console.log('[PERF-UI] +' + elapsed + 'ms | ' + stage + ' | ' + (details || ''));
+      try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.log_perf_client) {
+          window.pywebview.api.log_perf_client('UI_' + stage, parseFloat(elapsed), details || '');
+        }
+      } catch (e) {}
+    };
+    window.__logPerf('HEAD_START', 'HTML head evaluation begun');
+
     window.__capturedErrors = [];
     window.onerror = function(msg, url, line, col, error) {
       window.__capturedErrors.push({ msg: msg, url: url, line: line, col: col, error: String(error) });
@@ -53,8 +65,10 @@
         }
       };
     }
+    window.__logPerf('TAILWIND_CONFIGURED');
   </script>
   <script src="js/lucide.min.js" charset="UTF-8"></script>
+  <script>window.__logPerf('LUCIDE_LOADED');</script>
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body class="app-shell bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col overflow-hidden h-screen w-screen select-none transition-colors duration-300">
