@@ -13,19 +13,26 @@ public partial class MainWindow : Window
 {
     private NativeBridgeApi? _bridgeApi;
 
+    private Task? _initTask;
+
     public MainWindow()
     {
         InitializeComponent();
         Logger.Log("APP", "MainWindow instantiated");
         Loaded += MainWindow_Loaded;
+        // Start initialization immediately in parallel with window layout
+        _initTask = InitializeWebViewAsync();
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         try
         {
-            Logger.Log("APP", "MainWindow Loaded event fired. Initializing WebView2...");
-            await InitializeWebViewAsync();
+            Logger.Log("APP", "MainWindow Loaded event fired.");
+            if (_initTask != null)
+            {
+                await _initTask;
+            }
         }
         catch (Exception ex)
         {
@@ -36,11 +43,20 @@ public partial class MainWindow : Window
 
     private async Task InitializeWebViewAsync()
     {
-        // 1. Create CoreWebView2Environment with dedicated cache folder
+        // 1. Await pre-warmed CoreWebView2Environment from App.OnStartup or create if not ready
         string storageDir = Config.GetSafeWebViewStorage();
         Logger.Log("WEBVIEW", $"Storage directory: {storageDir}");
 
-        var env = await CoreWebView2Environment.CreateAsync(null, storageDir);
+        CoreWebView2Environment env;
+        if (App.PrewarmedEnvTask != null)
+        {
+            env = await App.PrewarmedEnvTask;
+        }
+        else
+        {
+            env = await CoreWebView2Environment.CreateAsync(null, storageDir);
+        }
+
         await webView.EnsureCoreWebView2Async(env);
         Logger.Log("WEBVIEW", "CoreWebView2Environment ensured successfully");
 
@@ -120,15 +136,25 @@ public partial class MainWindow : Window
         // 5. Locate UI Directory
         string baseDir = AppDomain.CurrentDomain.BaseDirectory;
         string uiFolder = Path.Combine(baseDir, "UI");
-        if (!Directory.Exists(uiFolder))
+        if (!Directory.Exists(uiFolder) || !File.Exists(Path.Combine(uiFolder, "index.html")))
         {
-            string devUi = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "SpotImageViewer.Native", "UI"));
-            if (Directory.Exists(devUi))
+            string[] candidates = new[]
             {
-                uiFolder = devUi;
+                Path.GetFullPath(Path.Combine(baseDir, "..", "SpotImageViewer.Native", "UI")),
+                Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "SpotImageViewer.Native", "UI")),
+                @"c:\Users\Pramod\Documents\GitHub\SpotImageViewer\SpotImageViewer.Native\UI"
+            };
+            foreach (var cand in candidates)
+            {
+                if (Directory.Exists(cand) && File.Exists(Path.Combine(cand, "index.html")))
+                {
+                    uiFolder = cand;
+                    break;
+                }
             }
         }
-        Logger.Log("UI", $"Resolved UI folder: {uiFolder}");
+        bool hasIndex = File.Exists(Path.Combine(uiFolder, "index.html"));
+        Logger.Log("UI", $"Resolved UI folder: {uiFolder} (index.html exists: {hasIndex})");
 
         // 6. Map UI directory to virtual secure origin https://app.local
         webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
