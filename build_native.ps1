@@ -37,15 +37,34 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
 
 Write-Host "Target Version: v$Version" -ForegroundColor Magenta
 
+# Pre-compile static Tailwind CSS if input file exists
+$TailwindInput = Join-Path $ScriptDir "input_tailwind.css"
+$TailwindOut = Join-Path $ScriptDir "SpotImageViewer.Native\UI\css\tailwind.min.css"
+if (Test-Path $TailwindInput) {
+    Write-Host "`nCompiling static Tailwind CSS stylesheet..." -ForegroundColor Cyan
+    try {
+        & npx.cmd tailwindcss -i $TailwindInput -o $TailwindOut --minify
+        Write-Host "Tailwind CSS pre-compiled successfully: $([math]::Round((Get-Item $TailwindOut).Length / 1KB, 1)) KB" -ForegroundColor Green
+    } catch {
+        Write-Host "Warning: Tailwind compilation failed ($($_.Exception.Message))" -ForegroundColor DarkYellow
+    }
+}
+
 $PublishDir = Join-Path $ScriptDir "SpotImageViewer.Native\publish"
 $ReleaseArchiveDir = Join-Path $ScriptDir "SpotImageViewer.Native\releases\v$Version"
 
 if ($Publish) {
-    Write-Host "`nPublishing single-file optimized native WPF executable..." -ForegroundColor Yellow
+    Write-Host "`nPublishing single-file optimized native executable..." -ForegroundColor Yellow
     Get-Process -Name "SpotImageViewer*" -ErrorAction SilentlyContinue | Stop-Process -Force
     Start-Sleep -Milliseconds 300
     & $DotnetExe publish $ProjectFile -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o $PublishDir
     
+    # Ensure all UI assets are reliably synced to publish folder
+    $SourceUi = Join-Path $ScriptDir "SpotImageViewer.Native\UI"
+    $DestUi = Join-Path $PublishDir "UI"
+    if (Test-Path $SourceUi) {
+        Copy-Item -Path "$SourceUi\*" -Destination $DestUi -Recurse -Force
+    }
     Write-Host "`nPublished executable located at: SpotImageViewer.Native\publish\SpotImageViewer.Native.exe" -ForegroundColor Green
 
     # Archive this version release

@@ -5,21 +5,6 @@ namespace SpotImageViewer.Native.Core;
 
 public static class BillingEngine
 {
-    public static List<string> GetTariffCategories()
-    {
-        return new List<string>
-        {
-            "Domestic (Rural) - Rate A(DM-R)",
-            "Domestic (Urban) - Rate A(DM-U)",
-            "Commercial Normal - Rate B(CM)",
-            "Commercial (Short Term) - Rate B(CM-ST)",
-            "Agriculture Normal - Rate C(A)",
-            "Industrial (Small) - Rate D(IT)",
-            "Public Lighting - Rate L",
-            "Public Water Works - Rate W"
-        };
-    }
-
     public static BillCalcResult CalculateBill(BillCalcPayload p)
     {
         double multiplier = p.Cycle switch

@@ -1,12 +1,14 @@
 using System;
-using System.Threading.Tasks;
 using System.Windows;
+using Microsoft.Web.WebView2.Core;
 using SpotImageViewer.Native.Core;
 
 namespace SpotImageViewer.Native;
 
 public partial class App : System.Windows.Application
 {
+    public static Task<CoreWebView2Environment>? PrewarmedEnvTask { get; private set; }
+
     protected override void OnStartup(System.Windows.StartupEventArgs e)
     {
         AppDomain.CurrentDomain.UnhandledException += (s, args) =>
@@ -21,6 +23,18 @@ public partial class App : System.Windows.Application
         };
 
         base.OnStartup(e);
+
+        if (e.Args.Length == 0 || e.Args[0] != "--test")
+        {
+            try
+            {
+                PrewarmedEnvTask = CoreWebView2Environment.CreateAsync(null, Config.GetSafeWebViewStorage());
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("APP", "Prewarm WebView2 failed", ex);
+            }
+        }
 
         if (e.Args.Length > 0 && e.Args[0] == "--test")
         {
