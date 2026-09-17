@@ -66,3 +66,19 @@ node_modules/
 *.swp
 *.swo
 .DS_Store
+
+# .NET / C#
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.pdb
+publish/
+releases/**/*.xml
+err.txt
+out.txt
+src/test_osd.pdf
+app_native.log
+native_debug.log
