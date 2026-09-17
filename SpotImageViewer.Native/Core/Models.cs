@@ -337,3 +337,21 @@ public class LiveOsdRecord
     [JsonPropertyName("status")]
     public string Status { get; set; } = "Success";
 }
+
+public class LowConsumptionItem
+{
+    [JsonPropertyName("consumer_id")]
+    public string ConsumerId { get; set; } = "";
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "";
+
+    [JsonPropertyName("units")]
+    public double Units { get; set; }
+
+    [JsonPropertyName("category")]
+    public string Category { get; set; } = "";
+
+    [JsonPropertyName("meter_no")]
+    public string MeterNo { get; set; } = "";
+}
