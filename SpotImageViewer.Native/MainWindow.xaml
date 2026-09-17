@@ -1,304 +1,283 @@
 <Window x:Class="SpotImageViewer.Native.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Spot Image Viewer &amp; Verification Studio (v0.0.1 Native WPF)" 
-        Height="850" Width="1340"
-        MinWidth="960" MinHeight="600"
+        Title="Spot Image Viewer &amp; Verification Studio — v20.56 (Native WPF)" 
+        Height="850" Width="1380"
+        MinWidth="1020" MinHeight="640"
         WindowState="Maximized"
-        Background="{StaticResource BrushBgMain}"
+        Background="{StaticResource BrushAppBg}"
         WindowStartupLocation="CenterScreen">
 
-    <Grid Background="{StaticResource BrushBgMain}">
+    <Grid Background="{StaticResource BrushAppBg}">
         <Grid.RowDefinitions>
-            <!-- Row 0: Top Header -->
-            <RowDefinition Height="56" />
-            <!-- Row 1: Main Content Tabs -->
+            <!-- Row 0: Universal 44px Topbar -->
+            <RowDefinition Height="44" />
+            <!-- Row 1: Work Body (Sidebar Rail + Main Content + Right Dock) -->
             <RowDefinition Height="*" />
-            <!-- Row 2: Status Bar -->
-            <RowDefinition Height="28" />
+            <!-- Row 2: Bottom Status Bar -->
+            <RowDefinition Height="26" />
         </Grid.RowDefinitions>
 
-        <!-- ==================== ROW 0: TOP HEADER ==================== -->
-        <Border Grid.Row="0" Background="{StaticResource BrushBgCard}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="0,0,0,1">
-            <Grid Margin="16,0">
+        <!-- =========================================================================
+             ROW 0: UNIVERSAL TOP NAVIGATION BAR (44px, exactly matches layout_head.html)
+             ========================================================================= -->
+        <Border Grid.Row="0" Background="{StaticResource BrushSurface0}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="0,0,0,1">
+            <Grid Margin="12,0">
                 <Grid.ColumnDefinitions>
-                    <!-- App Logo & Title -->
+                    <!-- Left Section: Sidebar Toggle & Brand -->
                     <ColumnDefinition Width="Auto" />
-                    <!-- Navigation Tabs -->
-                    <ColumnDefinition Width="Auto" />
-                    <!-- Global Search Bar -->
+                    <!-- Center Section: Centered Universal Search Box -->
                     <ColumnDefinition Width="*" />
-                    <!-- Right Actions & Stats -->
+                    <!-- Right Section: Utility Tools, Popovers & Status -->
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- 1. Logo & App Title -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,24,0">
-                    <Border Width="32" Height="32" CornerRadius="8" Background="{StaticResource BrushAccentSkyDark}" Margin="0,0,10,0">
-                        <TextBlock Text="📷" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="SPOT IMAGE VIEWER" FontWeight="Bold" FontSize="13" Foreground="{StaticResource BrushTextPrimary}" />
-                        <TextBlock Text="Verification Studio v0.0.1 (WPF)" FontSize="10" Foreground="{StaticResource BrushAccentSky}" />
+                <!-- Left Section: Toggle & Title -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="sidebarCollapseBtn"
+                            Style="{StaticResource TopbarIconBtn}"
+                            ToolTip="Toggle Sidebar (Ctrl+B)"
+                            Click="SidebarCollapseBtn_Click"
+                            Margin="0,0,10,0">
+                        <Path Data="{StaticResource GeoPanelLeft}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6" Width="15" Height="15" />
+                    </Button>
+                    <TextBlock Text="SpotImageViewer" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource BrushTextPrimary}" VerticalAlignment="Center" />
+                </StackPanel>
+
+                <!-- Center Section: Max-Width 540px Centered Universal Search Bar -->
+                <Grid Grid.Column="1" HorizontalAlignment="Center" Width="520" VerticalAlignment="Center">
+                    <TextBox x:Name="txtGlobalSearch"
+                             Style="{StaticResource SearchTextBox}"
+                             Tag="Search Consumer ID, Meter, Name, or Mobile..."
+                             KeyDown="TxtGlobalSearch_KeyDown"
+                             TextChanged="TxtGlobalSearch_TextChanged" />
+
+                    <!-- Trailing Buttons inside Search Box (Clear '✕' & Blue 'Find') -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0">
+                        <Button x:Name="btnClearSearch"
+                                Width="24" Height="24"
+                                Background="Transparent" BorderThickness="0"
+                                Foreground="{StaticResource BrushAccentRose}"
+                                ToolTip="Clear search"
+                                Visibility="Collapsed"
+                                Click="BtnClearSearch_Click"
+                                Margin="0,0,3,0"
+                                Cursor="Hand">
+                            <Path Data="{StaticResource GeoClose}" Stroke="{StaticResource BrushAccentRose}" StrokeThickness="1.8" Width="11" Height="11" />
+                        </Button>
+                        <Button x:Name="btnSearch"
+                                Content="Find"
+                                Style="{StaticResource AccentButton}"
+                                Click="BtnSearch_Click" />
                     </StackPanel>
-                </StackPanel>
+                </Grid>
 
-                <!-- 2. Nav Tabs -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
-                    <RadioButton x:Name="rbTabViewer" Content="📸 Viewer" Style="{StaticResource NavTabButton}" IsChecked="True" Checked="NavTab_Checked" Margin="0,0,4,0" />
-                    <RadioButton x:Name="rbTabTariff" Content="⚡ Tariff &amp; Theft" Style="{StaticResource NavTabButton}" Checked="NavTab_Checked" Margin="0,0,4,0" />
-                    <RadioButton x:Name="rbTabFuzzy" Content="🔍 Fuzzy Search" Style="{StaticResource NavTabButton}" Checked="NavTab_Checked" Margin="0,0,4,0" />
-                    <RadioButton x:Name="rbTabAudit" Content="📋 Audit Studio" Style="{StaticResource NavTabButton}" Checked="NavTab_Checked" Margin="0,0,4,0" />
-                    <RadioButton x:Name="rbTabLiveOsd" Content="🌐 Live OSD" Style="{StaticResource NavTabButton}" Checked="NavTab_Checked" Margin="0,0,4,0" />
-                    <RadioButton x:Name="rbTabSettings" Content="⚙️ Settings" Style="{StaticResource NavTabButton}" Checked="NavTab_Checked" />
-                </StackPanel>
+                <!-- Right Section: Utilities + Image Counter -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- + (Import Consumer Master Excel) -->
+                    <Button x:Name="btnImportToggle"
+                            Style="{StaticResource TopbarIconBtn}"
+                            ToolTip="Import Consumer Master Excel (+)"
+                            Click="BtnImportToggle_Click"
+                            Margin="0,0,2,0">
+                        <Path Data="{StaticResource GeoPlus}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.7" Width="14" Height="14" />
+                    </Button>
 
-                <!-- 3. Global Search Bar -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,20,0">
-                    <TextBox x:Name="txtGlobalSearch" Width="260" Style="{StaticResource ModernTextBox}" Tag="Consumer ID, Meter No, or Name..." KeyDown="TxtGlobalSearch_KeyDown" />
-                    <Button x:Name="btnSearch" Content="Search" Style="{StaticResource AccentButton}" Margin="6,0,0,0" Padding="12,6" Click="BtnSearch_Click" />
-                    <Button x:Name="btnClearSearch" Content="✕" Style="{StaticResource ModernButton}" Margin="4,0,0,0" Padding="8,6" Click="BtnClearSearch_Click" ToolTip="Reset / Clear Search" />
-                </StackPanel>
+                    <!-- 🔄 (Reload Image Index) -->
+                    <Button x:Name="btnReloadIndex"
+                            Style="{StaticResource TopbarIconBtn}"
+                            ToolTip="Reload &amp; Re-index Images"
+                            Click="BtnReloadIndex_Click"
+                            Margin="0,0,2,0">
+                        <Path x:Name="iconReloadIndex" Data="{StaticResource GeoRefresh}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6" Width="14" Height="14" RenderTransformOrigin="0.5,0.5">
+                            <Path.RenderTransform>
+                                <RotateTransform x:Name="rotateReloadIcon" Angle="0" />
+                            </Path.RenderTransform>
+                        </Path>
+                    </Button>
 
-                <!-- 4. Top-Right Image Count Badge & Online Dot -->
-                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border x:Name="badgeFolderStatus" Background="{StaticResource BrushBgInput}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="14" Padding="10,4" Cursor="Hand" MouseDown="BadgeFolderStatus_MouseDown" ToolTip="Click to view folder details">
+                    <!-- 📁 (Network Folders Dialog) -->
+                    <Button x:Name="btnFolderToggle"
+                            Style="{StaticResource TopbarIconBtn}"
+                            ToolTip="Manage Image Directories"
+                            Click="BtnFolderToggle_Click"
+                            Margin="0,0,2,0">
+                        <Path Data="{StaticResource GeoFolder}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6" Width="14" Height="14" />
+                    </Button>
+
+                    <!-- ? (Help & User Guide) -->
+                    <Button x:Name="btnHelp"
+                            Style="{StaticResource TopbarIconBtn}"
+                            ToolTip="User Guide &amp; Keyboard Shortcuts (?)"
+                            Click="BtnHelp_Click"
+                            Margin="0,0,2,0">
+                        <Path Data="{StaticResource GeoHelp}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6" Width="14" Height="14" />
+                    </Button>
+
+                    <!-- Theme Indicator -->
+                    <Button x:Name="btnThemeToggle"
+                            Style="{StaticResource TopbarIconBtn}"
+                            ToolTip="Dark Theme Active"
+                            Margin="0,0,6,0">
+                        <Path Data="{StaticResource GeoSun}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6" Width="14" Height="14" />
+                    </Button>
+
+                    <!-- Vertical Separator Divider -->
+                    <Rectangle Width="1" Height="16" Fill="{StaticResource BrushBorder}" Margin="0,0,8,0" />
+
+                    <!-- Image Count Badge & Online Dot -->
+                    <Border x:Name="badgeFolderStatus"
+                            Background="{StaticResource BrushSurface1}"
+                            BorderBrush="{StaticResource BrushBorder}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="8,3"
+                            Cursor="Hand"
+                            MouseDown="BadgeFolderStatus_MouseDown"
+                            ToolTip="Click to inspect directory counts">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Ellipse x:Name="dotStatus" Width="8" Height="8" Fill="{StaticResource BrushAccentEmerald}" Margin="0,0,6,0" />
-                            <TextBlock x:Name="txtImageCountHeader" Text="Scanning..." FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource BrushTextSecondary}" />
+                            <Ellipse x:Name="dotStatus" Width="7" Height="7" Fill="{StaticResource BrushAccentEmerald}" Margin="0,0,6,0" />
+                            <TextBlock x:Name="txtImageCountHeader" Text="1,61,425" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource BrushTextSecondary}" />
                         </StackPanel>
                     </Border>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- ==================== ROW 1: CONTENT AREA ==================== -->
+        <!-- =========================================================================
+             ROW 1: MIDDLE WORK BODY (Left Rail + Central Content + Right Dock)
+             ========================================================================= -->
         <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <!-- Column 0: Left 44px Icon Rail (Expands to 176px) -->
+                <ColumnDefinition Width="Auto" />
+                <!-- Column 1: Main Content Space -->
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-            <!-- TAB 1: SPOT IMAGE VIEWER -->
-            <Grid x:Name="panelViewer" Visibility="Visible">
-                <Grid.ColumnDefinitions>
-                    <!-- Consumer Master Sidebar -->
-                    <ColumnDefinition Width="340" MinWidth="260" MaxWidth="440" />
-                    <!-- Splitter -->
-                    <ColumnDefinition Width="1" />
-                    <!-- Main Photo Pane & Welcome View -->
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
+            <!-- ==================== LEFT ICON RAIL (VS Code / Photoshop Style) ==================== -->
+            <Border Grid.Column="0"
+                    x:Name="sidebarRail"
+                    Width="44"
+                    Background="{StaticResource BrushSurface0}"
+                    BorderBrush="{StaticResource BrushBorder}"
+                    BorderThickness="0,0,1,0"
+                    MouseEnter="SidebarRail_MouseEnter"
+                    MouseLeave="SidebarRail_MouseLeave">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <!-- Main 7 Nav Items -->
+                        <RowDefinition Height="*" />
+                        <!-- Bottom Settings Nav Item -->
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                <!-- Left Sidebar: Consumer Master Details -->
-                <Border Grid.Column="0" Background="{StaticResource BrushBgCard}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="0,0,1,0">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel Margin="16" x:Name="panelConsumerSidebar">
-                            
-                            <!-- Sidebar Header -->
-                            <Grid Margin="0,0,0,12">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="CONSUMER MASTER" FontSize="11" FontWeight="Bold" Foreground="{StaticResource BrushAccentSky}" VerticalAlignment="Center" />
-                                </StackPanel>
-                                <Border x:Name="badgeStatus" HorizontalAlignment="Right" Background="#064e3b" CornerRadius="4" Padding="6,2">
-                                    <TextBlock x:Name="txtStatusBadge" Text="ACTIVE" FontSize="10" FontWeight="Bold" Foreground="#34d399" />
-                                </Border>
-                            </Grid>
+                    <StackPanel Grid.Row="0" Margin="0,6,0,0">
+                        <!-- 1. Image Viewer -->
+                        <RadioButton x:Name="rbTabViewer"
+                                     Style="{StaticResource RailNavItem}"
+                                     Tag="Image Viewer"
+                                     IsChecked="True"
+                                     Checked="NavTab_Checked"
+                                     ToolTip="Spot Image Viewer">
+                            <Path Data="{StaticResource GeoImage}" Stroke="{StaticResource BrushAccentSky}" StrokeThickness="1.7" Width="16" Height="16" />
+                        </RadioButton>
 
-                            <!-- Consumer ID Card -->
-                            <Border Background="{StaticResource BrushBgInput}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
-                                <StackPanel>
-                                    <TextBlock Text="CONSUMER ID" FontSize="10" Foreground="{StaticResource BrushTextMuted}" FontWeight="SemiBold" />
-                                    <TextBlock x:Name="txtCID" Text="-" FontSize="18" FontWeight="Bold" Foreground="{StaticResource BrushAccentSky}" Margin="0,2,0,0" />
-                                    <TextBlock x:Name="txtConsumerName" Text="No consumer selected" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource BrushTextPrimary}" Margin="0,4,0,0" TextWrapping="Wrap" />
-                                    <TextBlock x:Name="txtAddress" Text="Search by 9-digit CID above to inspect spot bill records." FontSize="11" Foreground="{StaticResource BrushTextSecondary}" Margin="0,4,0,0" TextWrapping="Wrap" />
-                                </StackPanel>
-                            </Border>
+                        <!-- 2. Bill Calculator -->
+                        <RadioButton x:Name="rbTabTariff"
+                                     Style="{StaticResource RailNavItem}"
+                                     Tag="Bill Calculator"
+                                     Checked="NavTab_Checked"
+                                     ToolTip="Bill Calculator">
+                            <Path Data="{StaticResource GeoZap}" Stroke="{StaticResource BrushAccentAmber}" StrokeThickness="1.7" Width="16" Height="16" />
+                        </RadioButton>
 
-                            <!-- Key Master Specs Grid -->
-                            <Border Background="{StaticResource BrushBgInput}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
+                        <!-- 3. Theft Assessment -->
+                        <RadioButton x:Name="rbTabTheft"
+                                     Style="{StaticResource RailNavItem}"
+                                     Tag="Theft Assessment"
+                                     Checked="NavTab_Checked"
+                                     ToolTip="Theft Assessment Engine">
+                            <Path Data="{StaticResource GeoScale}" Stroke="{StaticResource BrushAccentRose}" StrokeThickness="1.7" Width="16" Height="16" />
+                        </RadioButton>
 
-                                    <!-- Row 0: Category & Phase -->
-                                    <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,8">
-                                        <TextBlock Text="TARIFF / CATEGORY" FontSize="9" Foreground="{StaticResource BrushTextMuted}" FontWeight="Bold" />
-                                        <TextBlock x:Name="txtTariff" Text="-" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource BrushTextPrimary}" TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,8">
-                                        <TextBlock Text="PHASE" FontSize="9" Foreground="{StaticResource BrushTextMuted}" FontWeight="Bold" />
-                                        <TextBlock x:Name="txtPhase" Text="-" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource BrushTextPrimary}" />
-                                    </StackPanel>
+                        <!-- 4. Low Consumption Audit -->
+                        <RadioButton x:Name="rbTabAudit"
+                                     Style="{StaticResource RailNavItem}"
+                                     Tag="Low Cons. Audit"
+                                     Checked="NavTab_Checked"
+                                     ToolTip="Low Consumption Audit">
+                            <Path Data="{StaticResource GeoFileSpreadsheet}" Stroke="{StaticResource BrushAccentEmerald}" StrokeThickness="1.7" Width="16" Height="16" />
+                        </RadioButton>
 
-                                    <!-- Row 1: Connected Load & Meter No -->
-                                    <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,0,8">
-                                        <TextBlock Text="CONNECTED LOAD" FontSize="9" Foreground="{StaticResource BrushTextMuted}" FontWeight="Bold" />
-                                        <TextBlock x:Name="txtLoad" Text="-" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource BrushTextPrimary}" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,8">
-                                        <TextBlock Text="METER NO" FontSize="9" Foreground="{StaticResource BrushTextMuted}" FontWeight="Bold" />
-                                        <TextBlock x:Name="txtMeterNo" Text="-" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource BrushTextPrimary}" />
-                                    </StackPanel>
+                        <!-- 5. Fuzzy Lookup -->
+                        <RadioButton x:Name="rbTabFuzzy"
+                                     Style="{StaticResource RailNavItem}"
+                                     Tag="Fuzzy Lookup"
+                                     Checked="NavTab_Checked"
+                                     ToolTip="Fuzzy Master Lookup">
+                            <Path Data="{StaticResource GeoSparkles}" Stroke="{StaticResource BrushAccentAmber}" StrokeThickness="1.7" Width="16" Height="16" />
+                        </RadioButton>
 
-                                    <!-- Row 2: Office & Contact -->
-                                    <StackPanel Grid.Row="2" Grid.Column="0">
-                                        <TextBlock Text="OFFICE / CCC" FontSize="9" Foreground="{StaticResource BrushTextMuted}" FontWeight="Bold" />
-                                        <TextBlock x:Name="txtOffice" Text="-" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource BrushTextPrimary}" TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Row="2" Grid.Column="1">
-                                        <TextBlock Text="MOBILE" FontSize="9" Foreground="{StaticResource BrushTextMuted}" FontWeight="Bold" />
-                                        <TextBlock x:Name="txtMobile" Text="-" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource BrushTextPrimary}" />
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
+                        <!-- 6. OSD Report -->
+                        <RadioButton x:Name="rbTabLiveOsd"
+                                     Style="{StaticResource RailNavItem}"
+                                     Tag="OSD Report Studio"
+                                     Checked="NavTab_Checked"
+                                     ToolTip="Live SAP OSD Portal">
+                            <Path Data="{StaticResource GeoFileCheck}" Stroke="{StaticResource BrushAccentCyan}" StrokeThickness="1.7" Width="16" Height="16" />
+                        </RadioButton>
 
-                            <!-- Live OSD Summary Badge -->
-                            <Border x:Name="cardOsdSummary" Background="#1e1b4b" BorderBrush="#3730a3" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12" Visibility="Collapsed">
-                                <StackPanel>
-                                    <TextBlock Text="LIVE SAP OUTSTANDING" FontSize="10" FontWeight="Bold" Foreground="#a5b4fc" />
-                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                        <TextBlock x:Name="txtOsdTotalDues" Text="₹0.00" FontSize="16" FontWeight="Bold" Foreground="#818cf8" />
-                                        <TextBlock x:Name="txtOsdDocType" Text="NO DUES" FontSize="10" FontWeight="Bold" Margin="8,4,0,0" Foreground="#34d399" />
-                                    </StackPanel>
-                                    <TextBlock x:Name="txtOsdDetails" Text="OSD: ₹0 | LPSC: ₹0" FontSize="10" Foreground="#c7d2fe" Margin="0,2,0,0" />
-                                </StackPanel>
-                            </Border>
+                        <!-- 7. DCRC & PO Billing -->
+                        <RadioButton x:Name="rbTabDcrc"
+                                     Style="{StaticResource RailNavItem}"
+                                     Tag="DCRC &amp; PO Billing"
+                                     Checked="NavTab_Checked"
+                                     ToolTip="Agency PO &amp; DCRC Billing">
+                            <Path Data="{StaticResource GeoReceipt}" Stroke="{StaticResource BrushAccentEmerald}" StrokeThickness="1.7" Width="16" Height="16" />
+                        </RadioButton>
+                    </StackPanel>
 
-                            <!-- Available Cycles Section -->
-                            <TextBlock Text="AVAILABLE SPOT BILL PHOTOS" FontSize="10" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,4,0,6" />
-                            <StackPanel x:Name="panelPhotoChips" Margin="0,0,0,12">
-                                <TextBlock Text="No consumer loaded" FontSize="11" Foreground="{StaticResource BrushTextMuted}" />
-                            </StackPanel>
+                    <!-- Bottom Settings Item -->
+                    <Border Grid.Row="1" BorderBrush="{StaticResource BrushBorder}" BorderThickness="0,1,0,0" Padding="0,6">
+                        <RadioButton x:Name="rbTabSettings"
+                                     Style="{StaticResource RailNavItem}"
+                                     Tag="Settings"
+                                     Checked="NavTab_Checked"
+                                     ToolTip="Global Settings">
+                            <Path Data="{StaticResource GeoSettings}" Stroke="{StaticResource BrushAccentIndigo}" StrokeThickness="1.7" Width="16" Height="16" />
+                        </RadioButton>
+                    </Border>
+                </Grid>
+            </Border>
 
-                            <!-- Quick Action Buttons -->
-                            <StackPanel Orientation="Vertical">
-                                <Button x:Name="btnFetchLiveOsdQuick" Content="🌐 Check Live OSD Portal" Style="{StaticResource ModernButton}" Margin="0,0,0,6" Click="BtnFetchLiveOsdQuick_Click" />
-                                <Button x:Name="btnCalcTariffQuick" Content="⚡ Open in Tariff Calculator" Style="{StaticResource ModernButton}" Click="BtnCalcTariffQuick_Click" />
-                            </StackPanel>
+            <!-- ==================== MAIN CONTENT DISPLAY ==================== -->
+            <Grid Grid.Column="1">
 
-                        </StackPanel>
-                    </ScrollViewer>
-                </Border>
+                <!-- =================================================================
+                     TAB 1: SPOT IMAGE VIEWER (exact layout_head + tab_viewer replication)
+                     ================================================================= -->
+                <Grid x:Name="panelViewer" Visibility="Visible">
+                    <Grid.ColumnDefinitions>
+                        <!-- Canvas Viewport with floating overlays -->
+                        <ColumnDefinition Width="*" />
+                        <!-- Right Docked Details Panel (280px) -->
+                        <ColumnDefinition Width="280" />
+                    </Grid.ColumnDefinitions>
 
-                <!-- Splitter -->
-                <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Background="{StaticResource BrushBorderSubtle}" />
+                    <!-- Left: Large Image Viewport & Overlays -->
+                    <Grid Grid.Column="0" Background="{StaticResource BrushCanvas}">
 
-                <!-- Main Viewport (Column 2) -->
-                <Grid Grid.Column="2">
-
-                    <!-- ================= WELCOME SCREEN ================= -->
-                    <!-- Designed to auto-fit viewport without vertical scrolling -->
-                    <Grid x:Name="panelWelcome" Visibility="Visible" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24" MaxWidth="820">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            
-                            <!-- Hero Icon & Glow -->
-                            <Grid HorizontalAlignment="Center" Margin="0,0,0,12">
-                                <Border Width="56" Height="56" CornerRadius="16" Background="{StaticResource BrushBgCard}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1">
-                                    <TextBlock Text="📷" FontSize="26" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                            </Grid>
-
-                            <!-- Hero Title & Subtitle -->
-                            <TextBlock Text="Welcome to Spot Image Viewer" FontSize="22" FontWeight="Bold" Foreground="{StaticResource BrushTextPrimary}" HorizontalAlignment="Center" Margin="0,0,0,4" />
-                            <TextBlock Text="Ultra-fast spot bill photo verification, consumer master intelligence, and live SAP portal audit studio." FontSize="12" Foreground="{StaticResource BrushTextSecondary}" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,20" MaxWidth="600" TextWrapping="Wrap" />
-
-                            <!-- 4-Feature Cards Responsive Grid -->
-                            <UniformGrid Columns="4" Margin="0,0,0,20">
-                                <!-- Card 1 -->
-                                <Border Background="{StaticResource BrushBgCard}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="4">
-                                    <StackPanel>
-                                        <TextBlock Text="🔍" FontSize="18" Margin="0,0,0,4" />
-                                        <TextBlock Text="Instant Search" FontWeight="Bold" FontSize="11" Foreground="{StaticResource BrushTextPrimary}" Margin="0,0,0,2" />
-                                        <TextBlock Text="Lookup by 9-digit CID, Meter No, or Name with auto-detection." FontSize="10" Foreground="{StaticResource BrushTextSecondary}" TextWrapping="Wrap" />
-                                    </StackPanel>
-                                </Border>
-
-                                <!-- Card 2 -->
-                                <Border Background="{StaticResource BrushBgCard}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="4">
-                                    <StackPanel>
-                                        <TextBlock Text="📸" FontSize="18" Margin="0,0,0,4" />
-                                        <TextBlock Text="Cycle Timeline" FontWeight="Bold" FontSize="11" Foreground="{StaticResource BrushTextPrimary}" Margin="0,0,0,2" />
-                                        <TextBlock Text="Inspect multi-month spot bill photos side-by-side in native DirectX." FontSize="10" Foreground="{StaticResource BrushTextSecondary}" TextWrapping="Wrap" />
-                                    </StackPanel>
-                                </Border>
-
-                                <!-- Card 3 -->
-                                <Border Background="{StaticResource BrushBgCard}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="4">
-                                    <StackPanel>
-                                        <TextBlock Text="⚡" FontSize="18" Margin="0,0,0,4" />
-                                        <TextBlock Text="Live OSD Portal" FontWeight="Bold" FontSize="11" Foreground="{StaticResource BrushTextPrimary}" Margin="0,0,0,2" />
-                                        <TextBlock Text="Real-time SAP WebDynpro outstanding dues, LPSC, and connection status." FontSize="10" Foreground="{StaticResource BrushTextSecondary}" TextWrapping="Wrap" />
-                                    </StackPanel>
-                                </Border>
-
-                                <!-- Card 4 -->
-                                <Border Background="{StaticResource BrushBgCard}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="4">
-                                    <StackPanel>
-                                        <TextBlock Text="📋" FontSize="18" Margin="0,0,0,4" />
-                                        <TextBlock Text="Audit Studio" FontWeight="Bold" FontSize="11" Foreground="{StaticResource BrushTextPrimary}" Margin="0,0,0,2" />
-                                        <TextBlock Text="High-speed low consumption filtering, defect detection, and Excel export." FontSize="10" Foreground="{StaticResource BrushTextSecondary}" TextWrapping="Wrap" />
-                                    </StackPanel>
-                                </Border>
-                            </UniformGrid>
-
-                            <!-- Keyboard Shortcuts Bar -->
-                            <Border Background="{StaticResource BrushBgInput}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="12,6" HorizontalAlignment="Center">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="SHORTCUTS:" FontSize="10" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,12,0" VerticalAlignment="Center" />
-                                    <TextBlock Text="[ / ] Focus Search   •   [ Enter ] Lookup   •   [ ← / → ] Switch Photos   •   [ Esc ] Clear" FontSize="10" Foreground="{StaticResource BrushTextSecondary}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </Border>
-
-                        </StackPanel>
-                    </Grid>
-
-                    <!-- ================= ACTIVE PHOTO VIEWER ================= -->
-                    <Grid x:Name="panelPhotoViewer" Visibility="Collapsed">
-                        <Grid.RowDefinitions>
-                            <!-- Toolbar -->
-                            <RowDefinition Height="42" />
-                            <!-- Image Canvas -->
-                            <RowDefinition Height="*" />
-                            <!-- Bottom Filmstrip -->
-                            <RowDefinition Height="90" />
-                        </Grid.RowDefinitions>
-
-                        <!-- Top Photo Controls Toolbar -->
-                        <Border Grid.Row="0" Background="{StaticResource BrushBgCard}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="0,0,0,1">
-                            <Grid Margin="12,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <!-- Current Photo Info -->
-                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock x:Name="txtPhotoMetaHeader" Text="Photo 1 of 1 • 30-04-2026" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource BrushTextPrimary}" Margin="0,0,12,0" />
-                                    <TextBlock x:Name="txtPhotoFileStatus" Text="(Online)" FontSize="10" Foreground="{StaticResource BrushAccentEmerald}" VerticalAlignment="Center" />
-                                </StackPanel>
-
-                                <!-- Zoom & Transform Tools -->
-                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button x:Name="btnZoomIn" Content="🔍+ Zoom In" Style="{StaticResource ModernButton}" Padding="8,4" Margin="0,0,4,0" Click="BtnZoomIn_Click" />
-                                    <Button x:Name="btnZoomOut" Content="🔍- Zoom Out" Style="{StaticResource ModernButton}" Padding="8,4" Margin="0,0,4,0" Click="BtnZoomOut_Click" />
-                                    <Button x:Name="btnZoomFit" Content="⛶ Fit" Style="{StaticResource ModernButton}" Padding="8,4" Margin="0,0,4,0" Click="BtnZoomFit_Click" />
-                                    <Button x:Name="btnRotate" Content="↻ Rotate" Style="{StaticResource ModernButton}" Padding="8,4" Margin="0,0,4,0" Click="BtnRotate_Click" />
-                                    <Button x:Name="btnInvert" Content="🌓 Invert" Style="{StaticResource ModernButton}" Padding="8,4" Margin="0,0,4,0" Click="BtnInvert_Click" />
-                                    <Button x:Name="btnOpenExternal" Content="↗ Open" Style="{StaticResource ModernButton}" Padding="8,4" Click="BtnOpenExternal_Click" ToolTip="Open in Default Windows Viewer" />
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-
-                        <!-- Center Hardware-Accelerated Pan/Zoom Canvas -->
-                        <Border Grid.Row="1" Background="#020617" ClipToBounds="True" x:Name="borderImageContainer" MouseWheel="BorderImageContainer_MouseWheel" MouseDown="BorderImageContainer_MouseDown" MouseMove="BorderImageContainer_MouseMove" MouseUp="BorderImageContainer_MouseUp" Cursor="SizeAll">
+                        <!-- 1. Background Hardware-Accelerated Pan & Zoom Canvas -->
+                        <Border x:Name="borderImageContainer"
+                                ClipToBounds="True"
+                                MouseWheel="BorderImageContainer_MouseWheel"
+                                MouseDown="BorderImageContainer_MouseDown"
+                                MouseMove="BorderImageContainer_MouseMove"
+                                MouseUp="BorderImageContainer_MouseUp"
+                                Cursor="Hand">
                             <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <Image x:Name="imgMain" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality">
+                                <Image x:Name="imgMain" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" Visibility="Collapsed">
                                     <Image.LayoutTransform>
                                         <RotateTransform x:Name="imgRotateTransform" Angle="0" />
                                     </Image.LayoutTransform>
@@ -312,244 +291,643 @@
                             </Grid>
                         </Border>
 
-                        <!-- Bottom Thumbnail Filmstrip Carousel -->
-                        <Border Grid.Row="2" Background="{StaticResource BrushBgCard}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="0,1,0,0">
-                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                                <StackPanel x:Name="panelFilmstrip" Orientation="Horizontal" Margin="8,6" VerticalAlignment="Center" />
-                            </ScrollViewer>
+                        <!-- 2. Clean Welcome Screen (When no image is loaded) -->
+                        <Grid x:Name="panelWelcome" Visibility="Visible" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="820" Margin="24">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <!-- Hero Icon -->
+                                <Border Width="52" Height="52" CornerRadius="16" Background="{StaticResource BrushSurface1}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,12">
+                                    <Path Data="{StaticResource GeoImage}" Stroke="{StaticResource BrushAccentSky}" StrokeThickness="1.7" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+
+                                <TextBlock Text="Welcome to Spot Image Viewer" FontSize="22" FontWeight="Bold" Foreground="{StaticResource BrushTextPrimary}" HorizontalAlignment="Center" Margin="0,0,0,4" />
+                                <TextBlock Text="Ultra-fast spot bill photo verification, consumer master intelligence, and live SAP portal audit studio." FontSize="12" Foreground="{StaticResource BrushTextSecondary}" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,20" MaxWidth="580" TextWrapping="Wrap" />
+
+                                <!-- 4 Quick Features Cards Grid -->
+                                <UniformGrid Columns="4" Margin="0,0,0,18">
+                                    <!-- Card 1 -->
+                                    <Border Background="{StaticResource BrushSurface1}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="4">
+                                        <StackPanel>
+                                            <Path Data="{StaticResource GeoSearch}" Stroke="{StaticResource BrushAccentSky}" StrokeThickness="1.6" Width="18" Height="18" HorizontalAlignment="Left" Margin="0,0,0,6" />
+                                            <TextBlock Text="Instant Search" FontWeight="Bold" FontSize="11" Foreground="{StaticResource BrushTextPrimary}" Margin="0,0,0,2" />
+                                            <TextBlock Text="Lookup by 9-digit CID, Meter No, or Name with auto-detection." FontSize="10" Foreground="{StaticResource BrushTextSecondary}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Card 2 -->
+                                    <Border Background="{StaticResource BrushSurface1}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="4">
+                                        <StackPanel>
+                                            <Path Data="{StaticResource GeoCalendar}" Stroke="{StaticResource BrushAccentEmerald}" StrokeThickness="1.6" Width="18" Height="18" HorizontalAlignment="Left" Margin="0,0,0,6" />
+                                            <TextBlock Text="Cycle Timeline" FontWeight="Bold" FontSize="11" Foreground="{StaticResource BrushTextPrimary}" Margin="0,0,0,2" />
+                                            <TextBlock Text="Inspect multi-month spot bill photos side-by-side in native DirectX." FontSize="10" Foreground="{StaticResource BrushTextSecondary}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Card 3 -->
+                                    <Border Background="{StaticResource BrushSurface1}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="4">
+                                        <StackPanel>
+                                            <Path Data="{StaticResource GeoZap}" Stroke="{StaticResource BrushAccentAmber}" StrokeThickness="1.6" Width="18" Height="18" HorizontalAlignment="Left" Margin="0,0,0,6" />
+                                            <TextBlock Text="Live OSD Portal" FontWeight="Bold" FontSize="11" Foreground="{StaticResource BrushTextPrimary}" Margin="0,0,0,2" />
+                                            <TextBlock Text="Real-time SAP WebDynpro outstanding dues, LPSC, and status." FontSize="10" Foreground="{StaticResource BrushTextSecondary}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Card 4 -->
+                                    <Border Background="{StaticResource BrushSurface1}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="4">
+                                        <StackPanel>
+                                            <Path Data="{StaticResource GeoFileSpreadsheet}" Stroke="{StaticResource BrushAccentPurple}" StrokeThickness="1.6" Width="18" Height="18" HorizontalAlignment="Left" Margin="0,0,0,6" />
+                                            <TextBlock Text="Audit Studio" FontWeight="Bold" FontSize="11" Foreground="{StaticResource BrushTextPrimary}" Margin="0,0,0,2" />
+                                            <TextBlock Text="High-speed low consumption filtering, defect detection, and Excel export." FontSize="10" Foreground="{StaticResource BrushTextSecondary}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+                                </UniformGrid>
+
+                                <!-- Shortcuts Bar -->
+                                <Border Background="{StaticResource BrushSurface1}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="6" Padding="12,6" HorizontalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="SHORTCUTS:" FontSize="10" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,12,0" VerticalAlignment="Center" />
+                                        <TextBlock Text="[ / ] Focus Search   •   [ Enter ] Lookup   •   [ ← / → ] Switch Photos   •   [ Esc ] Clear" FontSize="10" Foreground="{StaticResource BrushTextSecondary}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- 3. Floating Date Tag (Top-Right of Viewport, #imgDateTagContainer) -->
+                        <Border x:Name="imgDateTagContainer"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Top"
+                                Margin="0,12,12,0"
+                                Background="#D0181818"
+                                BorderBrush="{StaticResource BrushBorderStrong}"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                Padding="10,5"
+                                Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Path Data="{StaticResource GeoCalendar}" Stroke="{StaticResource BrushAccentSky}" StrokeThickness="1.6" Width="13" Height="13" Margin="0,0,6,0" />
+                                <TextBlock x:Name="txtImgDateTag" Text="30-04-2026" FontSize="11" FontFamily="Consolas, monospace" Foreground="{StaticResource BrushTextPrimary}" />
+                            </StackPanel>
                         </Border>
+
+                        <!-- 4. Floating On-Canvas Prev / Next Flanking Buttons (#btnCanvasPrev & #btnCanvasNext) -->
+                        <Button x:Name="btnCanvasPrev"
+                                Style="{StaticResource CanvasCircleNavButton}"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Margin="20,0,0,0"
+                                ToolTip="Previous Photo (←)"
+                                Click="BtnCanvasPrev_Click"
+                                Visibility="Collapsed">
+                            <Path Data="{StaticResource GeoChevronLeft}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2.4" Width="18" Height="18" Margin="-2,0,0,0" />
+                        </Button>
+
+                        <Button x:Name="btnCanvasNext"
+                                Style="{StaticResource CanvasCircleNavButton}"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Margin="0,0,20,0"
+                                ToolTip="Next Photo (→)"
+                                Click="BtnCanvasNext_Click"
+                                Visibility="Collapsed">
+                            <Path Data="{StaticResource GeoChevronRight}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2.4" Width="18" Height="18" Margin="2,0,0,0" />
+                        </Button>
+
+                        <!-- 5. Floating Centered Bottom Capsule Controls (#singleViewControls) -->
+                        <Border x:Name="singleViewControls"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Bottom"
+                                Margin="0,0,0,16"
+                                Background="#E5181818"
+                                BorderBrush="{StaticResource BrushBorderStrong}"
+                                BorderThickness="1"
+                                CornerRadius="16"
+                                Padding="8,4"
+                                Visibility="Collapsed">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.55" Color="#000000" />
+                            </Border.Effect>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <!-- Zoom Out -->
+                                <Button x:Name="btnZoomOut" Style="{StaticResource CapsuleButton}" ToolTip="Zoom Out (-)" Click="BtnZoomOut_Click">
+                                    <Path Data="{StaticResource GeoZoomOut}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6" Width="14" Height="14" />
+                                </Button>
+                                <!-- Zoom In -->
+                                <Button x:Name="btnZoomIn" Style="{StaticResource CapsuleButton}" ToolTip="Zoom In (+)" Click="BtnZoomIn_Click">
+                                    <Path Data="{StaticResource GeoZoomIn}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6" Width="14" Height="14" />
+                                </Button>
+                                <!-- Reset View / Fit -->
+                                <Button x:Name="btnZoomFit" Style="{StaticResource CapsuleButton}" ToolTip="Fit to Canvas" Click="BtnZoomFit_Click">
+                                    <Path Data="{StaticResource GeoMaximize}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6" Width="14" Height="14" />
+                                </Button>
+
+                                <Rectangle Width="1" Height="16" Fill="{StaticResource BrushBorder}" Margin="4,0" />
+
+                                <!-- Rotate 90deg -->
+                                <Button x:Name="btnRotate" Style="{StaticResource CapsuleButton}" ToolTip="Rotate 90°" Click="BtnRotate_Click">
+                                    <Path Data="{StaticResource GeoRotateCw}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6" Width="14" Height="14" />
+                                </Button>
+
+                                <!-- Zoom Level Text -->
+                                <TextBlock x:Name="txtZoomLevel" Text="100%" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource BrushAccentSky}" VerticalAlignment="Center" Margin="4,0" />
+
+                                <Rectangle Width="1" Height="16" Fill="{StaticResource BrushBorder}" Margin="4,0" />
+
+                                <!-- Print -->
+                                <Button x:Name="btnPrint" Style="{StaticResource CapsuleButton}" ToolTip="Print Image" Click="BtnPrint_Click">
+                                    <Path Data="{StaticResource GeoPrinter}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6" Width="14" Height="14" />
+                                </Button>
+                                <!-- Save Image -->
+                                <Button x:Name="btnSaveImage" Style="{StaticResource CapsuleButton}" ToolTip="Save Image File" Click="BtnSaveImage_Click">
+                                    <Path Data="{StaticResource GeoDownload}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6" Width="14" Height="14" />
+                                </Button>
+                                <!-- Open External -->
+                                <Button x:Name="btnOpenExternal" Style="{StaticResource CapsuleButton}" ToolTip="Open in Default Windows Viewer" Click="BtnOpenExternal_Click">
+                                    <Path Data="{StaticResource GeoImage}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6" Width="14" Height="14" />
+                                </Button>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 6. Floating Bottom-Left Live OSD HUD Card (#liveOsdHud) -->
+                        <Border x:Name="liveOsdHud"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Bottom"
+                                Margin="16,0,0,16"
+                                Width="230"
+                                Background="#E5181818"
+                                BorderBrush="{StaticResource BrushBorderStrong}"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Padding="10"
+                                Visibility="Collapsed">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.5" Color="#000000" />
+                            </Border.Effect>
+                            <StackPanel>
+                                <!-- Header -->
+                                <Grid Margin="0,0,0,6">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Path Data="{StaticResource GeoZap}" Stroke="{StaticResource BrushAccentAmber}" StrokeThickness="1.6" Width="13" Height="13" Margin="0,0,4,0" />
+                                        <TextBlock Text="LIVE OSD" FontSize="10" FontWeight="Bold" Foreground="{StaticResource BrushTextPrimary}" />
+                                    </StackPanel>
+                                    <Button x:Name="btnRefreshLiveOsdHud" Style="{StaticResource TopbarIconBtn}" Width="20" Height="20" HorizontalAlignment="Right" ToolTip="Refresh Live OSD" Click="BtnRefreshLiveOsdHud_Click">
+                                        <Path Data="{StaticResource GeoRefresh}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" Width="11" Height="11" />
+                                    </Button>
+                                </Grid>
+
+                                <Rectangle Height="1" Fill="{StaticResource BrushBorder}" Margin="0,0,0,6" />
+
+                                <!-- Key-Value Summary -->
+                                <Grid Margin="0,0,0,3">
+                                    <TextBlock Text="STATUS" FontSize="9" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" />
+                                    <TextBlock x:Name="txtLiveOsdStatus" Text="Active" FontSize="10" FontWeight="Bold" Foreground="{StaticResource BrushAccentEmerald}" HorizontalAlignment="Right" />
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <TextBlock Text="TOTAL DUES" FontSize="9" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" />
+                                    <TextBlock x:Name="txtLiveOsdTotalDues" Text="₹ 0.00" FontSize="11" FontWeight="Bold" FontFamily="Consolas, monospace" Foreground="{StaticResource BrushAccentAmber}" HorizontalAlignment="Right" />
+                                </Grid>
+
+                                <Grid Margin="0,0,0,3">
+                                    <TextBlock Text="UNPAID / LPSC" FontSize="8.5" Foreground="{StaticResource BrushTextMuted}" />
+                                    <TextBlock x:Name="txtLiveOsdUnpaidLpsc" Text="₹ 0.00 + ₹ 0.00" FontSize="9" FontFamily="Consolas, monospace" Foreground="{StaticResource BrushTextSecondary}" HorizontalAlignment="Right" />
+                                </Grid>
+
+                                <Grid>
+                                    <TextBlock Text="OFFICE" FontSize="8.5" Foreground="{StaticResource BrushTextMuted}" />
+                                    <TextBlock x:Name="txtLiveOsdOffice" Text="KUSHIDA CCC" FontSize="9" Foreground="{StaticResource BrushTextSecondary}" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" MaxWidth="130" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
                     </Grid>
 
-                </Grid>
-            </Grid>
+                    <!-- Right: Docked Consumer Profile Pane (280px, #detailsPanel) -->
+                    <Border Grid.Column="1"
+                            x:Name="detailsPanel"
+                            Background="{StaticResource BrushSurface0}"
+                            BorderBrush="{StaticResource BrushBorder}"
+                            BorderThickness="1,0,0,0"
+                            Padding="10">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <!-- Top Bar (Count + Collapse) -->
+                                <RowDefinition Height="Auto" />
+                                <!-- Section 1: Consumer Details (Pinned Top) -->
+                                <RowDefinition Height="Auto" />
+                                <!-- Section 2: Available Dates (Expands) -->
+                                <RowDefinition Height="*" />
+                                <!-- Section 3: Notes & Remarks (Docked Bottom) -->
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
 
-            <!-- TAB 2: TARIFF & THEFT CALCULATOR -->
-            <Grid x:Name="panelTariff" Visibility="Collapsed" Margin="24">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="420" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <!-- Left: Calculator Inputs Form -->
-                <Border Grid.Column="0" Background="{StaticResource BrushBgCard}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,16,0">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel>
-                            <TextBlock Text="TARIFF &amp; THEFT ASSESSMENT ENGINE" FontWeight="Bold" FontSize="12" Foreground="{StaticResource BrushAccentSky}" Margin="0,0,0,12" />
-                            
-                            <!-- Category -->
-                            <TextBlock Text="CONSUMER CATEGORY" FontSize="10" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,0,4" />
-                            <ComboBox x:Name="cbTariffCategory" Height="32" Margin="0,0,0,10" Background="{StaticResource BrushBgInput}" Foreground="{StaticResource BrushTextPrimary}" />
-
-                            <!-- Cycle & Days -->
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" Margin="0,0,6,0">
-                                    <TextBlock Text="BILLING CYCLE" FontSize="10" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,0,4" />
-                                    <ComboBox x:Name="cbBillingCycle" Height="32">
-                                        <ComboBoxItem Content="Quarterly" IsSelected="True" />
-                                        <ComboBoxItem Content="Monthly" />
-                                    </ComboBox>
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Margin="6,0,0,0">
-                                    <TextBlock Text="DAYS" FontSize="10" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,0,4" />
-                                    <TextBox x:Name="txtCalcDays" Text="90" Style="{StaticResource ModernTextBox}" />
-                                </StackPanel>
+                            <!-- Top Header Row -->
+                            <Grid Grid.Row="0" Margin="0,0,0,8">
+                                <Border Background="{StaticResource BrushSurface1}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left">
+                                    <TextBlock x:Name="txtSearchResultCount" Text="0 photos" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource BrushTextSecondary}" />
+                                </Border>
                             </Grid>
 
-                            <!-- Units & Connected Load -->
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" Margin="0,0,6,0">
-                                    <TextBlock Text="UNITS BILLED" FontSize="10" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,0,4" />
-                                    <TextBox x:Name="txtCalcUnits" Text="150" Style="{StaticResource ModernTextBox}" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Margin="6,0,0,0">
-                                    <TextBlock Text="CONNECTED LOAD (kVA/kW)" FontSize="10" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,0,4" />
-                                    <TextBox x:Name="txtCalcLoad" Text="1.0" Style="{StaticResource ModernTextBox}" />
-                                </StackPanel>
-                            </Grid>
-
-                            <!-- Theft Specifics -->
-                            <Border Background="{StaticResource BrushBgInput}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,6,0,12">
+                            <!-- SECTION 1: CONSUMER DETAILS CARD (#section-profile) -->
+                            <Border Grid.Row="1" Background="{StaticResource BrushSurface1}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,8" Padding="8">
                                 <StackPanel>
-                                    <TextBlock Text="SECTION 126 / 135 THEFT ASSESSMENT" FontSize="10" FontWeight="Bold" Foreground="{StaticResource BrushAccentAmber}" Margin="0,0,0,8" />
-                                    <Grid>
+                                    <!-- Section Header -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                        <Border Width="16" Height="16" CornerRadius="4" Background="#2631a8ff" Margin="0,0,6,0">
+                                            <Path Data="{StaticResource GeoUser}" Stroke="{StaticResource BrushAccentSky}" StrokeThickness="1.6" Width="9" Height="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <TextBlock Text="CONSUMER DETAILS" FontSize="10" FontWeight="Bold" Foreground="{StaticResource BrushTextPrimary}" VerticalAlignment="Center" />
+                                    </StackPanel>
+
+                                    <!-- 1. Name Row -->
+                                    <Border Background="{StaticResource BrushSurface0}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="6" Padding="6,4" Margin="0,0,0,5">
+                                        <Grid>
+                                            <StackPanel Margin="0,0,20,0">
+                                                <TextBlock Text="NAME" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" />
+                                                <TextBlock x:Name="profileName" Text="No consumer selected" FontSize="11" FontWeight="Bold" Foreground="{StaticResource BrushTextPrimary}" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
+                                            </StackPanel>
+                                            <Button Style="{StaticResource CopySmallButton}" HorizontalAlignment="Right" VerticalAlignment="Top" ToolTip="Copy Name" Click="CopyName_Click">
+                                                <Path Data="{StaticResource GeoCopy}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" Width="11" Height="11" />
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- 2. Dual Badges: CID & Meter -->
+                                    <Grid Margin="0,0,0,5">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" Margin="0,0,4,0">
-                                            <TextBlock Text="PROV. DAYS (Max 365)" FontSize="9" Foreground="{StaticResource BrushTextMuted}" />
-                                            <TextBox x:Name="txtTheftProvDays" Text="365" Style="{StaticResource ModernTextBox}" Margin="0,2,0,0" />
+
+                                        <!-- CID Badge (Sky-tinted) -->
+                                        <Border Grid.Column="0" Background="#1831a8ff" BorderBrush="#3331a8ff" BorderThickness="1" CornerRadius="6" Padding="6,4" Margin="0,0,3,0">
+                                            <Grid>
+                                                <StackPanel Margin="0,0,16,0">
+                                                    <TextBlock Text="CID" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource BrushAccentSky}" />
+                                                    <TextBlock x:Name="profileCid" Text="-" FontSize="10.5" FontWeight="Bold" FontFamily="Consolas, monospace" Foreground="{StaticResource BrushAccentSky}" Margin="0,1,0,0" />
+                                                </StackPanel>
+                                                <Button Style="{StaticResource CopySmallButton}" HorizontalAlignment="Right" VerticalAlignment="Top" ToolTip="Copy CID" Click="CopyCid_Click">
+                                                    <Path Data="{StaticResource GeoCopy}" Stroke="{StaticResource BrushAccentSky}" StrokeThickness="1.5" Width="10" Height="10" />
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Meter Badge (Emerald-tinted) -->
+                                        <Border Grid.Column="1" Background="#1835c98a" BorderBrush="#3335c98a" BorderThickness="1" CornerRadius="6" Padding="6,4" Margin="3,0,0,0">
+                                            <Grid>
+                                                <StackPanel Margin="0,0,16,0">
+                                                    <TextBlock Text="METER" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource BrushAccentEmerald}" />
+                                                    <TextBlock x:Name="profileMeter" Text="-" FontSize="10.5" FontWeight="Bold" FontFamily="Consolas, monospace" Foreground="{StaticResource BrushAccentEmerald}" Margin="0,1,0,0" />
+                                                </StackPanel>
+                                                <Button Style="{StaticResource CopySmallButton}" HorizontalAlignment="Right" VerticalAlignment="Top" ToolTip="Copy Meter" Click="CopyMeter_Click">
+                                                    <Path Data="{StaticResource GeoCopy}" Stroke="{StaticResource BrushAccentEmerald}" StrokeThickness="1.5" Width="10" Height="10" />
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- 3. Dual Badges: Mobile & Load -->
+                                    <Grid Margin="0,0,0,5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Mobile Badge (Indigo-tinted) -->
+                                        <Border Grid.Column="0" Background="#18818cf8" BorderBrush="#33818cf8" BorderThickness="1" CornerRadius="6" Padding="6,4" Margin="0,0,3,0">
+                                            <Grid>
+                                                <StackPanel Margin="0,0,16,0">
+                                                    <TextBlock Text="MOBILE" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource BrushAccentIndigo}" />
+                                                    <TextBlock x:Name="profileMobile" Text="-" FontSize="10" FontWeight="SemiBold" FontFamily="Consolas, monospace" Foreground="{StaticResource BrushAccentIndigo}" Margin="0,1,0,0" />
+                                                </StackPanel>
+                                                <Button Style="{StaticResource CopySmallButton}" HorizontalAlignment="Right" VerticalAlignment="Top" ToolTip="Copy Mobile" Click="CopyMobile_Click">
+                                                    <Path Data="{StaticResource GeoCopy}" Stroke="{StaticResource BrushAccentIndigo}" StrokeThickness="1.5" Width="10" Height="10" />
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Load / Class Badge (Amber-tinted) -->
+                                        <Border Grid.Column="1" Background="#18f5b84b" BorderBrush="#33f5b84b" BorderThickness="1" CornerRadius="6" Padding="6,4" Margin="3,0,0,0">
+                                            <Grid>
+                                                <StackPanel Margin="0,0,16,0">
+                                                    <TextBlock Text="LOAD/CLS" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource BrushAccentAmber}" />
+                                                    <TextBlock x:Name="profileLoadClass" Text="-" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource BrushAccentAmber}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                                <Button Style="{StaticResource CopySmallButton}" HorizontalAlignment="Right" VerticalAlignment="Top" ToolTip="Copy Load" Click="CopyLoad_Click">
+                                                    <Path Data="{StaticResource GeoCopy}" Stroke="{StaticResource BrushAccentAmber}" StrokeThickness="1.5" Width="10" Height="10" />
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- 4. Address Row -->
+                                    <Border Background="{StaticResource BrushSurface0}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="6" Padding="6,4">
+                                        <Grid>
+                                            <StackPanel Margin="0,0,20,0">
+                                                <TextBlock Text="ADDRESS" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" />
+                                                <TextBlock x:Name="profileAddress" Text="-" FontSize="10" Foreground="{StaticResource BrushTextSecondary}" TextWrapping="Wrap" MaxHeight="36" Margin="0,1,0,0" />
+                                            </StackPanel>
+                                            <Button Style="{StaticResource CopySmallButton}" HorizontalAlignment="Right" VerticalAlignment="Top" ToolTip="Copy Address" Click="CopyAddress_Click">
+                                                <Path Data="{StaticResource GeoCopy}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" Width="11" Height="11" />
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- SECTION 2: AVAILABLE DATES (Expands to fill vertical room) -->
+                            <Border Grid.Row="2" Background="{StaticResource BrushSurface1}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,8" Padding="8">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+
+                                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
+                                        <Border Width="16" Height="16" CornerRadius="4" Background="#2635c98a" Margin="0,0,6,0">
+                                            <Path Data="{StaticResource GeoCalendar}" Stroke="{StaticResource BrushAccentEmerald}" StrokeThickness="1.6" Width="9" Height="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <TextBlock Text="AVAILABLE DATES" FontSize="10" FontWeight="Bold" Foreground="{StaticResource BrushTextPrimary}" VerticalAlignment="Center" />
+                                    </StackPanel>
+
+                                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                        <StackPanel x:Name="panelPhotoChips">
+                                            <TextBlock Text="No consumer loaded" FontSize="10.5" Foreground="{StaticResource BrushTextMuted}" Margin="4,2" />
                                         </StackPanel>
-                                        <StackPanel Grid.Column="1" Margin="4,0,0,0">
-                                            <TextBlock Text="PROV. HOURS/DAY" FontSize="9" Foreground="{StaticResource BrushTextMuted}" />
-                                            <TextBox x:Name="txtTheftProvHours" Text="24" Style="{StaticResource ModernTextBox}" Margin="0,2,0,0" />
-                                        </StackPanel>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Border>
+
+                            <!-- SECTION 3: NOTES & REMARKS (Docked at Bottom) -->
+                            <Border Grid.Row="3" Background="{StaticResource BrushSurface1}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="8" Padding="8">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                        <Border Width="16" Height="16" CornerRadius="4" Background="#26f5b84b" Margin="0,0,6,0">
+                                            <Path Data="{StaticResource GeoEdit3}" Stroke="{StaticResource BrushAccentAmber}" StrokeThickness="1.6" Width="9" Height="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <TextBlock Text="NOTES &amp; REMARKS" FontSize="10" FontWeight="Bold" Foreground="{StaticResource BrushTextPrimary}" VerticalAlignment="Center" />
+                                    </StackPanel>
+
+                                    <Grid Margin="0,0,0,4">
+                                        <TextBlock Text="STATUS" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,0,2" />
+                                        <ComboBox x:Name="cbNoteCategory" Height="24" HorizontalAlignment="Right" Width="100" FontSize="10" Background="{StaticResource BrushSurface0}" Foreground="{StaticResource BrushTextPrimary}">
+                                            <ComboBoxItem Content="OK" IsSelected="True" />
+                                            <ComboBoxItem Content="CHECK" />
+                                            <ComboBoxItem Content="RECHECK" />
+                                            <ComboBoxItem Content="DEFECTIVE" />
+                                            <ComboBoxItem Content="THEFT" />
+                                        </ComboBox>
+                                    </Grid>
+
+                                    <TextBox x:Name="txtNoteRemarks" Height="42" TextWrapping="Wrap" AcceptsReturn="True" Style="{StaticResource ModernTextBox}" Tag="Enter remarks..." FontSize="10.5" Margin="0,0,0,6" />
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Button x:Name="btnSaveNote" Grid.Column="0" Content="Save Note" Style="{StaticResource AccentButton}" Margin="0,0,4,0" Click="BtnSaveNote_Click" />
+                                        <Button x:Name="btnDeleteNote" Grid.Column="1" Content="✕" Width="26" Height="24" Background="#26ff5f70" BorderThickness="0" Foreground="{StaticResource BrushAccentRose}" ToolTip="Clear Remarks" Cursor="Hand" Click="BtnDeleteNote_Click" />
                                     </Grid>
                                 </StackPanel>
                             </Border>
 
-                            <Button x:Name="btnExecuteCalc" Content="⚡ Compute Assessment" Style="{StaticResource AccentButton}" Padding="0,10" Click="BtnExecuteCalc_Click" />
-                        </StackPanel>
-                    </ScrollViewer>
-                </Border>
+                        </Grid>
+                    </Border>
+                </Grid>
 
-                <!-- Right: Calculation Breakdown -->
-                <Border Grid.Column="1" Background="{StaticResource BrushBgCard}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="20">
-                    <StackPanel>
-                        <TextBlock Text="CALCULATION RESULTS &amp; CHARGE SLABS" FontWeight="Bold" FontSize="13" Foreground="{StaticResource BrushTextPrimary}" Margin="0,0,0,12" />
-                        
-                        <!-- Summary Highlight Cards -->
-                        <UniformGrid Columns="3" Margin="0,0,0,16">
-                            <Border Background="{StaticResource BrushBgInput}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,6,0">
-                                <StackPanel>
-                                    <TextBlock Text="ASSESSED ENERGY" FontSize="10" Foreground="{StaticResource BrushTextMuted}" FontWeight="Bold" />
-                                    <TextBlock x:Name="txtResAssessedUnits" Text="0 Units" FontSize="16" FontWeight="Bold" Foreground="{StaticResource BrushAccentSky}" Margin="0,4,0,0" />
-                                </StackPanel>
-                            </Border>
-                            <Border Background="{StaticResource BrushBgInput}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="3,0,3,0">
-                                <StackPanel>
-                                    <TextBlock Text="ENERGY CHARGES" FontSize="10" Foreground="{StaticResource BrushTextMuted}" FontWeight="Bold" />
-                                    <TextBlock x:Name="txtResEnergyCharge" Text="₹0.00" FontSize="16" FontWeight="Bold" Foreground="{StaticResource BrushAccentEmerald}" Margin="0,4,0,0" />
-                                </StackPanel>
-                            </Border>
-                            <Border Background="{StaticResource BrushBgInput}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="6,0,0,0">
-                                <StackPanel>
-                                    <TextBlock Text="TOTAL PAYABLE" FontSize="10" Foreground="{StaticResource BrushTextMuted}" FontWeight="Bold" />
-                                    <TextBlock x:Name="txtResTotalPayable" Text="₹0.00" FontSize="16" FontWeight="Bold" Foreground="{StaticResource BrushAccentAmber}" Margin="0,4,0,0" />
-                                </StackPanel>
-                            </Border>
-                        </UniformGrid>
+                <!-- =================================================================
+                     TAB 2: BILL CALCULATOR & THEFT ASSESSMENT (High Fidelity)
+                     ================================================================= -->
+                <Grid x:Name="panelTariff" Visibility="Collapsed" Margin="20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="380" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
 
-                        <TextBlock Text="DETAILED CHARGES BREAKDOWN" FontSize="11" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,0,6" />
-                        <Border Background="{StaticResource BrushBgInput}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="12">
-                            <TextBlock x:Name="txtResBreakdown" Text="Select category and parameters on the left, then click Compute Assessment." FontSize="11" Foreground="{StaticResource BrushTextSecondary}" TextWrapping="Wrap" />
-                        </Border>
-                    </StackPanel>
-                </Border>
-            </Grid>
+                    <Border Grid.Column="0" Background="{StaticResource BrushSurface0}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,16,0">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <TextBlock Text="BILL &amp; THEFT ASSESSMENT ENGINE" FontWeight="Bold" FontSize="12" Foreground="{StaticResource BrushAccentSky}" Margin="0,0,0,12" />
 
-            <!-- TAB 3: FUZZY SEARCH -->
-            <Grid x:Name="panelFuzzy" Visibility="Collapsed" Margin="24">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
+                                <TextBlock Text="CONSUMER CATEGORY" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,0,4" />
+                                <ComboBox x:Name="cbTariffCategory" Height="30" Margin="0,0,0,10" Background="{StaticResource BrushSurface1}" Foreground="{StaticResource BrushTextPrimary}" />
 
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
-                    <TextBox x:Name="txtFuzzyInput" Width="400" Style="{StaticResource ModernTextBox}" Tag="Search by consumer name, address, or meter number..." KeyDown="TxtFuzzyInput_KeyDown" />
-                    <Button x:Name="btnRunFuzzySearch" Content="🔍 Search Master Database" Style="{StaticResource AccentButton}" Margin="8,0,0,0" Click="BtnRunFuzzySearch_Click" />
-                </StackPanel>
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                        <TextBlock Text="BILLING CYCLE" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,0,4" />
+                                        <ComboBox x:Name="cbBillingCycle" Height="30">
+                                            <ComboBoxItem Content="Quarterly" IsSelected="True" />
+                                            <ComboBoxItem Content="Monthly" />
+                                        </ComboBox>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                        <TextBlock Text="DAYS" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,0,4" />
+                                        <TextBox x:Name="txtCalcDays" Text="90" Style="{StaticResource ModernTextBox}" Height="30" />
+                                    </StackPanel>
+                                </Grid>
 
-                <!-- Virtualized Results DataGrid -->
-                <DataGrid x:Name="gridFuzzyResults" Grid.Row="1" Background="{StaticResource BrushBgCard}" BorderBrush="{StaticResource BrushBorderSubtle}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" SelectionMode="Single" MouseDoubleClick="GridFuzzyResults_MouseDoubleClick" RowHeight="32">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="CONSUMER ID" Binding="{Binding ConsumerId}" Width="140" />
-                        <DataGridTextColumn Header="NAME" Binding="{Binding Name}" Width="260" />
-                        <DataGridTextColumn Header="ADDRESS" Binding="{Binding Address}" Width="*" />
-                        <DataGridTextColumn Header="METER NO" Binding="{Binding MeterNo}" Width="140" />
-                        <DataGridTextColumn Header="OFFICE" Binding="{Binding Office}" Width="160" />
-                    </DataGrid.Columns>
-                </DataGrid>
-            </Grid>
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                        <TextBlock Text="UNITS BILLED" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,0,4" />
+                                        <TextBox x:Name="txtCalcUnits" Text="150" Style="{StaticResource ModernTextBox}" Height="30" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                        <TextBlock Text="CONNECTED LOAD (kW)" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,0,4" />
+                                        <TextBox x:Name="txtCalcLoad" Text="1.0" Style="{StaticResource ModernTextBox}" Height="30" />
+                                    </StackPanel>
+                                </Grid>
 
-            <!-- TAB 4: AUDIT STUDIO -->
-            <Grid x:Name="panelAudit" Visibility="Collapsed" Margin="24">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
+                                <Border Background="{StaticResource BrushSurface1}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,6,0,12">
+                                    <StackPanel>
+                                        <TextBlock Text="SECTION 126 / 135 THEFT ASSESSMENT" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource BrushAccentAmber}" Margin="0,0,0,8" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                                <TextBlock Text="PROV. DAYS (Max 365)" FontSize="9" Foreground="{StaticResource BrushTextMuted}" />
+                                                <TextBox x:Name="txtTheftProvDays" Text="365" Style="{StaticResource ModernTextBox}" Margin="0,2,0,0" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                                <TextBlock Text="PROV. HOURS/DAY" FontSize="9" Foreground="{StaticResource BrushTextMuted}" />
+                                                <TextBox x:Name="txtTheftProvHours" Text="24" Style="{StaticResource ModernTextBox}" Margin="0,2,0,0" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
 
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
-                    <TextBlock Text="FILTER LOW CONSUMPTION:" FontSize="11" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                    <TextBox x:Name="txtAuditMaxUnits" Width="80" Text="30" Style="{StaticResource ModernTextBox}" Margin="0,0,8,0" />
-                    <Button x:Name="btnRunAudit" Content="📋 Load Low Consumption Audit List" Style="{StaticResource AccentButton}" Margin="0,0,12,0" Click="BtnRunAudit_Click" />
-                    <Button x:Name="btnExportAuditCsv" Content="📥 Export CSV" Style="{StaticResource ModernButton}" Click="BtnExportAuditCsv_Click" />
-                </StackPanel>
+                                <Button x:Name="btnExecuteCalc" Content="⚡ Compute Assessment" Style="{StaticResource AccentButton}" Height="34" Click="BtnExecuteCalc_Click" />
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
 
-                <DataGrid x:Name="gridAuditResults" Grid.Row="1" Background="{StaticResource BrushBgCard}" BorderBrush="{StaticResource BrushBorderSubtle}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" SelectionMode="Single" MouseDoubleClick="GridAuditResults_MouseDoubleClick" RowHeight="32">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="CONSUMER ID" Binding="{Binding ConsumerId}" Width="140" />
-                        <DataGridTextColumn Header="NAME" Binding="{Binding Name}" Width="240" />
-                        <DataGridTextColumn Header="CONSUMPTION (UNITS)" Binding="{Binding Units}" Width="160" />
-                        <DataGridTextColumn Header="CATEGORY" Binding="{Binding Category}" Width="160" />
-                        <DataGridTextColumn Header="METER NO" Binding="{Binding MeterNo}" Width="140" />
-                    </DataGrid.Columns>
-                </DataGrid>
-            </Grid>
-
-            <!-- TAB 5: LIVE OSD PORTAL -->
-            <Grid x:Name="panelLiveOsd" Visibility="Collapsed" Margin="24">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
-                    <TextBox x:Name="txtLiveOsdCidInput" Width="240" Style="{StaticResource ModernTextBox}" Tag="Enter 9-digit CID..." />
-                    <Button x:Name="btnFetchLiveOsd" Content="🌐 Query WBSEDCL SAP Portal" Style="{StaticResource AccentButton}" Margin="8,0,0,0" Click="BtnFetchLiveOsd_Click" />
-                </StackPanel>
-
-                <Border Grid.Row="1" Background="{StaticResource BrushBgCard}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="20">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel x:Name="panelOsdResultContent">
-                            <TextBlock Text="Enter Consumer ID above and click Query to retrieve real-time SAP WebDynpro outstanding dues." FontSize="12" Foreground="{StaticResource BrushTextSecondary}" />
-                        </StackPanel>
-                    </ScrollViewer>
-                </Border>
-            </Grid>
-
-            <!-- TAB 6: SETTINGS -->
-            <Grid x:Name="panelSettings" Visibility="Collapsed" Margin="24">
-                <Border Background="{StaticResource BrushBgCard}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="20">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Border Grid.Column="1" Background="{StaticResource BrushSurface0}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="8" Padding="18">
                         <StackPanel>
-                            <TextBlock Text="STORAGE &amp; IMAGE DIRECTORY CONFIGURATION" FontWeight="Bold" FontSize="13" Foreground="{StaticResource BrushAccentSky}" Margin="0,0,0,16" />
-                            
-                            <!-- Folders List -->
-                            <TextBlock Text="REGISTERED IMAGE DIRECTORIES" FontSize="11" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,0,8" />
-                            <StackPanel x:Name="panelSettingsFoldersList" Margin="0,0,0,16">
-                                <TextBlock Text="Loading folder paths..." FontSize="11" Foreground="{StaticResource BrushTextMuted}" />
-                            </StackPanel>
+                            <TextBlock Text="CALCULATION RESULTS &amp; CHARGE SLABS" FontWeight="Bold" FontSize="12.5" Foreground="{StaticResource BrushTextPrimary}" Margin="0,0,0,12" />
 
-                            <!-- Folder Actions -->
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,24">
-                                <Button x:Name="btnAddFolder" Content="➕ Add Additional Image Folder" Style="{StaticResource AccentButton}" Margin="0,0,8,0" Click="BtnAddFolder_Click" />
-                                <Button x:Name="btnRefreshFolders" Content="🔄 Refresh Status &amp; Recheck Folders" Style="{StaticResource ModernButton}" Click="BtnRefreshFolders_Click" />
-                            </StackPanel>
+                            <UniformGrid Columns="3" Margin="0,0,0,16">
+                                <Border Background="{StaticResource BrushSurface1}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,6,0">
+                                    <StackPanel>
+                                        <TextBlock Text="ASSESSED ENERGY" FontSize="9.5" Foreground="{StaticResource BrushTextMuted}" FontWeight="Bold" />
+                                        <TextBlock x:Name="txtResAssessedUnits" Text="0 Units" FontSize="16" FontWeight="Bold" Foreground="{StaticResource BrushAccentSky}" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{StaticResource BrushSurface1}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="3,0,3,0">
+                                    <StackPanel>
+                                        <TextBlock Text="ENERGY CHARGES" FontSize="9.5" Foreground="{StaticResource BrushTextMuted}" FontWeight="Bold" />
+                                        <TextBlock x:Name="txtResEnergyCharge" Text="₹0.00" FontSize="16" FontWeight="Bold" Foreground="{StaticResource BrushAccentEmerald}" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{StaticResource BrushSurface1}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="6,0,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="TOTAL PAYABLE" FontSize="9.5" Foreground="{StaticResource BrushTextMuted}" FontWeight="Bold" />
+                                        <TextBlock x:Name="txtResTotalPayable" Text="₹0.00" FontSize="16" FontWeight="Bold" Foreground="{StaticResource BrushAccentAmber}" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                </Border>
+                            </UniformGrid>
 
-                            <!-- App Info / System Stats -->
-                            <TextBlock Text="SYSTEM STATS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,0,8" />
-                            <Border Background="{StaticResource BrushBgInput}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="14">
-                                <StackPanel>
-                                    <TextBlock x:Name="txtSettingsSystemInfo" Text="SpotImageViewer Native v0.0.1 (Pure WPF Architecture)" FontSize="12" Foreground="{StaticResource BrushTextPrimary}" />
-                                    <TextBlock Text="Runs 100% natively via DirectX without Chromium or browser engine." FontSize="11" Foreground="{StaticResource BrushTextSecondary}" Margin="0,4,0,0" />
-                                </StackPanel>
+                            <TextBlock Text="DETAILED CHARGES BREAKDOWN" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,0,6" />
+                            <Border Background="{StaticResource BrushSurface1}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="6" Padding="12">
+                                <TextBlock x:Name="txtResBreakdown" Text="Select category and parameters on the left, then click Compute Assessment." FontSize="11" Foreground="{StaticResource BrushTextSecondary}" TextWrapping="Wrap" />
                             </Border>
                         </StackPanel>
-                    </ScrollViewer>
-                </Border>
-            </Grid>
+                    </Border>
+                </Grid>
 
+                <!-- =================================================================
+                     TAB 3: FUZZY SEARCH
+                     ================================================================= -->
+                <Grid x:Name="panelFuzzy" Visibility="Collapsed" Margin="20">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,14">
+                        <TextBox x:Name="txtFuzzyInput" Width="420" Style="{StaticResource ModernTextBox}" Height="32" Tag="Search by consumer name, address, or meter number..." KeyDown="TxtFuzzyInput_KeyDown" />
+                        <Button x:Name="btnRunFuzzySearch" Content="🔍 Search Master Database" Style="{StaticResource AccentButton}" Margin="8,0,0,0" Height="32" Click="BtnRunFuzzySearch_Click" />
+                    </StackPanel>
+
+                    <DataGrid x:Name="gridFuzzyResults" Grid.Row="1" Background="{StaticResource BrushSurface0}" BorderBrush="{StaticResource BrushBorder}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" SelectionMode="Single" MouseDoubleClick="GridFuzzyResults_MouseDoubleClick" RowHeight="30">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="CONSUMER ID" Binding="{Binding ConsumerId}" Width="140" />
+                            <DataGridTextColumn Header="NAME" Binding="{Binding Name}" Width="260" />
+                            <DataGridTextColumn Header="ADDRESS" Binding="{Binding Address}" Width="*" />
+                            <DataGridTextColumn Header="METER NO" Binding="{Binding MeterNo}" Width="140" />
+                            <DataGridTextColumn Header="OFFICE" Binding="{Binding Office}" Width="160" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+
+                <!-- =================================================================
+                     TAB 4: AUDIT STUDIO
+                     ================================================================= -->
+                <Grid x:Name="panelAudit" Visibility="Collapsed" Margin="20">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,14">
+                        <TextBlock Text="FILTER LOW CONSUMPTION:" FontSize="11" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBox x:Name="txtAuditMaxUnits" Width="70" Text="30" Style="{StaticResource ModernTextBox}" Height="30" Margin="0,0,8,0" />
+                        <Button x:Name="btnRunAudit" Content="📋 Load Low Consumption Audit List" Style="{StaticResource AccentButton}" Height="30" Margin="0,0,10,0" Click="BtnRunAudit_Click" />
+                        <Button x:Name="btnExportAuditCsv" Content="📥 Export CSV" Style="{StaticResource ModernButton}" Height="30" Click="BtnExportAuditCsv_Click" />
+                    </StackPanel>
+
+                    <DataGrid x:Name="gridAuditResults" Grid.Row="1" Background="{StaticResource BrushSurface0}" BorderBrush="{StaticResource BrushBorder}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" SelectionMode="Single" MouseDoubleClick="GridAuditResults_MouseDoubleClick" RowHeight="30">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="CONSUMER ID" Binding="{Binding ConsumerId}" Width="140" />
+                            <DataGridTextColumn Header="NAME" Binding="{Binding Name}" Width="240" />
+                            <DataGridTextColumn Header="CONSUMPTION (UNITS)" Binding="{Binding Units}" Width="160" />
+                            <DataGridTextColumn Header="CATEGORY" Binding="{Binding Category}" Width="160" />
+                            <DataGridTextColumn Header="METER NO" Binding="{Binding MeterNo}" Width="140" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+
+                <!-- =================================================================
+                     TAB 5: LIVE OSD PORTAL
+                     ================================================================= -->
+                <Grid x:Name="panelLiveOsd" Visibility="Collapsed" Margin="20">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,14">
+                        <TextBox x:Name="txtLiveOsdCidInput" Width="260" Height="32" Style="{StaticResource ModernTextBox}" Tag="Enter 9-digit CID..." />
+                        <Button x:Name="btnFetchLiveOsd" Content="🌐 Query WBSEDCL SAP Portal" Style="{StaticResource AccentButton}" Height="32" Margin="8,0,0,0" Click="BtnFetchLiveOsd_Click" />
+                    </StackPanel>
+
+                    <Border Grid.Row="1" Background="{StaticResource BrushSurface0}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="8" Padding="18">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel x:Name="panelOsdResultContent">
+                                <TextBlock Text="Enter Consumer ID above and click Query to retrieve real-time SAP WebDynpro outstanding dues." FontSize="11.5" Foreground="{StaticResource BrushTextSecondary}" />
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
+
+                <!-- =================================================================
+                     TAB 6: SETTINGS
+                     ================================================================= -->
+                <Grid x:Name="panelSettings" Visibility="Collapsed" Margin="20">
+                    <Border Background="{StaticResource BrushSurface0}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="8" Padding="20">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <TextBlock Text="STORAGE &amp; IMAGE DIRECTORY CONFIGURATION" FontWeight="Bold" FontSize="13" Foreground="{StaticResource BrushAccentSky}" Margin="0,0,0,14" />
+
+                                <TextBlock Text="REGISTERED IMAGE DIRECTORIES" FontSize="11" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,0,8" />
+                                <StackPanel x:Name="panelSettingsFoldersList" Margin="0,0,0,14">
+                                    <TextBlock Text="Loading folder paths..." FontSize="11" Foreground="{StaticResource BrushTextMuted}" />
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,24">
+                                    <Button x:Name="btnAddFolder" Content="➕ Add Additional Image Folder" Style="{StaticResource AccentButton}" Height="32" Margin="0,0,8,0" Click="BtnAddFolder_Click" />
+                                    <Button x:Name="btnRefreshFolders" Content="🔄 Refresh Status &amp; Recheck Folders" Style="{StaticResource ModernButton}" Height="32" Click="BtnRefreshFolders_Click" />
+                                </StackPanel>
+
+                                <TextBlock Text="SYSTEM STATS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource BrushTextMuted}" Margin="0,0,0,8" />
+                                <Border Background="{StaticResource BrushSurface1}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="6" Padding="14">
+                                    <StackPanel>
+                                        <TextBlock x:Name="txtSettingsSystemInfo" Text="SpotImageViewer Native v0.0.1 (Pure WPF Architecture)" FontSize="12" Foreground="{StaticResource BrushTextPrimary}" />
+                                        <TextBlock Text="Runs 100% natively via DirectX without Chromium or browser engine." FontSize="11" Foreground="{StaticResource BrushTextSecondary}" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
+
+            </Grid>
         </Grid>
 
-        <!-- ==================== ROW 2: STATUS BAR ==================== -->
-        <Border Grid.Row="2" Background="{StaticResource BrushBgInput}" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="0,1,0,0">
+        <!-- =========================================================================
+             ROW 2: BOTTOM STATUS BAR (26px)
+             ========================================================================= -->
+        <Border Grid.Row="2" Background="{StaticResource BrushSurface0}" BorderBrush="{StaticResource BrushBorder}" BorderThickness="0,1,0,0">
             <Grid Margin="12,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock x:Name="txtStatusMessage" Grid.Column="0" Text="Ready" FontSize="11" Foreground="{StaticResource BrushTextSecondary}" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Text="SpotImageViewer v0.0.1 (Native WPF) • SQLite images_v7.db" FontSize="11" Foreground="{StaticResource BrushTextMuted}" VerticalAlignment="Center" />
+                <StackPanel Orientation="Horizontal" Grid.Column="0" VerticalAlignment="Center">
+                    <Ellipse Width="6" Height="6" Fill="{StaticResource BrushAccentEmerald}" Margin="0,0,8,0" />
+                    <TextBlock x:Name="txtStatusMessage" Text="Ready" FontSize="11" Foreground="{StaticResource BrushTextSecondary}" VerticalAlignment="Center" />
+                </StackPanel>
+
+                <TextBlock Grid.Column="1" Text="SpotImageViewer v0.0.1 (Native DirectX WPF) • SQLite images_v7.db" FontSize="11" Foreground="{StaticResource BrushTextMuted}" VerticalAlignment="Center" />
             </Grid>
         </Border>
 
