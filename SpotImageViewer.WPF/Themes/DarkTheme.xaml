@@ -1,0 +1,197 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Color Palette -->
+    <Color x:Key="BgDarkest">#020617</Color>
+    <Color x:Key="BgDark">#0f172a</Color>
+    <Color x:Key="BgCard">#1e293b</Color>
+    <Color x:Key="BgInput">#0f172a</Color>
+    <Color x:Key="BgHover">#334155</Color>
+    <Color x:Key="BorderDark">#334155</Color>
+    <Color x:Key="BorderSubtle">#1e293b</Color>
+    <Color x:Key="TextPrimary">#f8fafc</Color>
+    <Color x:Key="TextSecondary">#94a3b8</Color>
+    <Color x:Key="TextMuted">#64748b</Color>
+    <Color x:Key="AccentSky">#0ea5e9</Color>
+    <Color x:Key="AccentSkyHover">#38bdf8</Color>
+    <Color x:Key="AccentEmerald">#10b981</Color>
+    <Color x:Key="AccentAmber">#f59e0b</Color>
+    <Color x:Key="AccentRose">#f43f5e</Color>
+
+    <!-- SolidColorBrushes -->
+    <SolidColorBrush x:Key="BrushBgDarkest" Color="{StaticResource BgDarkest}" />
+    <SolidColorBrush x:Key="BrushBgDark" Color="{StaticResource BgDark}" />
+    <SolidColorBrush x:Key="BrushBgCard" Color="{StaticResource BgCard}" />
+    <SolidColorBrush x:Key="BrushBgInput" Color="{StaticResource BgInput}" />
+    <SolidColorBrush x:Key="BrushBgHover" Color="{StaticResource BgHover}" />
+    <SolidColorBrush x:Key="BrushBorderDark" Color="{StaticResource BorderDark}" />
+    <SolidColorBrush x:Key="BrushBorderSubtle" Color="{StaticResource BorderSubtle}" />
+    <SolidColorBrush x:Key="BrushTextPrimary" Color="{StaticResource TextPrimary}" />
+    <SolidColorBrush x:Key="BrushTextSecondary" Color="{StaticResource TextSecondary}" />
+    <SolidColorBrush x:Key="BrushTextMuted" Color="{StaticResource TextMuted}" />
+    <SolidColorBrush x:Key="BrushAccentSky" Color="{StaticResource AccentSky}" />
+    <SolidColorBrush x:Key="BrushAccentSkyHover" Color="{StaticResource AccentSkyHover}" />
+    <SolidColorBrush x:Key="BrushAccentEmerald" Color="{StaticResource AccentEmerald}" />
+    <SolidColorBrush x:Key="BrushAccentAmber" Color="{StaticResource AccentAmber}" />
+    <SolidColorBrush x:Key="BrushAccentRose" Color="{StaticResource AccentRose}" />
+
+    <!-- Button Style (Primary Accent) -->
+    <Style x:Key="BtnPrimary" TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource BrushAccentSky}" />
+        <Setter Property="Foreground" Value="#ffffff" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Padding" Value="14,8" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Background" Value="{StaticResource BrushAccentSkyHover}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.5" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Button Style (Secondary / Ghost) -->
+    <Style x:Key="BtnSecondary" TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource BrushBgCard}" />
+        <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrushBorderDark}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Padding" Value="10,6" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Background" Value="{StaticResource BrushBgHover}" />
+                            <Setter Property="BorderBrush" Value="{StaticResource BrushAccentSky}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Modern Search TextBox Style -->
+    <Style x:Key="SearchTextBox" TargetType="TextBox">
+        <Setter Property="Background" Value="{StaticResource BrushBgInput}" />
+        <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}" />
+        <Setter Property="CaretBrush" Value="{StaticResource BrushAccentSky}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrushBorderDark}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="12,8" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border x:Name="border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="10">
+                        <ScrollViewer x:Name="PART_ContentHost" Focusable="false" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="BorderBrush" Value="#475569" />
+                        </Trigger>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource BrushAccentSky}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Top Navigation TabItem Style -->
+    <Style x:Key="NavTabItem" TargetType="TabItem">
+        <Setter Property="Foreground" Value="{StaticResource BrushTextSecondary}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="16,8" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItem">
+                    <Border x:Name="tabBorder"
+                            Background="Transparent"
+                            BorderThickness="0,0,0,2"
+                            BorderBrush="Transparent"
+                            Padding="{TemplateBinding Padding}"
+                            Margin="0,0,4,0">
+                        <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource BrushAccentSky}" />
+                            <Setter TargetName="tabBorder" Property="BorderBrush" Value="{StaticResource BrushAccentSky}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Sleek ScrollBar Style -->
+    <Style TargetType="ScrollBar">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Width" Value="8" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollBar">
+                    <Grid>
+                        <Track x:Name="PART_Track" IsDirectionReversed="true">
+                            <Track.Thumb>
+                                <Thumb>
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border Background="{StaticResource BrushBorderDark}" CornerRadius="4" Margin="1" />
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="{StaticResource BrushBgHover}" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

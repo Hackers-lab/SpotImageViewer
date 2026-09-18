@@ -1,0 +1,103 @@
+<Window x:Class="SpotImageViewer.WPF.Views.FolderSettingsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Image Folders Management" 
+        Height="450" Width="680"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BrushBgDark}"
+        Foreground="{StaticResource BrushTextPrimary}"
+        ResizeMode="NoResize">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="📁 Registered Image Folders" FontSize="16" FontWeight="Bold" Foreground="{StaticResource BrushTextPrimary}" />
+            <TextBlock Text="Configure primary spot bill folder and additional network/local backup folders." FontSize="11" Foreground="{StaticResource BrushTextSecondary}" Margin="0,4,0,0" />
+        </StackPanel>
+
+        <!-- Folders List -->
+        <Border Grid.Row="1" Background="{StaticResource BrushBgCard}" BorderBrush="{StaticResource BrushBorderDark}" BorderThickness="1" CornerRadius="8" Padding="8">
+            <ListBox x:Name="FoldersList" 
+                     Background="Transparent" 
+                     BorderThickness="0"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="{StaticResource BrushBgDark}" BorderBrush="{StaticResource BrushBorderDark}" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,0,6">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Status Dot -->
+                                <Ellipse Grid.Column="0" Width="10" Height="10" VerticalAlignment="Center" Margin="0,0,10,0">
+                                    <Ellipse.Style>
+                                        <Style TargetType="Ellipse">
+                                            <Setter Property="Fill" Value="{StaticResource BrushAccentEmerald}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Accessible}" Value="False">
+                                                    <Setter Property="Fill" Value="{StaticResource BrushAccentAmber}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Ellipse.Style>
+                                </Ellipse>
+
+                                <!-- Path & Type -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Path}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource BrushTextPrimary}" TextTrimming="CharacterEllipsis" />
+                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                        <TextBlock Text="{Binding Accessible, StringFormat='Status: {0}'}" FontSize="10" Foreground="{StaticResource BrushTextSecondary}" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- Image Count Badge -->
+                                <Border Grid.Column="2" CornerRadius="4" Padding="8,3" VerticalAlignment="Center">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="#131f37" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Accessible}" Value="False">
+                                                    <Setter Property="Background" Value="#332115" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="{Binding ImageCount, StringFormat='{}{0:N0} images'}" FontSize="11" FontWeight="Bold">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{StaticResource BrushAccentSky}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Accessible}" Value="False">
+                                                        <Setter Property="Foreground" Value="{StaticResource BrushAccentAmber}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Border>
+
+        <!-- Actions -->
+        <Grid Grid.Row="2" Margin="0,16,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                <Button Style="{StaticResource BtnSecondary}" Content="➕ Add Folder" Click="OnAddFolderClick" Margin="0,0,8,0" />
+                <Button Style="{StaticResource BtnSecondary}" Content="🔄 Refresh Status" Click="OnRefreshClick" />
+            </StackPanel>
+            <Button Style="{StaticResource BtnPrimary}" Content="Close" Click="OnCloseClick" HorizontalAlignment="Right" Width="80" />
+        </Grid>
+    </Grid>
+</Window>
