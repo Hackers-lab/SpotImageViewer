@@ -29,7 +29,7 @@ if ($Publish) {
     Write-Host "`nPublishing single-file ultra-fast native WPF executable..." -ForegroundColor Yellow
     Get-Process -Name "SpotImageViewer.WPF*" -ErrorAction SilentlyContinue | Stop-Process -Force
     Start-Sleep -Milliseconds 300
-    & $DotnetExe publish $ProjectFile -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o $PublishDir
+    & $DotnetExe publish $ProjectFile -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o $PublishDir
     
     Write-Host "`nPublished executable located at: SpotImageViewer.WPF\publish\SpotImageViewer.WPF.exe" -ForegroundColor Green
 
