@@ -6,7 +6,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-blue.svg)](#)
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](#license)
 
-**SpotImageViewer** is a high-performance desktop verification studio engineered specifically for power utility professionals (WBSEDCL). It transforms the chaotic process of managing field-captured spot meter imagery into a streamlined, high-efficiency workflow—combining millisecond image retrieval with real-time WBSEDCL portal integration, fuzzy candidate lookup, and precision calculation studios.
+**SpotImageViewer** is a high-performance desktop verification studio engineered specifically for power utility professionals (w*****l). It transforms the chaotic process of managing field-captured spot meter imagery into a streamlined, high-efficiency workflow—combining millisecond image retrieval with real-time w*****l portal integration, fuzzy candidate lookup, and precision calculation studios.
 
 ![SpotImageViewer Home Workspace](images/home%20page.jpg)
 
@@ -17,7 +17,7 @@
 In modern power utility operations, rapid access to visual meter records and authoritative consumer billing data is critical. SpotImageViewer eliminates folder browsing, disjointed spreadsheets, and manual web portal checks by delivering a unified, intelligent single-page desktop workspace:
 
 - **Instant Visual Discovery:** Index, locate, and preview hundreds of thousands of spot meter photos in milliseconds.
-- **Live WBSEDCL Portal Connectivity:** Real-time Outstanding Dues (OSD) scraping and connection status checking right on your viewport.
+- **Live w*****l Portal Connectivity:** Real-time Outstanding Dues (OSD) scraping and connection status checking right on your viewport.
 - **Intelligent Assessment Tools:** Compute WBERC-compliant bills, perform dual-ledger theft assessments, and match records via batch fuzzy lookup.
 - **Enterprise Ergonomics:** Modern glassmorphic interface powered by Microsoft Edge WebView2, featuring full Dark & Light mode persistence and VS Code-inspired tool rails.
 
@@ -38,7 +38,7 @@ SpotImageViewer indexes local and shared network drives using a high-performance
 
 ---
 
-### ⚡ Live WBSEDCL OSD & Portal HUD
+### ⚡ Live w*****l OSD & Portal HUD
 Stay informed without leaving your workflow. The embedded floating HUD card queries live portal data in the background:
 - **Connection Status:** Displays clean live status indicators (**Connected**, **Deemed**, **Disconnected**).
 - **Outstanding Dues Breakdown:** Instant extraction of total dues, unpaid bill balance, and Late Payment Surcharge (LPSC).
@@ -111,7 +111,7 @@ SpotImageViewer provides a distraction-free, professional environment designed f
 | **Frontend UI** | Modern HTML5 Single Page Application (SPA) with Tailwind CSS & Lucide Icons |
 | **Database** | Embedded SQLite3 with Write-Ahead Logging (WAL) mode |
 | **Imaging Engine** | Pillow (PIL) image processing with dynamic thumbnail caching |
-| **PDF Extraction** | `pypdf` stream extractor for official WBSEDCL certificates |
+| **PDF Extraction** | `pypdf` stream extractor for official w*****l certificates |
 | **Fuzzy Matching** | `rapidfuzz` & `thefuzz` string metrics |
 | **Packaging** | PyInstaller binary bundle with Inno Setup modern installer |
 

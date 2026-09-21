@@ -6,13 +6,13 @@ This document explains the end-to-end architecture, SAP WebDynpro protocol quirk
 
 ## 1. Architectural Overview & Workflow
 
-The service queries the official WBSEDCL (West Bengal State Electricity Distribution Company Limited) portal to retrieve live Outstanding Dues (OSD) or "No Dues Certificate" reports in PDF format for any given 9-digit Consumer ID.
+The service queries the official w*****l (West Bengal State Electricity Distribution Company Limited) portal to retrieve live Outstanding Dues (OSD) or "No Dues Certificate" reports in PDF format for any given 9-digit Consumer ID.
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Python as Python Service
-    participant Portal as WBSEDCL WebDynpro Portal
+    participant Portal as w*****l WebDynpro Portal
     participant PDF as SAP Dynamic PDF Endpoint
 
     Python->>Portal: GET /OutstandingReport?consumerId={9_DIGIT_ID}
@@ -115,7 +115,7 @@ pip install requests pypdf
 
 ```python
 """
-Live OSD Service (WBSEDCL Portal PDF Fetcher & Parser)
+Live OSD Service (w*****l Portal PDF Fetcher & Parser)
 Production-ready standalone Python implementation.
 """
 
