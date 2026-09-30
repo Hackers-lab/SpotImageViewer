@@ -8,6 +8,7 @@ const TAB_META = {
   fuzzy:    { title: 'Batch Fuzzy Lookup',    icon: 'sparkles' },
   osd:      { title: 'OSD Report Studio',     icon: 'file-check-2' },
   dcrc:     { title: 'Agency PO & DCRC Billing', icon: 'receipt' },
+  spotai:   { title: 'Bill Downloader', icon: 'file-down' },
   settings: { title: 'Global Settings',       icon: 'settings' },
 };
 
@@ -315,20 +316,32 @@ async function initApp() {
     if (fRes && fRes.success) renderFolders(fRes.folders);
   }
 
-  // Load tariffs
-  const tariffRes = await callAPI('get_tariffs');
-  if (tariffRes && tariffRes.success) {
-    currentTariffs = tariffRes.tariffs;
-    populateTariffDropdowns();
-    renderTariffEditorList();
-    runBillCalc();
-    runTheftCalc();
-  }
+  // Load tariffs asynchronously in background without blocking immediate window presentation
+  callAPI('get_tariffs').then((tariffRes) => {
+    if (tariffRes && tariffRes.success) {
+      currentTariffs = tariffRes.tariffs;
+      populateTariffDropdowns();
+      renderTariffEditorList();
+      runBillCalc();
+      runTheftCalc();
+    }
+  }).catch(() => {});
   
   setupViewportEvents();
   updateStatusBar("Ready", "normal");
   if (window.__logPerf) window.__logPerf('INIT_APP_COMPLETE', 'App ready for user input');
   callAPI('show_window');
+
+  // Dismiss instant boot overlay smoothly
+  const bootOverlay = document.getElementById('appBootOverlay');
+  if (bootOverlay) {
+    bootOverlay.style.opacity = '0';
+    bootOverlay.style.pointerEvents = 'none';
+    setTimeout(() => {
+      try { bootOverlay.remove(); } catch(e) {}
+    }, 250);
+  }
+
   // Consumer database status check & notification in status bar (right section)
   const dbWarningContainer = document.getElementById('statusDbWarningContainer');
   const dbWarningText = document.getElementById('statusDbWarningText');
@@ -350,6 +363,7 @@ async function initApp() {
   setTimeout(() => {
     checkUpdateSilent();
     loadAuditSession();
+    if (typeof initSpotAIModule === 'function') initSpotAIModule();
   }, 4000);
 
   // Initialize interactive manual fuzzy lookup rows
@@ -428,6 +442,9 @@ function switchTab(tabId) {
   updatePageHeader(tabId);
   if (tabId === 'dcrc' && typeof initDcrcModule === 'function') {
     initDcrcModule();
+  }
+  if (tabId === 'spotai' && typeof initSpotAIModule === 'function') {
+    initSpotAIModule();
   }
   safeCreateIcons();
 }

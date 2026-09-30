@@ -15,6 +15,7 @@ PARTIAL_ORDER = [
     "tab_fuzzy.html",
     "tab_osd.html",
     "tab_dcrc.html",
+    "tab_spotai.html",
     "tab_settings.html",
     "modals.html",
     "layout_foot.html",

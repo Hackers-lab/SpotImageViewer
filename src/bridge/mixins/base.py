@@ -16,9 +16,9 @@ def _get_tk_root():
         return _tk_root
 
 try:
-    from core import config, database, utils, tariff_manager
+    from core import config, database
 except ImportError:
-    import config, database, utils, tariff_manager
+    import config, database
 
 # Shared thread pool for offloading heavy I/O from the PyWebView bridge thread.
 _io_pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="siv-io")
@@ -44,6 +44,7 @@ class BaseBridge:
         self._folder_service_inst = None
         self._update_service_inst = None
         self._osd_service_inst = None
+        self._spotai_bill_service_inst = None
         self._last_dcrc_result = None
 
     def set_window(self, window):
@@ -128,3 +129,23 @@ class BaseBridge:
                 from services.osd_service import OSDService
             self._osd_service_inst = OSDService()
         return self._osd_service_inst
+
+    @property
+    def _spotai_bill_service(self):
+        if self._spotai_bill_service_inst is None:
+            try:
+                from core.services.spotai_bill_service import SpotAIBillService
+            except ImportError:
+                from services.spotai_bill_service import SpotAIBillService
+            self._spotai_bill_service_inst = SpotAIBillService()
+        return self._spotai_bill_service_inst
+
+    @property
+    def _license_service(self):
+        if not hasattr(self, "_license_service_inst") or self._license_service_inst is None:
+            try:
+                from core.services.license_service import LicenseService
+            except ImportError:
+                from services.license_service import LicenseService
+            self._license_service_inst = LicenseService()
+        return self._license_service_inst

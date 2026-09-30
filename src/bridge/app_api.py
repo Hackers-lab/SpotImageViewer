@@ -15,6 +15,7 @@ from .mixins import (
     AuditBridge,
     OSDBridge,
     DCRCBridge,
+    SpotAIBridge,
 )
 
 
@@ -29,6 +30,7 @@ class AppAPI(
     AuditBridge,
     OSDBridge,
     DCRCBridge,
+    SpotAIBridge,
 ):
     """
     Unified RPC Bridge for PyWebView.

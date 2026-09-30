@@ -82,3 +82,4 @@ out.txt
 src/test_osd.pdf
 app_native.log
 native_debug.log
+webview_storage/

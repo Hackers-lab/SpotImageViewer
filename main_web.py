@@ -78,7 +78,20 @@ def main():
     perf_log.clear_log()
     perf_log.log_perf("PY_BOOT_START", details="Python process initialized, AppAPI ready")
 
-    # Launch independent native splash screen immediately (<50ms)
+    # Set high-performance browser arguments for Edge WebView2
+    os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = (
+        "--disable-features=msSmartScreenProtection,TranslateUI,OptimizationHints,MediaRouter "
+        "--disable-background-networking "
+        "--disable-component-update "
+        "--disable-sync "
+        "--disable-domain-reliability "
+        "--no-first-run "
+        "--no-default-browser-check "
+        "--disable-logging "
+        "--disable-breakpad"
+    )
+
+    # Launch independent native splash screen immediately (<10ms)
     try:
         from ui_splash import show_splash, close_splash
         splash = show_splash(version=f"v{config.CURRENT_VERSION}")
@@ -90,8 +103,8 @@ def main():
     # Instantiate the Python RPC Bridge immediately
     api = AppAPI()
 
-    # Clean up stale WebView2 zombies so lockfile is free and warm cache is used
-    _cleanup_stale_webview_processes()
+    # Clean up stale WebView2 zombies in background thread so boot is not delayed
+    threading.Thread(target=_cleanup_stale_webview_processes, daemon=True).start()
 
     # Patch numpy in background — saves 150-500ms startup time
     threading.Thread(target=_patch_numpy, daemon=True).start()
@@ -132,7 +145,9 @@ def main():
     except Exception:
         pass
 
-    # Create PyWebView window with native Edge WebView2 engine and dark background
+    # Create PyWebView window with native Edge WebView2 engine and dark background.
+    # Window starts hidden so the user sees the beautiful animated splash screen
+    # until the WebView2 engine and initial UI are 100% rendered and ready.
     if splash:
         splash.update_status("Starting WebView2 engine...")
     perf_log.log_perf("WINDOW_CREATING", details="webview.create_window started")
@@ -184,10 +199,10 @@ def main():
 
     window.events.closed += _on_closed
 
-    # Fallback safety: ensure window is revealed within 3.5s even if JS initialization has a glitch
+    # Fallback safety: ensure window is revealed within 8.0s even if unhandled errors occur
     import time
     def _safety_reveal():
-        time.sleep(3.5)
+        time.sleep(8.0)
         try:
             window.show()
         except Exception:
@@ -198,6 +213,8 @@ def main():
             pass
     threading.Thread(target=_safety_reveal, daemon=True).start()
 
+    if splash:
+        splash.update_status("Loading Verification Studio...")
     perf_log.log_perf("WEBVIEW_STARTING", details="Calling webview.start() event loop")
     webview.start(debug=False, private_mode=False, storage_path=storage_dir)
 

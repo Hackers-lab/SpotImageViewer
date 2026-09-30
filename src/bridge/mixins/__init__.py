@@ -8,6 +8,7 @@ from .fuzzy_bridge import FuzzyBridge
 from .audit_bridge import AuditBridge
 from .osd_bridge import OSDBridge
 from .dcrc_bridge import DCRCBridge
+from .spotai_bridge import SpotAIBridge
 
 __all__ = [
     "BaseBridge",
@@ -20,4 +21,5 @@ __all__ = [
     "AuditBridge",
     "OSDBridge",
     "DCRCBridge",
+    "SpotAIBridge",
 ]

@@ -1,0 +1,680 @@
+    <section id="tab-spotai" class="tab-content flex-1 p-3 sm:p-5 lg:p-6 overflow-y-auto hidden">
+      <div class="max-w-6xl mx-auto space-y-4">
+
+        <!-- Top Header & Session Bar (Clean, Minimalist Card) -->
+        <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-2xs">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white flex items-center justify-center shadow-sm shrink-0">
+              <i data-lucide="file-down" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h2 class="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                  Consumer Bill Downloader
+                </h2>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                  Batch Print Studio
+                </span>
+              </div>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400">High-throughput multi-account invoice downloader &amp; dues auditor</p>
+            </div>
+          </div>
+
+          <!-- Session Badge & Auth Action (Hidden when locked) -->
+          <div id="spotaiHeaderActions" class="hidden items-center gap-2 shrink-0">
+            <!-- Active Session Badge -->
+            <div id="spotaiSessionBadge" class="hidden items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span id="spotaiOfficerText" class="font-semibold text-xs">Officer Active</span>
+              <button onclick="handleSpotAILogout()" class="ml-1 p-1 text-slate-400 hover:text-rose-500 transition cursor-pointer" title="Logout from portal">
+                <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+
+            <!-- Login Trigger Button -->
+            <button id="btnOpenSpotAILogin" onclick="openSpotAILoginModal()" class="px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer">
+              <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
+              <span>Portal Login</span>
+            </button>
+
+            <!-- Admin Menu Dropdown -->
+            <div class="relative inline-block text-left">
+              <button 
+                id="btnSpotAIAdminDropdown"
+                onclick="toggleSpotAIAdminMenu()" 
+                class="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                title="Admin & License Controls">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-amber-500"></i>
+                <span class="hidden sm:inline">Admin</span>
+                <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400"></i>
+              </button>
+
+              <div id="spotaiAdminDropdownMenu" class="hidden absolute right-0 mt-1 w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 z-40 space-y-1 text-xs animate-in fade-in zoom-in-95 duration-100">
+                <button 
+                  onclick="openAdminKeyGenModal(); toggleSpotAIAdminMenu(false);" 
+                  class="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-amber-500/10 text-slate-700 dark:text-slate-200 hover:text-amber-600 transition cursor-pointer font-medium">
+                  <i data-lucide="key" class="w-3.5 h-3.5 text-amber-500"></i>
+                  <span>Key Generator (PIN)</span>
+                </button>
+                <button 
+                  onclick="handleRelockSpotAIModule(); toggleSpotAIAdminMenu(false);" 
+                  class="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-rose-500/10 text-slate-700 dark:text-slate-200 hover:text-rose-600 transition cursor-pointer font-medium">
+                  <i data-lucide="lock" class="w-3.5 h-3.5 text-rose-500"></i>
+                  <span>Relock Module (Test)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <!-- ACCESS CONTROL / ACTIVATION LOCK CARD -->
+        <div id="spotaiAccessLockedCard" class="hidden bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-10 shadow-xl text-center max-w-lg mx-auto my-8 space-y-6 animate-in fade-in zoom-in-95 duration-200">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500/15 to-blue-500/15 text-cyan-600 dark:text-cyan-400 flex items-center justify-center mx-auto shadow-inner border border-cyan-500/20">
+            <i data-lucide="shield-alert" class="w-8 h-8"></i>
+          </div>
+
+          <div class="space-y-1">
+            <h3 class="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">Module Access Activation Required</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              The Consumer Bill Downloader is protected. Share your hardware request code with support to unlock permanent access.
+            </p>
+          </div>
+
+          <!-- Machine Request Code Box -->
+          <div class="p-4 bg-slate-50/80 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2 text-left">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Your Machine Request Code</span>
+              <span class="text-[10px] text-cyan-600 dark:text-cyan-400 font-mono font-medium bg-cyan-500/10 px-2 py-0.5 rounded-full">PC Hardware ID</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <input 
+                id="spotaiMyRequestCode" 
+                type="text" 
+                readonly 
+                class="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 select-all focus:outline-none"
+                value="Fetching..."
+              />
+              <button 
+                type="button" 
+                onclick="copySpotAIRequestCode()" 
+                class="px-3 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                <span>Copy</span>
+              </button>
+            </div>
+            <p class="text-[10px] text-slate-400">Join our Telegram support group and share this code to receive your permanent activation key.</p>
+          </div>
+
+          <!-- Quick Action: Telegram Support -->
+          <div>
+            <button 
+              type="button" 
+              onclick="openTelegramSupport()" 
+              class="w-full py-2.5 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-md shadow-sky-600/20 transition flex items-center justify-center gap-2 cursor-pointer active:scale-98">
+              <i data-lucide="send" class="w-4 h-4"></i>
+              <span>Join Telegram Group to Ask for Access</span>
+            </button>
+          </div>
+
+          <!-- Activation Input -->
+          <div class="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3 text-left">
+            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">Enter Activation Key</label>
+            <div class="flex items-center gap-2">
+              <input 
+                id="spotaiActivationKeyInput" 
+                type="text" 
+                placeholder="ACT-XXXX-XXXX-XXXX-XXXX" 
+                class="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 uppercase focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition"
+              />
+              <button 
+                id="btnApplyActivationKey" 
+                type="button" 
+                onclick="applySpotAIActivationKey()" 
+                class="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer shrink-0">
+                <i data-lucide="unlock" class="w-3.5 h-3.5"></i>
+                <span>Activate</span>
+              </button>
+            </div>
+            <div id="spotaiActivationMsg" class="hidden p-2 rounded-xl text-xs font-medium"></div>
+          </div>
+        </div>
+
+        <!-- UNLOCKED MAIN WORKSPACE CONTAINER -->
+        <div id="spotaiUnlockedWorkspace" class="space-y-4">
+
+          <!-- Live Batch Progress Banner Strip -->
+          <div id="spotaiProgressBanner" class="hidden rounded-2xl border border-cyan-500/30 bg-cyan-500/10 backdrop-blur-md p-4 text-xs text-slate-800 dark:text-slate-200 shadow-sm transition-all duration-300 animate-in fade-in">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex items-center gap-3">
+                <div id="spotaiProgressSpinner" class="w-5 h-5 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin shrink-0"></div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span id="spotaiProgressTitle" class="font-bold text-cyan-700 dark:text-cyan-300">Downloading Bills...</span>
+                    <span id="spotaiProgressPercent" class="font-mono font-bold text-xs text-cyan-600 dark:text-cyan-400">0%</span>
+                  </div>
+                  <p id="spotaiProgressSubtitle" class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Initializing batch workers...</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="w-40 sm:w-60 bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden shrink-0">
+                  <div id="spotaiProgressBar" class="bg-gradient-to-r from-cyan-500 to-blue-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <button id="btnCancelSpotAIBatch" onclick="cancelSpotAIBatch()" class="px-3 py-1 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white transition active:scale-95 shadow-xs cursor-pointer shrink-0">
+                  Stop
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Master Workspace Grid: 2-Column Responsive Layout -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+            <!-- LEFT COLUMN (7 Cols): Consumer Account Input Card -->
+            <div class="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
+              
+              <!-- Mode Tabs: Paste vs File Upload -->
+              <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <i data-lucide="users" class="w-3.5 h-3.5 text-cyan-500"></i>
+                  Target Accounts
+                </span>
+
+                <div class="inline-flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-medium">
+                  <button id="btnInputModePaste" onclick="switchSpotAIInputMode('paste')" class="px-3 py-1 rounded-md font-bold bg-white dark:bg-slate-900 text-cyan-600 dark:text-cyan-400 shadow-2xs transition cursor-pointer">
+                    Paste IDs
+                  </button>
+                  <button id="btnInputModeFile" onclick="switchSpotAIInputMode('file')" class="px-3 py-1 rounded-md font-medium text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 transition cursor-pointer">
+                    Excel / CSV File
+                  </button>
+                </div>
+              </div>
+
+              <!-- 1. Textarea Paste Mode -->
+              <div id="spotaiPasteContainer" class="space-y-2">
+                <textarea 
+                  id="spotaiIdsInput"
+                  rows="7"
+                  oninput="handleSpotAITextInput()"
+                  placeholder="Paste 9-digit Consumer IDs (separated by spaces, commas, or new lines)&#10;300476577&#10;300506096&#10;300201830"
+                  class="w-full p-3 bg-slate-50/70 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 transition shadow-inner resize-y leading-relaxed"
+                ></textarea>
+                <div class="flex items-center justify-between text-[11px]">
+                  <span class="text-slate-400">Supports comma, tab, space, or newline delimited IDs</span>
+                  <span id="spotaiDetectedCount" class="font-bold text-cyan-600 dark:text-cyan-400 font-mono">0 valid IDs detected</span>
+                </div>
+              </div>
+
+              <!-- 2. File Upload Mode -->
+              <div id="spotaiFileContainer" class="hidden space-y-3">
+                <div class="border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-cyan-500 dark:hover:border-cyan-500 rounded-2xl p-7 text-center cursor-pointer transition bg-slate-50/40 dark:bg-slate-950/40 group" onclick="pickSpotAIConsumerFile()">
+                  <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 group-hover:bg-cyan-500/20 text-cyan-500 flex items-center justify-center mx-auto mb-2.5 transition">
+                    <i data-lucide="upload-cloud" class="w-6 h-6"></i>
+                  </div>
+                  <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">Click to select an Excel (.xlsx / .xls) or CSV / TXT file</p>
+                  <p class="text-[11px] text-slate-400 mt-1">Consumer IDs in any column or format will be automatically extracted</p>
+                </div>
+
+                <!-- Selected File Badge -->
+                <div id="spotaiFileSelectedCard" class="hidden p-3 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                  <div class="flex items-center gap-2.5">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-500"></i>
+                    <div>
+                      <span id="spotaiSelectedFileName" class="text-xs font-bold text-slate-800 dark:text-slate-100 block">file.xlsx</span>
+                      <span id="spotaiSelectedFileCount" class="text-[11px] text-slate-400 font-mono">0 consumer IDs found</span>
+                    </div>
+                  </div>
+                  <button onclick="clearSpotAISelectedFile()" class="p-1 text-slate-400 hover:text-rose-500 transition rounded" title="Remove file">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Quick Helper Bar -->
+              <div class="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
+                <button onclick="clearSpotAIInputs()" class="text-slate-400 hover:text-rose-500 font-medium transition cursor-pointer">
+                  Clear All
+                </button>
+                <span class="text-[11px] text-slate-400 flex items-center gap-1">
+                  <i data-lucide="sparkles" class="w-3.5 h-3.5 text-cyan-500"></i> Automatic Deduplication
+                </span>
+              </div>
+            </div>
+
+            <!-- RIGHT COLUMN (5 Cols): Download Preferences & Execution Controls -->
+            <div class="lg:col-span-5 space-y-4">
+
+              <!-- Configuration Card -->
+              <div class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5 pb-2 border-b border-slate-100 dark:border-slate-800/80">
+                  <i data-lucide="sliders" class="w-3.5 h-3.5 text-cyan-500"></i>
+                  Download Configuration
+                </span>
+
+                <!-- 1. Bill Selection Option -->
+                <div class="space-y-1.5">
+                  <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Which Bill to Fetch?
+                  </label>
+                  <div class="grid grid-cols-3 gap-1.5">
+                    <label class="flex flex-col p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 cursor-pointer has-[:checked]:border-cyan-500 has-[:checked]:bg-cyan-500/10 transition text-center">
+                      <div class="flex items-center justify-center gap-1">
+                        <input type="radio" name="spotaiBillOpt" value="latest" checked onchange="toggleSpotAIMonthInput()" class="text-cyan-600 focus:ring-cyan-500 w-3.5 h-3.5">
+                        <span class="text-xs font-bold text-slate-800 dark:text-slate-200">Latest</span>
+                      </div>
+                      <span class="text-[10px] text-slate-400 mt-0.5">Newest bill</span>
+                    </label>
+
+                    <label class="flex flex-col p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 cursor-pointer has-[:checked]:border-cyan-500 has-[:checked]:bg-cyan-500/10 transition text-center">
+                      <div class="flex items-center justify-center gap-1">
+                        <input type="radio" name="spotaiBillOpt" value="month" onchange="toggleSpotAIMonthInput()" class="text-cyan-600 focus:ring-cyan-500 w-3.5 h-3.5">
+                        <span class="text-xs font-bold text-slate-800 dark:text-slate-200">Month</span>
+                      </div>
+                      <span class="text-[10px] text-slate-400 mt-0.5">Specific bill</span>
+                    </label>
+
+                    <label class="flex flex-col p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 cursor-pointer has-[:checked]:border-cyan-500 has-[:checked]:bg-cyan-500/10 transition text-center">
+                      <div class="flex items-center justify-center gap-1">
+                        <input type="radio" name="spotaiBillOpt" value="all" onchange="toggleSpotAIMonthInput()" class="text-cyan-600 focus:ring-cyan-500 w-3.5 h-3.5">
+                        <span class="text-xs font-bold text-slate-800 dark:text-slate-200">All</span>
+                      </div>
+                      <span class="text-[10px] text-slate-400 mt-0.5">All history</span>
+                    </label>
+                  </div>
+
+                  <!-- Month Input (Conditional) -->
+                  <div id="spotaiMonthInputWrapper" class="hidden mt-2">
+                    <input 
+                      type="text" 
+                      id="spotaiTargetMonth" 
+                      placeholder="Billing Month (MM.YYYY, e.g. 08.2026)..." 
+                      class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                </div>
+
+                <!-- 2. Download Speed / Parallelism -->
+                <div class="space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <label class="text-xs font-semibold text-slate-700 dark:text-slate-300">Parallel Threads</label>
+                    <span class="text-[10px] font-mono text-cyan-600 dark:text-cyan-400 font-semibold">Keep-Alive Engine</span>
+                  </div>
+                  <div class="grid grid-cols-3 gap-1.5">
+                    <label class="flex flex-col p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 cursor-pointer has-[:checked]:border-cyan-500 has-[:checked]:bg-cyan-500/10 transition text-center">
+                      <input type="radio" name="spotaiSpeedOpt" value="4" class="sr-only">
+                      <span class="text-xs font-bold text-slate-800 dark:text-slate-200">Standard</span>
+                      <span class="text-[9px] text-slate-400">4 Workers</span>
+                    </label>
+
+                    <label class="flex flex-col p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 cursor-pointer has-[:checked]:border-cyan-500 has-[:checked]:bg-cyan-500/10 transition text-center">
+                      <input type="radio" name="spotaiSpeedOpt" value="8" checked class="sr-only">
+                      <span class="text-xs font-bold text-cyan-600 dark:text-cyan-400">Fast ★</span>
+                      <span class="text-[9px] text-cyan-500 font-medium">8 Workers</span>
+                    </label>
+
+                    <label class="flex flex-col p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 cursor-pointer has-[:checked]:border-cyan-500 has-[:checked]:bg-cyan-500/10 transition text-center">
+                      <input type="radio" name="spotaiSpeedOpt" value="12" class="sr-only">
+                      <span class="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center justify-center gap-0.5">
+                        <i data-lucide="zap" class="w-3 h-3 text-amber-500"></i> Turbo
+                      </span>
+                      <span class="text-[9px] text-amber-500 font-medium">12 Workers</span>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- 3. Destination Output Folder -->
+                <div class="space-y-1.5">
+                  <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Output Directory
+                  </label>
+                  <div class="flex items-center gap-1.5">
+                    <input 
+                      type="text" 
+                      id="spotaiOutputDir" 
+                      placeholder="Default: App / Downloaded_Bills" 
+                      class="flex-1 px-3 py-2 bg-slate-50/70 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-cyan-500 truncate"
+                    />
+                    <button onclick="pickSpotAIDownloadFolder()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 transition flex items-center gap-1 cursor-pointer shrink-0" title="Select Folder">
+                      <i data-lucide="folder" class="w-3.5 h-3.5"></i>
+                      <span>Browse</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 4. Excel Columns Configuration Strip -->
+                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50/80 dark:bg-slate-950/80 border border-slate-200/80 dark:border-slate-800/80">
+                  <div class="min-w-0 pr-2">
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs font-bold text-slate-800 dark:text-slate-200">Export Report Format</span>
+                      <span id="spotaiColCountBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 font-mono">9 Columns</span>
+                    </div>
+                    <p id="spotaiColPreviewText" class="text-[10px] text-slate-400 truncate mt-0.5">
+                      Consumer ID, Name, Address, Class, Tariff, Total Dues...
+                    </p>
+                  </div>
+                  <button 
+                    type="button" 
+                    onclick="openColumnCustomizerModal()" 
+                    class="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 shadow-2xs transition flex items-center gap-1.5 shrink-0 cursor-pointer">
+                    <i data-lucide="settings-2" class="w-3.5 h-3.5 text-cyan-500"></i>
+                    <span>Customize</span>
+                  </button>
+                </div>
+
+                <!-- Action Button: Start Batch Download -->
+                <button 
+                  id="btnStartSpotAIBatch" 
+                  onclick="startSpotAIBatchDownload()" 
+                  class="w-full py-3 bg-gradient-to-r from-cyan-600 via-sky-600 to-blue-600 hover:from-cyan-500 hover:via-sky-500 hover:to-blue-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-cyan-600/20 transition flex items-center justify-center gap-2 active:scale-98 cursor-pointer">
+                  <i data-lucide="download" class="w-4 h-4"></i>
+                  <span>Start Batch Download</span>
+                </button>
+              </div>
+
+            </div>
+
+          </div>
+
+          <!-- Post-Batch Action Bar (Print All / Open Folder / Export Excel) -->
+          <div id="spotaiPostActionBar" class="hidden bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
+            <!-- Summary Badges -->
+            <div class="flex items-center gap-2.5">
+              <span class="text-xs font-bold text-slate-800 dark:text-slate-200">Batch Results:</span>
+              <span id="spotaiStatSuccess" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 font-mono">0 Downloaded</span>
+              <span id="spotaiStatFailed" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/10 text-rose-600 border border-rose-500/20 font-mono">0 Failed</span>
+            </div>
+
+            <!-- Batch Action Buttons -->
+            <div class="flex items-center gap-2">
+              <button 
+                id="btnExportCustomExcel" 
+                onclick="exportCustomExcelNow()" 
+                class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-cyan-600/20 cursor-pointer active:scale-95"
+                title="Export downloaded records to Excel">
+                <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                <span>Export Excel</span>
+              </button>
+
+              <button 
+                id="btnPrintAllBills" 
+                onclick="printAllDownloadedBills()" 
+                class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer active:scale-95"
+                title="Merge all downloaded bills into a single PDF document and send to printer">
+                <i data-lucide="printer" class="w-4 h-4"></i>
+                <span>Print All Bills</span>
+              </button>
+
+              <button onclick="openSpotAIDownloadFolder()" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold transition flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                <i data-lucide="folder-open" class="w-3.5 h-3.5 text-amber-500"></i>
+                <span>Folder</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Downloaded Records Table Card -->
+          <div id="spotaiTableContainer" class="hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-xs overflow-hidden">
+            <div class="px-4 py-3 bg-slate-50/50 dark:bg-slate-950/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <i data-lucide="receipt" class="w-3.5 h-3.5 text-cyan-500"></i>
+                  Downloaded Bills &amp; Dues Ledger
+                </span>
+                <span id="spotaiTableCount" class="text-[11px] text-slate-400 font-mono">0 records</span>
+              </div>
+              <button onclick="exportCustomExcelNow()" class="px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 text-xs font-semibold transition flex items-center gap-1 cursor-pointer">
+                <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
+                <span>Export Report</span>
+              </button>
+            </div>
+
+            <div class="overflow-x-auto max-h-96 overflow-y-auto">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead class="sticky top-0 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th class="py-2.5 px-3 w-10 text-center">#</th>
+                    <th class="py-2.5 px-3">Consumer ID</th>
+                    <th class="py-2.5 px-3">Consumer Name</th>
+                    <th class="py-2.5 px-3">Bill Month</th>
+                    <th class="py-2.5 px-3 text-right">Bill Amt (₹)</th>
+                    <th class="py-2.5 px-3 text-right">Total OSD (₹)</th>
+                    <th class="py-2.5 px-3 text-right">Live LPSC (₹)</th>
+                    <th class="py-2.5 px-3 text-right">Total Dues (₹)</th>
+                    <th class="py-2.5 px-3 text-center">Status</th>
+                    <th class="py-2.5 px-3 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="spotaiTableBody" class="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+                  <!-- Dynamically populated rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- PORTAL LOGIN MODAL -->
+      <div id="spotaiLoginModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-xl bg-cyan-500/10 text-cyan-500 flex items-center justify-center">
+                <i data-lucide="shield-check" class="w-4.5 h-4.5"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Officer Portal Login</h3>
+                <p class="text-[10px] text-slate-400">Department Portal Authentication</p>
+              </div>
+            </div>
+            <button onclick="closeSpotAILoginModal()" class="text-slate-400 hover:text-slate-200 p-1 rounded cursor-pointer">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <!-- Step 1: Officer Username & Password -->
+          <div id="spotaiAuthStep1" class="space-y-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Officer Username (ERP / Employee ID)</label>
+              <input 
+                type="text" 
+                id="spotaiLoginUser" 
+                placeholder="e.g. 90018747" 
+                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Portal Password</label>
+              <input 
+                type="password" 
+                id="spotaiLoginPass" 
+                placeholder="Enter password..." 
+                onkeydown="if(event.key === 'Enter') handleSpotAIRequestOtp();"
+                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            <div id="spotaiLoginError" class="hidden p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs"></div>
+
+            <button 
+              id="btnSpotAISendOtp" 
+              onclick="handleSpotAIRequestOtp()" 
+              class="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer">
+              <i data-lucide="send" class="w-3.5 h-3.5"></i>
+              <span>Send OTP</span>
+            </button>
+          </div>
+
+          <!-- Step 2: OTP Verification -->
+          <div id="spotaiAuthStep2" class="hidden space-y-3">
+            <div class="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-700 dark:text-cyan-300 text-xs">
+              OTP has been dispatched to your registered mobile number.
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Enter 6-Digit OTP</label>
+              <input 
+                type="text" 
+                id="spotaiLoginOtp" 
+                maxlength="6"
+                placeholder="Enter OTP..." 
+                onkeydown="if(event.key === 'Enter') handleSpotAIVerifyOtp();"
+                class="w-full px-3 py-2.5 text-center bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-mono font-bold tracking-widest text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            <div id="spotaiOtpError" class="hidden p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs"></div>
+
+            <div class="flex items-center gap-2">
+              <button onclick="resetSpotAILoginStep()" class="flex-1 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition cursor-pointer">
+                Back
+              </button>
+              <button 
+                id="btnSpotAIVerifyOtp" 
+                onclick="handleSpotAIVerifyOtp()" 
+                class="flex-2 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer">
+                <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
+                <span>Verify &amp; Activate</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EXCEL COLUMN CUSTOMIZER MODAL -->
+      <div id="spotaiColumnCustomizerModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[88vh]">
+          
+          <!-- Modal Header -->
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 shrink-0">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-xl bg-cyan-500/10 text-cyan-500 flex items-center justify-center">
+                <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Customize Export Columns</h3>
+                <p class="text-[11px] text-slate-400">Select and arrange column headers for your exported Excel spreadsheet</p>
+              </div>
+            </div>
+            <button onclick="closeColumnCustomizerModal()" class="text-slate-400 hover:text-slate-200 p-1 rounded cursor-pointer">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <!-- Presets Strip -->
+          <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-1.5 shrink-0">
+            <span class="text-xs text-slate-500 font-semibold mr-1 flex items-center gap-1">
+              <i data-lucide="wand-2" class="w-3 h-3 text-cyan-500"></i>
+              Presets:
+            </span>
+            <button type="button" onclick="applyColumnPreset('disconnection')" class="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-cyan-500 text-slate-700 dark:text-slate-300 text-xs font-medium transition cursor-pointer">
+              Disconnection List
+            </button>
+            <button type="button" onclick="applyColumnPreset('standard')" class="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-cyan-500 text-slate-700 dark:text-slate-300 text-xs font-medium transition cursor-pointer">
+              Standard Bill
+            </button>
+            <button type="button" onclick="applyColumnPreset('payment')" class="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-cyan-500 text-slate-700 dark:text-slate-300 text-xs font-medium transition cursor-pointer">
+              Payment Recovery
+            </button>
+            <button type="button" onclick="applyColumnPreset('full')" class="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-cyan-500 text-slate-700 dark:text-slate-300 text-xs font-medium transition cursor-pointer">
+              All Fields
+            </button>
+            <button type="button" onclick="applyColumnPreset('reset')" class="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-rose-500 text-xs font-medium transition cursor-pointer" title="Reset columns">
+              Reset
+            </button>
+          </div>
+
+          <!-- Scrollable Column Grid -->
+          <div class="flex-1 overflow-y-auto pr-1">
+            <div id="spotaiColumnsList" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Bottom Footer -->
+          <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
+            <button type="button" onclick="addExportColumn()" class="px-3.5 py-2 rounded-xl bg-cyan-600/10 hover:bg-cyan-600/20 text-cyan-600 dark:text-cyan-400 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <span>Add Column</span>
+            </button>
+
+            <button 
+              type="button" 
+              onclick="closeColumnCustomizerModal()" 
+              class="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer">
+              <i data-lucide="check" class="w-3.5 h-3.5"></i>
+              <span>Save &amp; Apply</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ADMIN KEY GENERATOR MODAL -->
+      <div id="spotaiAdminKeyGenModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+          
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                <i data-lucide="key" class="w-4.5 h-4.5"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Admin Key Generator</h3>
+                <p class="text-[10px] text-slate-400">Portal Activation Utility</p>
+              </div>
+            </div>
+            <button onclick="closeAdminKeyGenModal()" class="text-slate-400 hover:text-slate-200 p-1 rounded cursor-pointer">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <div class="space-y-3 text-xs">
+            <div>
+              <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Admin Security PIN</label>
+              <input 
+                type="password" 
+                id="adminKeyGenPin" 
+                placeholder="Enter Admin PIN" 
+                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">User's Machine Request Code</label>
+              <input 
+                type="text" 
+                id="adminKeyGenReqCode" 
+                placeholder="REQ-XXXX-XXXX-XXXX-XXXX" 
+                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-xs uppercase text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            <div id="adminKeyGenResultBox" class="hidden p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-1">
+              <span class="text-[10px] font-bold text-emerald-600 uppercase">Generated Activation Key:</span>
+              <div class="flex items-center gap-2">
+                <input 
+                  type="text" 
+                  id="adminKeyGenOutput" 
+                  readonly 
+                  class="flex-1 font-mono font-bold text-xs bg-white dark:bg-slate-900 px-2 py-1.5 rounded-lg border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 select-all" 
+                />
+                <button type="button" onclick="copyAdminGeneratedKey()" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold cursor-pointer">
+                  Copy
+                </button>
+              </div>
+            </div>
+
+            <div id="adminKeyGenError" class="hidden p-2 rounded-lg bg-rose-500/10 text-rose-600 text-xs"></div>
+
+            <button 
+              type="button" 
+              onclick="handleAdminGenerateKeySubmit()" 
+              class="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+              <span>Generate Activation Key</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </section>

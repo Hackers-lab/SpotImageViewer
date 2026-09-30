@@ -1,13 +1,17 @@
 {
-  "version": 20.56,
-  "release_notes": "V20.56 — Modular Architecture & Instant Native Startup Splash:\n\n- Codebase Modularization: Decomposed large monolithic files (>1,000–2,000 lines) into focused domain sub-modules (<300–800 lines each) across Python RPC Bridge, DCRC Exporter, Meter Audit Tool, and Web UI partials.\n- Instant Native Startup Splash: Added independent native startup splash screen that appears in <200ms with progress bar and dynamic status updates, eliminating startup blind spots and white/black screen flicker.\n- Performance & Stability: Enhanced WebView2 lifecycle synchronization, non-blocking splash thread, and automated v20.56 release packaging.",
-  "download_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.56/SpotImageViewer_Setup_v20.56.exe",
-  "installer_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.56/SpotImageViewer_Setup_v20.56.exe",
-  "zip_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.56/SpotImageViewer_Setup_v20.56.exe",
+  "version": 20.57,
+  "release_notes": "V20.57 — Consumer Bill Downloader, Cryptographic Hardware Access Control & Modern UI Studio:\n\n- Consumer Bill Downloader & Batch Print Studio: High-concurrency multi-account bill PDF fetcher with concurrent Keep-Alive connection pooling, automated dues ledger analysis (OSD, Live LPSC, and dynamic Total Dues), and 1-click batch printing.\n- Auto-Retry Authentication on Logout: Automatically detects and immediately re-submits credentials when the department portal clears an existing session ('successfully logged out'), delivering a seamless 1-click OTP dispatch experience without manual resubmission.\n- Cryptographic Hardware Access Control: Secure, offline-capable HMAC-SHA256 machine hardware licensing engine with unique Machine Request Codes (PC Hardware ID) and admin key generator with PIN protection.\n- Telegram Support Community Integration: Built-in 1-click Telegram support gateway (https://t.me/wbtools_support) with automatic clipboard request code copying for instant access grants.\n- Modern Minimalist 2-Column Studio UI: Completely overhauled workspace layout featuring responsive target accounts panel, granular download mode preferences, custom Excel report header customizer, and sticky ledger table with dark/light glassmorphic styling.",
+  "download_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.57/SpotImageViewer_Setup_v20.57.exe",
+  "installer_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.57/SpotImageViewer_Setup_v20.57.exe",
+  "zip_url": "https://github.com/Hackers-lab/SpotImageViewer/releases/download/v20.57/SpotImageViewer_Setup_v20.57.exe",
   "install_args": "/VERYSILENT /NORESTART",
-  "launch_exe": "SpotImageViewer\\SpotImageViewerV20.56.exe",
+  "launch_exe": "SpotImageViewer\\SpotImageViewerV20.57.exe",
   "sha256": "",
   "previous_versions": [
+    {
+      "version": 20.56,
+      "release_notes": "V20.56 — Modular Architecture & Instant Native Startup Splash:\n\n- Codebase Modularization: Decomposed large monolithic files (>1,000–2,000 lines) into focused domain sub-modules (<300–800 lines each) across Python RPC Bridge, DCRC Exporter, Meter Audit Tool, and Web UI partials.\n- Instant Native Startup Splash: Added independent native startup splash screen that appears in <200ms with progress bar and dynamic status updates, eliminating startup blind spots and white/black screen flicker.\n- Performance & Stability: Enhanced WebView2 lifecycle synchronization, non-blocking splash thread, and automated v20.56 release packaging."
+    },
     {
       "version": 20.55,
       "release_notes": "V20.55 — Agency PO Billing Generator & Chronological Date Engine:\n\n- Agency PO & DCRC Billing Generator: Automated reconciliation of SAP DCRC events, cash payment registers, and zone allocations.\n- True Chronological Date Engine: Accurate time-based agency mapping across contractual cutoff dates, resolving alphabetical text-comparison date anomalies.\n- Executive Printable Workbooks: Complete print-ready Portrait A4 workbooks with breakup reports, countable consumer lists, and separate pages for 1PH and 3PH.\n- File Dialog & Selector Fix: Proper WinForms and webview filter handling for seamless Excel/CSV file selection."
